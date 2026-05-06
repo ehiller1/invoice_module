@@ -1,0 +1,37 @@
+{
+  "invoice_id": "INV-2024-003",
+  "vendor_name": "Duke Energy",
+  "vendor_address": "P.O. Box 13098, Durham, NC 27702",
+  "invoice_date": "2024-01-28",
+  "due_date": "2024-02-28",
+  "amount_total": 1850.00,
+  "church_name": "Holy Comforter Episcopal Church",
+  "description": "January 2024 electricity and gas service",
+  "line_items": [
+    {
+      "description": "Electricity charges (Jan 2024)",
+      "quantity": 1,
+      "unit_price": 1200.00,
+      "amount": 1200.00,
+      "suggested_account": "6600",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Natural gas charges (Jan 2024)",
+      "quantity": 1,
+      "unit_price": 450.00,
+      "amount": 450.00,
+      "suggested_account": "6600",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Water and sewer service",
+      "quantity": 1,
+      "unit_price": 200.00,
+      "amount": 200.00,
+      "suggested_account": "6600",
+      "suggested_fund": "GEN"
+    }
+  ],
+  "notes": "Monthly utility bill - Winter heating season"
+}

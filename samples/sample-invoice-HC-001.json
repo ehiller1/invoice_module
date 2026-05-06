@@ -1,0 +1,44 @@
+{
+  "invoice_id": "INV-2024-001",
+  "vendor_name": "Christian Supply Company",
+  "vendor_address": "123 Church Street, Nashville, TN 37201",
+  "invoice_date": "2024-01-15",
+  "due_date": "2024-02-15",
+  "amount_total": 3250.00,
+  "church_name": "Holy Comforter Episcopal Church",
+  "line_items": [
+    {
+      "description": "Altar vestments and linens",
+      "quantity": 1,
+      "unit_price": 1200.00,
+      "amount": 1200.00,
+      "suggested_account": "6100",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Hymnals (qty 50)",
+      "quantity": 50,
+      "unit_price": 25.00,
+      "amount": 1250.00,
+      "suggested_account": "6300",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Printer paper and office supplies",
+      "quantity": 1,
+      "unit_price": 300.00,
+      "amount": 300.00,
+      "suggested_account": "6200",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Seasonal flowers for altar",
+      "quantity": 1,
+      "unit_price": 500.00,
+      "amount": 500.00,
+      "suggested_account": "6400",
+      "suggested_fund": "GEN"
+    }
+  ],
+  "notes": "Regular supplies for January operations"
+}

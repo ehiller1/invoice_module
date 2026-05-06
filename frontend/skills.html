@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skill Library — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+            gold: { 500: '#c9a227' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    .fade-in { animation: fadeIn 0.25s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<div class="flex h-full">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-navy-900 flex flex-col shadow-xl">
+    <div class="px-6 py-6 border-b border-navy-700">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-semibold text-sm">EIME</p>
+          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 px-4 py-4 space-y-1">
+      <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        Upload Invoice
+      </a>
+      <a href="/jobs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Processing Jobs
+      </a>
+      <a href="/coa.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Chart of Accounts
+      </a>
+      <a href="/skills.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-navy-700">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        Skill Library
+      </a>
+      <a href="/chat.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        Agent Chat
+      </a>
+    </nav>
+    <div class="px-4 py-4 border-t border-navy-700">
+      <div class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
+        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+        <span class="text-slate-300 text-xs">SKILL.md Runtime</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex overflow-hidden">
+    <!-- Skills list -->
+    <div class="w-80 border-r border-slate-200 bg-white flex flex-col flex-shrink-0">
+      <div class="px-5 py-4 border-b border-slate-200">
+        <h1 class="text-base font-semibold text-slate-800">Skill Library</h1>
+        <p class="text-xs text-slate-500 mt-0.5">SKILL.md files loaded at runtime by the agent skill router</p>
+      </div>
+
+      <!-- Archetype filter -->
+      <div class="px-5 py-3 border-b border-slate-100 flex gap-1.5 flex-wrap">
+        <button onclick="filterSkills('')" id="filter-all" class="filter-btn pill bg-navy-900 text-white">All</button>
+        <button onclick="filterSkills('orchestrator')" id="filter-orchestrator" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">Orchestrator</button>
+        <button onclick="filterSkills('researcher')" id="filter-researcher" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">Researcher</button>
+        <button onclick="filterSkills('worker')" id="filter-worker" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">Worker</button>
+        <button onclick="filterSkills('reviewer')" id="filter-reviewer" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">Reviewer</button>
+        <button onclick="filterSkills('conversationalist')" id="filter-conversationalist" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">HITL</button>
+        <button onclick="filterSkills('membrane')" id="filter-membrane" class="filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200">Membrane</button>
+      </div>
+
+      <div id="skills-list" class="flex-1 overflow-y-auto divide-y divide-slate-100"></div>
+    </div>
+
+    <!-- Skill detail -->
+    <div class="flex-1 overflow-auto bg-slate-50">
+      <div id="skill-detail" class="hidden h-full flex flex-col fade-in">
+        <div class="bg-white border-b border-slate-200 px-8 py-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span id="detail-archetype-badge" class="pill bg-blue-100 text-blue-700"></span>
+              </div>
+              <h2 id="detail-name" class="text-xl font-semibold text-slate-800 font-mono"></h2>
+              <p id="detail-description" class="text-sm text-slate-500 mt-1 max-w-2xl"></p>
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-3 gap-4">
+            <div class="bg-slate-50 rounded-lg p-3">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Inputs</p>
+              <div id="detail-inputs" class="flex flex-wrap gap-1"></div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Allowed Tools</p>
+              <div id="detail-tools" class="flex flex-wrap gap-1"></div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Skill Path</p>
+              <p id="detail-path" class="text-xs font-mono text-slate-600 break-all"></p>
+            </div>
+          </div>
+          <div class="mt-3 bg-slate-50 rounded-lg p-3">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Expected Output</p>
+            <p id="detail-output" class="text-xs text-slate-600"></p>
+          </div>
+        </div>
+        <div class="flex-1 px-8 py-6">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3">Workflow Body (SKILL.md)</h3>
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <pre id="detail-body" class="px-5 py-4 text-xs text-slate-700 leading-relaxed font-mono"></pre>
+          </div>
+        </div>
+      </div>
+      <div id="skill-placeholder" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          </div>
+          <p class="text-sm font-medium text-slate-500">Select a skill to view its specification</p>
+          <p class="text-xs text-slate-400 mt-1">Skills encode accounting expertise discoverable at runtime</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+let allSkills = [];
+let activeFilter = '';
+
+const ARCHETYPE_COLORS = {
+  orchestrator: 'bg-purple-100 text-purple-700',
+  researcher:   'bg-blue-100 text-blue-700',
+  worker:       'bg-teal-100 text-teal-700',
+  reviewer:     'bg-amber-100 text-amber-700',
+  conversationalist: 'bg-orange-100 text-orange-700',
+  membrane:     'bg-pink-100 text-pink-700',
+};
+
+async function loadSkills() {
+  const res = await fetch(`${API}/api/skills`);
+  allSkills = await res.json();
+  renderList(allSkills);
+}
+
+function renderList(skills) {
+  const el = document.getElementById('skills-list');
+  el.innerHTML = skills.map(s => `
+    <button onclick="loadSkillDetail('${s.name}')"
+      class="skill-item w-full text-left px-5 py-3.5 hover:bg-slate-50 transition-colors" data-name="${s.name}">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-sm font-medium text-slate-800">${s.name}</span>
+        <span class="pill ${ARCHETYPE_COLORS[s.archetype] || 'bg-slate-100 text-slate-600'}">${s.archetype}</span>
+      </div>
+      <p class="text-xs text-slate-400 line-clamp-2">${s.description}</p>
+    </button>
+  `).join('');
+}
+
+function filterSkills(archetype) {
+  activeFilter = archetype;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.className = 'filter-btn pill bg-slate-100 text-slate-600 hover:bg-slate-200';
+  });
+  const activeId = archetype ? `filter-${archetype}` : 'filter-all';
+  document.getElementById(activeId).className = 'filter-btn pill bg-navy-900 text-white';
+  const filtered = archetype ? allSkills.filter(s => s.archetype === archetype) : allSkills;
+  renderList(filtered);
+}
+
+async function loadSkillDetail(name) {
+  // highlight
+  document.querySelectorAll('.skill-item').forEach(el => el.classList.remove('bg-navy-50', 'border-l-2', 'border-navy-600'));
+  const item = document.querySelector(`.skill-item[data-name="${name}"]`);
+  if (item) item.classList.add('bg-navy-50', 'border-l-2', 'border-navy-600');
+
+  const res = await fetch(`${API}/api/skills/${name}`);
+  const skill = await res.json();
+
+  const colors = ARCHETYPE_COLORS[skill.archetype] || 'bg-slate-100 text-slate-600';
+  document.getElementById('detail-archetype-badge').className = `pill ${colors}`;
+  document.getElementById('detail-archetype-badge').textContent = skill.archetype.toUpperCase();
+  document.getElementById('detail-name').textContent = skill.name;
+  document.getElementById('detail-description').textContent = skill.description;
+  document.getElementById('detail-path').textContent = skill.path?.replace(/.*\/backend\//, '') || '—';
+  document.getElementById('detail-output').textContent = skill.expected_output;
+
+  const inputs = skill.inputs || [];
+  document.getElementById('detail-inputs').innerHTML = inputs.map(i =>
+    `<span class="pill bg-slate-200 text-slate-700 font-mono">${i}</span>`
+  ).join('') || '<span class="text-xs text-slate-400">none</span>';
+
+  const tools = skill.allowed_tools || [];
+  document.getElementById('detail-tools').innerHTML = tools.map(t =>
+    `<span class="pill bg-green-100 text-green-700 font-mono">${t}</span>`
+  ).join('') || '<span class="text-xs text-slate-400">none</span>';
+
+  document.getElementById('detail-body').textContent = skill.body || '(no workflow body)';
+
+  document.getElementById('skill-detail').classList.remove('hidden');
+  document.getElementById('skill-placeholder').classList.add('hidden');
+}
+
+loadSkills();
+</script>
+</body>
+</html>

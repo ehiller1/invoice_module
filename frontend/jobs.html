@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing Jobs — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    .fade-in { animation: fadeIn 0.25s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<div class="flex h-full">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-navy-900 flex flex-col shadow-xl">
+    <div class="px-6 py-6 border-b border-navy-700">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-semibold text-sm">EIME</p>
+          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 px-4 py-4 space-y-1">
+      <a href="/" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        Upload Invoice
+      </a>
+      <a href="/jobs.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-navy-700">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Processing Jobs
+        <span id="hitl-count" class="hidden ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5"></span>
+      </a>
+      <a href="/coa.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Chart of Accounts
+      </a>
+      <a href="/budget.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Budget
+      </a>
+      <a href="/skills.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        Skill Library
+      </a>
+      <a href="/chat.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        Agent Chat
+      </a>
+    </nav>
+    <div class="px-4 py-4 border-t border-navy-700">
+      <div class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
+        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+        <span class="text-slate-300 text-xs" id="church-name-label">—</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-auto">
+    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-800">Processing Jobs</h1>
+        <p class="text-sm text-slate-500">Track invoice processing and review flagged line items.</p>
+      </div>
+      <button onclick="loadJobs()" class="text-sm text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Refresh
+      </button>
+    </header>
+
+    <div class="px-8 py-8">
+      <!-- HITL alert -->
+      <div id="hitl-alert" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center gap-4 fade-in">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <p class="text-sm font-medium text-amber-800 flex-1">Some invoices require human review before journal entries can be finalized.</p>
+      </div>
+
+      <!-- Job list -->
+      <div id="jobs-container" class="space-y-4">
+        <div class="text-sm text-slate-400 text-center py-12">Loading jobs…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- HITL Review Modal -->
+<div id="hitl-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-auto fade-in">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+      <div>
+        <h2 class="text-base font-semibold text-slate-800">HITL Review — Flagged Line Items</h2>
+        <p class="text-xs text-slate-500 mt-0.5" id="modal-subtitle">Review and approve or override each flagged posting.</p>
+      </div>
+      <button onclick="closeHITL()" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="hitl-budget-panel" class="px-6 pt-5"></div>
+    <div id="hitl-lines" class="px-6 py-5 space-y-4"></div>
+    <div id="budget-attest-row" class="hidden px-6 pb-4">
+      <label class="flex items-start gap-2 text-xs text-slate-700 bg-rose-50 border border-rose-200 rounded-lg p-3">
+        <input type="checkbox" id="budget-attest-cb" class="mt-0.5 rounded" onchange="updateApproveButton()" />
+        <span>I attest that this OVER_BUDGET expense is necessary and authorized. (Required to approve any red-flagged line.)</span>
+      </label>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+      <button onclick="closeHITL()" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+      <button id="hitl-submit-btn" onclick="submitHITL()" class="px-4 py-2 text-sm font-medium text-white bg-navy-900 hover:bg-navy-800 rounded-lg">Submit Decisions</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+let currentHITLJobId = null;
+let currentHITLJob = null;
+
+const RISK_COLORS = { LOW: 'bg-green-100 text-green-700', MEDIUM: 'bg-amber-100 text-amber-700', HIGH: 'bg-red-100 text-red-700', CRITICAL: 'bg-red-900 text-white' };
+const FRAUD_COLORS = { LOW: 'bg-green-100 text-green-700', MEDIUM: 'bg-amber-100 text-amber-700', HIGH: 'bg-orange-100 text-orange-700', CRITICAL: 'bg-red-900 text-white' };
+
+function riskBadge(job) {
+  const r = job.risk_assessment;
+  if (!r) return '';
+  return `<span class="pill ${RISK_COLORS[r.risk_level] || 'bg-slate-100 text-slate-600'}" title="Misclassification Risk">Risk: ${r.risk_level}</span>`;
+}
+
+function fraudBadge(job) {
+  const f = job.fraud_assessment;
+  if (!f) return '';
+  const cls = FRAUD_COLORS[f.fraud_level] || 'bg-slate-100 text-slate-600';
+  return `<span class="pill ${cls}" title="Fraud Score: ${f.fraud_score}">Fraud: ${f.fraud_level}</span>`;
+}
+
+function budgetCheckPanel(job, asModal=false) {
+  const checks = (job.budget_check || []).filter(b => b.status !== 'WITHIN_BUDGET' && b.status !== 'NO_BUDGET');
+  if (!checks.length) return '';
+  const rows = checks.map(b => {
+    const pct = Number(b.consumed_pct);
+    const isOver = b.status === 'OVER_BUDGET';
+    const isWarn = b.status === 'WARNING';
+    const cls = isOver ? 'bg-rose-50 text-rose-700' : isWarn ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
+    return `
+      <tr class="${cls}">
+        <td class="py-1.5 px-2 font-mono text-xs">${b.account_number}</td>
+        <td class="py-1.5 px-2 text-xs">${b.account_name}</td>
+        <td class="py-1.5 px-2 text-right text-xs font-mono">$${Number(b.annual_budget).toFixed(2)}</td>
+        <td class="py-1.5 px-2 text-right text-xs font-mono">$${Number(b.ytd_actual).toFixed(2)}</td>
+        <td class="py-1.5 px-2 text-right text-xs font-mono">$${Number(b.this_invoice).toFixed(2)}</td>
+        <td class="py-1.5 px-2 text-right text-xs font-mono">$${Number(b.after).toFixed(2)}</td>
+        <td class="py-1.5 px-2 text-right text-xs font-semibold">${(pct*100).toFixed(0)}%</td>
+      </tr>
+    `;
+  }).join('');
+  const wrapper = asModal
+    ? `<div class="bg-white border border-slate-200 rounded-xl p-4 mb-4">`
+    : `<div class="px-5 py-4 border-b border-slate-200 bg-white">`;
+  const closeWrap = asModal ? `</div>` : `</div>`;
+  return `${wrapper}
+    <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Budget Check</h3>
+    <div class="overflow-auto">
+    <table class="w-full text-xs border-collapse">
+      <thead><tr class="text-slate-400 text-left border-b border-slate-200">
+        <th class="pb-1.5 px-2 font-medium">Account</th>
+        <th class="pb-1.5 px-2 font-medium">Name</th>
+        <th class="pb-1.5 px-2 font-medium text-right">Annual</th>
+        <th class="pb-1.5 px-2 font-medium text-right">YTD</th>
+        <th class="pb-1.5 px-2 font-medium text-right">This Invoice</th>
+        <th class="pb-1.5 px-2 font-medium text-right">After</th>
+        <th class="pb-1.5 px-2 font-medium text-right">% Used</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+  ${closeWrap}`;
+}
+
+function budgetImpactStrip(job) {
+  // Compact strip showing per-line "before/after" budget impact.
+  const checks = job.budget_check || [];
+  if (!checks.length) return '';
+  const rows = checks.map(b => {
+    const pct = Number(b.consumed_pct);
+    const isOver = b.status === 'OVER_BUDGET';
+    const isWarn = b.status === 'WARNING';
+    const isNoB = b.status === 'NO_BUDGET';
+    const cls = isOver ? 'bg-rose-100 text-rose-700' : isWarn ? 'bg-amber-100 text-amber-700' : isNoB ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-700';
+    const label = isNoB ? 'no budget' : `${(pct*100).toFixed(0)}%`;
+    const tag = isNoB
+      ? `account ${b.account_number}`
+      : `Account ${b.account_number} • Annual $${Number(b.annual_budget).toFixed(0)} • Before YTD $${Number(b.ytd_actual).toFixed(2)} → After $${Number(b.after).toFixed(2)}`;
+    return `<div class="flex items-center gap-2 text-xs">
+      <span class="text-slate-500">${b.line_id}:</span>
+      <span class="text-slate-600">${tag}</span>
+      <span class="pill ${cls}">${label}</span>
+    </div>`;
+  }).join('');
+  return `<div class="px-5 py-4 border-b border-slate-200 bg-white">
+    <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Budget Impact</h3>
+    <div class="space-y-1">${rows}</div>
+  </div>`;
+}
+
+function riskFraudPanel(job) {
+  const r = job.risk_assessment;
+  const f = job.fraud_assessment;
+  if (!r && !f) return '';
+  let html = `<div class="px-5 py-4 border-b border-slate-200 bg-white">
+    <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Risk &amp; Fraud Assessment</h3>
+    <div class="grid grid-cols-2 gap-4">`;
+
+  if (r) {
+    html += `<div class="bg-slate-50 rounded-lg p-3">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-xs font-semibold text-slate-600">Misclassification Risk</p>
+        <span class="pill ${RISK_COLORS[r.risk_level] || ''}">${r.risk_level} (${Number(r.risk_score).toFixed(3)})</span>
+      </div>
+      ${r.recommendations?.map(rec => `<p class="text-xs text-slate-500">→ ${rec}</p>`).join('') || ''}
+      ${(r.per_line_risks || []).filter(l => l.risk_level !== 'LOW').map(l =>
+        `<div class="mt-1 text-xs text-slate-500"><span class="font-mono text-slate-700">${l.line_id}</span> — ${l.risk_level}: ${l.flags.join(', ')}</div>`
+      ).join('')}
+    </div>`;
+  }
+
+  if (f) {
+    const actionColor = { APPROVE: 'text-green-600', FLAG_FOR_TREASURER: 'text-amber-600', FLAG_FOR_FINANCE_COMMITTEE: 'text-orange-600', ESCALATE_TO_AUDITOR: 'text-red-600' }[f.recommended_action] || 'text-slate-600';
+    html += `<div class="bg-slate-50 rounded-lg p-3">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-xs font-semibold text-slate-600">Fraud Risk</p>
+        <span class="pill ${FRAUD_COLORS[f.fraud_level] || ''}">${f.fraud_level} (${Number(f.fraud_score).toFixed(3)})</span>
+      </div>
+      <p class="text-xs font-semibold ${actionColor} mb-1">${f.recommended_action?.replace(/_/g,' ')}</p>
+      ${(f.signals || []).map(s =>
+        `<div class="text-xs text-slate-500 mt-0.5">[Cat ${s.category}] ${s.signal_id}: ${s.description}</div>`
+      ).join('')}
+    </div>`;
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+const STATUS_COLORS = {
+  UPLOADED: 'bg-slate-100 text-slate-600',
+  EXTRACTING: 'bg-blue-100 text-blue-700',
+  CLASSIFYING: 'bg-blue-100 text-blue-700',
+  MAPPING: 'bg-indigo-100 text-indigo-700',
+  REVIEWING: 'bg-violet-100 text-violet-700',
+  PENDING_HITL: 'bg-amber-100 text-amber-700',
+  BUILDING_ENTRY: 'bg-teal-100 text-teal-700',
+  EMITTED: 'bg-green-100 text-green-700',
+  REJECTED: 'bg-red-100 text-red-700',
+  ERROR: 'bg-red-100 text-red-700',
+};
+
+async function loadChurch() {
+  const res = await fetch(`${API}/api/churches`);
+  const data = await res.json();
+  if (data[0]) document.getElementById('church-name-label').textContent = data[0].church_name;
+}
+
+async function loadJobs() {
+  const res = await fetch(`${API}/api/jobs`);
+  const jobs = await res.json();
+  const hitlJobs = jobs.filter(j => j.status === 'PENDING_HITL');
+  const cnt = document.getElementById('hitl-count');
+  if (hitlJobs.length) { cnt.classList.remove('hidden'); cnt.textContent = hitlJobs.length; document.getElementById('hitl-alert').classList.remove('hidden'); }
+  else { cnt.classList.add('hidden'); document.getElementById('hitl-alert').classList.add('hidden'); }
+
+  // Check URL param
+  const urlJob = new URLSearchParams(location.search).get('job');
+
+  const container = document.getElementById('jobs-container');
+  if (!jobs.length) {
+    container.innerHTML = `<div class="text-sm text-slate-400 text-center py-12">No jobs yet. <a href="/" class="text-navy-700 underline">Upload an invoice</a> to get started.</div>`;
+    return;
+  }
+
+  container.innerHTML = jobs.map(job => {
+    const je = job.journal_entry;
+    const statusColor = STATUS_COLORS[job.status] || 'bg-slate-100 text-slate-600';
+    const isHITL = job.status === 'PENDING_HITL';
+    const isEmitted = job.status === 'EMITTED';
+    const inv = job.invoice_document;
+    return `
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden ${urlJob === job.job_id ? 'ring-2 ring-navy-600' : ''}" id="job-${job.job_id}">
+        <div class="px-5 py-4 flex items-center gap-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-semibold text-slate-800 truncate">${job.filename}</p>
+              <span class="pill ${statusColor}">${job.status.replace('_',' ')}</span>
+              ${isHITL ? '<span class="pill bg-amber-100 text-amber-700">⚠ Needs Review</span>' : ''}
+            </div>
+            <p class="text-xs text-slate-400">
+              Job ${job.job_id.slice(0,8)} •
+              ${inv ? `${inv.vendor_name} • Inv ${inv.invoice_number} • $${Number(inv.total_amount).toFixed(2)}` : 'Extracting…'}
+            </p>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            ${riskBadge(job)}${fraudBadge(job)}
+            ${isHITL ? `<button onclick="openHITL('${job.job_id}')" class="text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition-colors">Review →</button>` : ''}
+            ${isEmitted && je ? `<a href="${API}/api/audit/${je.entry_id}/pdf" target="_blank" class="text-xs text-slate-500 border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>PDF</a>` : ''}
+            <a href="/chat.html?job=${job.job_id}" class="text-xs text-navy-700 border border-navy-200 hover:bg-navy-50 px-3 py-1.5 rounded-lg transition-colors">Ask Agent</a>
+            <button onclick="toggleDetail('${job.job_id}')" class="text-xs text-slate-500 border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-colors">Details</button>
+          </div>
+        </div>
+
+        <!-- Expandable detail -->
+        <div class="detail-panel hidden border-t border-slate-100 bg-slate-50" id="detail-${job.job_id}">
+          ${riskFraudPanel(job)}
+          ${budgetImpactStrip(job)}
+          ${je ? `
+          <div class="px-5 py-4 border-b border-slate-200 bg-white">
+            <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Journal Entry</h3>
+            <div class="grid grid-cols-4 gap-3">
+              <div><p class="text-xs text-slate-400">Entry ID</p><p class="text-xs font-mono text-slate-700 mt-0.5">${je.entry_id}</p></div>
+              <div><p class="text-xs text-slate-400">Period</p><p class="text-xs font-semibold text-slate-700 mt-0.5">${je.accounting_period}</p></div>
+              <div><p class="text-xs text-slate-400">Total Debits</p><p class="text-xs font-semibold text-slate-700 mt-0.5">$${Number(je.total_debits).toFixed(2)}</p></div>
+              <div><p class="text-xs text-slate-400">Balanced</p><p class="text-xs font-semibold mt-0.5 ${je.balanced ? 'text-green-600' : 'text-red-600'}">${je.balanced ? '✓ Yes' : '✗ No'}</p></div>
+            </div>
+            <div class="mt-3 overflow-auto">
+              <table class="w-full text-xs">
+                <thead><tr class="text-slate-400 text-left border-b border-slate-200">
+                  <th class="pb-1.5 font-medium">#</th><th class="pb-1.5 font-medium">Account</th><th class="pb-1.5 font-medium">Fund</th><th class="pb-1.5 font-medium text-right">Debit</th><th class="pb-1.5 font-medium text-right">Credit</th>
+                </tr></thead>
+                <tbody>
+                  ${(je.lines || []).map(l => `
+                    <tr class="border-b border-slate-50">
+                      <td class="py-1.5 text-slate-400">${l.sequence}</td>
+                      <td class="py-1.5">${l.account_number} <span class="text-slate-500">${l.account_name}</span></td>
+                      <td class="py-1.5 text-slate-500">${l.fund_id}</td>
+                      <td class="py-1.5 text-right font-mono">${l.debit > 0 ? '$'+Number(l.debit).toFixed(2) : ''}</td>
+                      <td class="py-1.5 text-right font-mono text-slate-500">${l.credit > 0 ? '$'+Number(l.credit).toFixed(2) : ''}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>` : ''}
+          <div class="px-5 py-4">
+            <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Audit Log</h3>
+            <div class="space-y-1.5">
+              ${(job.audit_log || []).map(e => `
+                <div class="flex items-start gap-3 text-xs">
+                  <span class="text-slate-400 font-mono whitespace-nowrap">${new Date(e.ts).toLocaleTimeString()}</span>
+                  <span class="pill ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-500'} flex-shrink-0">${e.status}</span>
+                  <span class="text-slate-600">${e.detail}</span>
+                </div>`).join('')}
+            </div>
+          </div>
+          ${job.classified_items && job.classified_items.length ? `
+          <div class="px-5 py-4 border-t border-slate-200">
+            <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Classified Line Items</h3>
+            <div class="space-y-2">
+              ${job.classified_items.map(ci => `
+                <div class="bg-white rounded-lg border border-slate-200 px-3 py-2.5">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1">
+                      <p class="text-xs font-medium text-slate-700">${ci.line_id}: ${ci.description}</p>
+                      <p class="text-xs text-slate-400 mt-0.5">${ci.classification_rationale}</p>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                      <p class="text-xs font-semibold text-slate-800">$${Number(ci.amount).toFixed(2)}</p>
+                      <p class="text-xs text-slate-400">${ci.expense_category}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 mt-1.5">
+                    ${ci.flags.requires_hitl ? '<span class="pill bg-amber-100 text-amber-700">HITL</span>' : ''}
+                    ${ci.flags.capitalise ? '<span class="pill bg-purple-100 text-purple-700">CAPITALISE</span>' : ''}
+                    ${ci.flags.is_housing_related ? '<span class="pill bg-blue-100 text-blue-700">HOUSING</span>' : ''}
+                    ${ci.flags.is_missions_passthrough ? '<span class="pill bg-green-100 text-green-700">MISSIONS PT</span>' : ''}
+                    <span class="pill bg-slate-100 text-slate-600">conf ${Number(ci.confidence).toFixed(2)}</span>
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  if (urlJob) {
+    setTimeout(() => {
+      const el = document.getElementById(`job-${urlJob}`);
+      if (el) { el.scrollIntoView({ behavior: 'smooth' }); toggleDetail(urlJob); }
+    }, 100);
+  }
+}
+
+function toggleDetail(jobId) {
+  const panel = document.getElementById(`detail-${jobId}`);
+  panel.classList.toggle('hidden');
+}
+
+// HITL modal
+async function openHITL(jobId) {
+  const res = await fetch(`${API}/api/jobs/${jobId}`);
+  currentHITLJob = await res.json();
+  currentHITLJobId = jobId;
+
+  const inv = currentHITLJob.invoice_document;
+  document.getElementById('modal-subtitle').textContent =
+    inv ? `Invoice ${inv.invoice_number} — ${inv.vendor_name} — $${Number(inv.total_amount).toFixed(2)}` : jobId;
+
+  const escalated = (currentHITLJob.reviewed_allocations?.escalation_items || []);
+  const classified = currentHITLJob.classified_items || [];
+  const draft = currentHITLJob.draft_allocations?.lines || [];
+
+  // Budget panel
+  const budgetEl = document.getElementById('hitl-budget-panel');
+  budgetEl.innerHTML = budgetCheckPanel(currentHITLJob, true);
+
+  // Attestation row visibility
+  const hasOver = (currentHITLJob.budget_check || []).some(b => b.status === 'OVER_BUDGET');
+  const attestRow = document.getElementById('budget-attest-row');
+  if (hasOver) attestRow.classList.remove('hidden');
+  else attestRow.classList.add('hidden');
+  document.getElementById('budget-attest-cb').checked = false;
+  updateApproveButton();
+
+  const linesEl = document.getElementById('hitl-lines');
+  linesEl.innerHTML = escalated.map(lineId => {
+    const ci = classified.find(c => c.line_id === lineId);
+    const dl = draft.find(d => d.line_id === lineId);
+    const reasons = currentHITLJob.reviewed_allocations?.lines?.find(l => l.line_id === lineId)?.reasons || [];
+    return `
+      <div class="bg-slate-50 rounded-xl border border-slate-200 p-4" id="hitl-line-${lineId}">
+        <div class="flex items-start justify-between mb-2">
+          <div>
+            <p class="text-sm font-semibold text-slate-800">${lineId}: ${ci?.description || '—'}</p>
+            <p class="text-sm text-slate-500">$${Number(ci?.amount || 0).toFixed(2)} • ${ci?.expense_category || '—'}</p>
+          </div>
+          <span class="pill bg-amber-100 text-amber-700">Escalated</span>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 rounded-lg p-2.5 mb-3">
+          <p class="text-xs font-medium text-amber-700">Escalation reasons:</p>
+          <ul class="list-disc list-inside mt-1 space-y-0.5">
+            ${reasons.map(r => `<li class="text-xs text-amber-600">${r}</li>`).join('')}
+          </ul>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-600 mb-2">Your Decision:</p>
+          <div class="flex gap-2 mb-3">
+            <button onclick="setDecision('${lineId}','APPROVED')" class="decision-btn px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors" data-line="${lineId}" data-action="APPROVED">
+              ✓ Approve as-is
+            </button>
+            <button onclick="setDecision('${lineId}','OVERRIDE')" class="decision-btn px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors" data-line="${lineId}" data-action="OVERRIDE">
+              ✏ Override
+            </button>
+            <button onclick="setDecision('${lineId}','REJECT')" class="decision-btn px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors" data-line="${lineId}" data-action="REJECT">
+              ✗ Reject
+            </button>
+          </div>
+          ${ci?.flags?.is_missions_passthrough ? `
+          <label class="flex items-center gap-2 text-xs text-slate-600 mb-2">
+            <input type="checkbox" id="missions-attest-${lineId}" class="rounded" />
+            I confirm this payment has been approved by the Missions Committee.
+          </label>` : ''}
+          <textarea id="hitl-notes-${lineId}" placeholder="Notes (optional)…" rows="2"
+            class="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 resize-none focus:ring-1 focus:ring-navy-600 outline-none"></textarea>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('hitl-modal').classList.remove('hidden');
+}
+
+function setDecision(lineId, action) {
+  document.querySelectorAll(`.decision-btn[data-line="${lineId}"]`).forEach(btn => {
+    btn.className = 'decision-btn px-3 py-1.5 text-xs rounded-lg border border-slate-200 transition-colors';
+  });
+  const active = document.querySelector(`.decision-btn[data-line="${lineId}"][data-action="${action}"]`);
+  const colors = { APPROVED: 'border-green-400 bg-green-50 text-green-700', OVERRIDE: 'border-blue-400 bg-blue-50 text-blue-700', REJECT: 'border-red-400 bg-red-50 text-red-700' };
+  active.className = `decision-btn px-3 py-1.5 text-xs rounded-lg border transition-colors ${colors[action]}`;
+  active.setAttribute('data-selected', 'true');
+}
+
+function updateApproveButton() {
+  const btn = document.getElementById('hitl-submit-btn');
+  if (!btn || !currentHITLJob) return;
+  const hasOver = (currentHITLJob.budget_check || []).some(b => b.status === 'OVER_BUDGET');
+  const cb = document.getElementById('budget-attest-cb');
+  const needAttest = hasOver && cb && !cb.checked;
+  btn.disabled = needAttest;
+  if (needAttest) {
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.classList.remove('bg-navy-900', 'hover:bg-navy-800');
+    btn.classList.add('bg-slate-400');
+  } else {
+    btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-slate-400');
+    btn.classList.add('bg-navy-900', 'hover:bg-navy-800');
+  }
+}
+
+async function submitHITL() {
+  const btn = document.getElementById('hitl-submit-btn');
+  if (btn && btn.disabled) return;
+
+  const escalated = currentHITLJob.reviewed_allocations?.escalation_items || [];
+  const decisions = escalated.map(lineId => {
+    const selected = document.querySelector(`.decision-btn[data-line="${lineId}"][data-selected="true"]`);
+    const action = selected?.getAttribute('data-action') || 'APPROVED';
+    const notes = document.getElementById(`hitl-notes-${lineId}`)?.value || '';
+    const missionsCb = document.getElementById(`missions-attest-${lineId}`);
+    return {
+      line_id: lineId,
+      action,
+      notes,
+      reviewer_id: 'treasurer',
+      missions_attestation: missionsCb ? missionsCb.checked : false,
+    };
+  });
+
+  const attestCb = document.getElementById('budget-attest-cb');
+  const budget_approval_attestation = !!(attestCb && attestCb.checked);
+
+  await fetch(`${API}/api/jobs/${currentHITLJobId}/hitl`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ line_decisions: decisions, budget_approval_attestation }),
+  });
+
+  closeHITL();
+  setTimeout(loadJobs, 2000);
+}
+
+function closeHITL() {
+  document.getElementById('hitl-modal').classList.add('hidden');
+  currentHITLJobId = null;
+  currentHITLJob = null;
+}
+
+loadChurch();
+loadJobs();
+setInterval(loadJobs, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+{
+  "church_id": "grace_umc",
+  "church_name": "Grace United Methodist Church",
+  "denomination_type": "UMC",
+  "fiscal_year": 2026,
+  "fiscal_year_start": "2026-01-01",
+  "accounts": [
+    {
+      "account_number": "1010",
+      "account_name": "Operating Cash",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1020",
+      "account_name": "Building Fund Cash",
+      "account_type": "Asset",
+      "fund_id": "BLDG",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1030",
+      "account_name": "Missions Cash",
+      "account_type": "Asset",
+      "fund_id": "MISS",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1500",
+      "account_name": "Land",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1510",
+      "account_name": "Buildings",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1520",
+      "account_name": "Equipment - Office",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1530",
+      "account_name": "Equipment - HVAC",
+      "account_type": "Asset",
+      "fund_id": "BLDG",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1540",
+      "account_name": "Vehicles",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2010",
+      "account_name": "Accounts Payable",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2020",
+      "account_name": "Designated Gifts Liability",
+      "account_type": "Liability",
+      "fund_id": "MISS",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "2030",
+      "account_name": "Payroll Liabilities",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "3100",
+      "account_name": "Net Assets - Without Restriction",
+      "account_type": "Equity",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "3200",
+      "account_name": "Net Assets - Purpose Restricted",
+      "account_type": "Equity",
+      "fund_id": "MISS",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "3300",
+      "account_name": "Net Assets - Endowment",
+      "account_type": "Equity",
+      "fund_id": "ENDOW",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "active": true
+    },
+    {
+      "account_number": "4100",
+      "account_name": "Tithes & Offerings",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4200",
+      "account_name": "Designated Gifts - Building",
+      "account_type": "Revenue",
+      "fund_id": "BLDG",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4210",
+      "account_name": "Designated Gifts - Missions",
+      "account_type": "Revenue",
+      "fund_id": "MISS",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4220",
+      "account_name": "Designated Gifts - Youth",
+      "account_type": "Revenue",
+      "fund_id": "YOUTH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "5100",
+      "account_name": "Clergy Compensation - Salary",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5101",
+      "account_name": "Clergy Compensation - Housing Allowance",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5102",
+      "account_name": "Clergy Compensation - Parsonage Utilities",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5110",
+      "account_name": "SECA Reimbursement",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5200",
+      "account_name": "Lay Staff Wages",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5300",
+      "account_name": "Employee Benefits - Health",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5310",
+      "account_name": "Employee Benefits - Retirement",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6100",
+      "account_name": "Worship - Music",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6110",
+      "account_name": "Worship - Altar & Communion",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6200",
+      "account_name": "Children's Ministry",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6300",
+      "account_name": "Youth Ministry - General",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6310",
+      "account_name": "Youth Ministry - Restricted",
+      "account_type": "Expense",
+      "fund_id": "YOUTH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "6400",
+      "account_name": "Adult Education",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6500",
+      "account_name": "Missions - Local",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6600",
+      "account_name": "Missions - Pass-Through Disbursements",
+      "account_type": "Expense",
+      "fund_id": "MISS",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "6700",
+      "account_name": "Pastoral Care",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6900",
+      "account_name": "Benevolence Disbursements",
+      "account_type": "Expense",
+      "fund_id": "BENEV",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "7100",
+      "account_name": "Mortgage / Rent",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7200",
+      "account_name": "Utilities - Electric",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7210",
+      "account_name": "Utilities - Gas",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7220",
+      "account_name": "Utilities - Water/Sewer",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7230",
+      "account_name": "Utilities - Internet/Phone",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7300",
+      "account_name": "Maintenance & Repairs",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7310",
+      "account_name": "Janitorial Services",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7320",
+      "account_name": "Lawn & Grounds",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7400",
+      "account_name": "Insurance - Property & Liability",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7500",
+      "account_name": "Technology - Software & Subscriptions",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8100",
+      "account_name": "Office Supplies",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8200",
+      "account_name": "Legal & Audit",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8300",
+      "account_name": "Denominational Apportionment - Conference",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8310",
+      "account_name": "Denominational Apportionment - District",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8400",
+      "account_name": "Stewardship & Fundraising",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "9100",
+      "account_name": "Depreciation Expense",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "9200",
+      "account_name": "Capital Expenditures - Building",
+      "account_type": "Asset",
+      "fund_id": "BLDG",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "9210",
+      "account_name": "Capital Expenditures - Equipment",
+      "account_type": "Asset",
+      "fund_id": "BLDG",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "9300",
+      "account_name": "Loan Principal",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    }
+  ],
+  "funds": [
+    {
+      "fund_id": "GEN",
+      "fund_name": "General Operating",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "fund_category": "GENERAL_OPERATING",
+      "purpose_description": "Day-to-day ministry and operations",
+      "expenditure_rules": "Unrestricted - any operating expense",
+      "current_balance": "85000"
+    },
+    {
+      "fund_id": "BLDG",
+      "fund_name": "Building Fund",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "CAPITAL_CAMPAIGN",
+      "purpose_description": "Capital improvements to facilities",
+      "expenditure_rules": "Construction, major HVAC, capital equipment only",
+      "current_balance": "142000"
+    },
+    {
+      "fund_id": "MISS",
+      "fund_name": "World Missions Fund",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Support of missionaries and mission organizations",
+      "expenditure_rules": "Pass-through to registered missionary organizations",
+      "current_balance": "28500"
+    },
+    {
+      "fund_id": "YOUTH",
+      "fund_name": "Youth Ministry Fund",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Youth retreats, materials, scholarships",
+      "expenditure_rules": "Youth ministry expenses only (ministry_area=YOUTH)",
+      "current_balance": "9750"
+    },
+    {
+      "fund_id": "BENEV",
+      "fund_name": "Pastor's Benevolence Fund",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "BOARD_DESIGNATED",
+      "purpose_description": "Aid to individuals in need",
+      "expenditure_rules": "IRS substantiation required; pastor discretion",
+      "current_balance": "4200"
+    },
+    {
+      "fund_id": "ENDOW",
+      "fund_name": "Smith Endowment",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "fund_category": "PERMANENTLY_RESTRICTED",
+      "purpose_description": "Principal preserved; income funds music ministry",
+      "expenditure_rules": "Income only; principal never spent",
+      "current_balance": "250000"
+    }
+  ],
+  "allocation_schedules": [
+    {
+      "schedule_id": "UTIL_BY_SQFT",
+      "name": "Utilities - Square Footage Allocation",
+      "basis": "square_footage",
+      "allocations": [
+        {
+          "fund_id": "GEN",
+          "pct": 75.0,
+          "ministry_area": "FACILITIES"
+        },
+        {
+          "fund_id": "GEN",
+          "pct": 15.0,
+          "ministry_area": "CHILDREN"
+        },
+        {
+          "fund_id": "GEN",
+          "pct": 10.0,
+          "ministry_area": "YOUTH"
+        }
+      ],
+      "applies_to_categories": [
+        "UTILITIES"
+      ]
+    }
+  ],
+  "capitalisation_threshold_usd": "2500",
+  "parsonage_allowance_current_year": "36000",
+  "parsonage_allowance_used_ytd": "18500",
+  "apportionment_accounts": [
+    {
+      "account_number": "8300",
+      "pct_of_revenue": "12.0"
+    },
+    {
+      "account_number": "8310",
+      "pct_of_revenue": "3.0"
+    }
+  ],
+  "warnings": []
+}

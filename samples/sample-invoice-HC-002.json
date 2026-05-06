@@ -1,0 +1,53 @@
+{
+  "invoice_id": "INV-2024-002",
+  "vendor_name": "East Coast Maintenance Services",
+  "vendor_address": "456 Industrial Park, Durham, NC 27701",
+  "invoice_date": "2024-01-20",
+  "due_date": "2024-02-20",
+  "amount_total": 5800.00,
+  "church_name": "Holy Comforter Episcopal Church",
+  "line_items": [
+    {
+      "description": "HVAC system repair and inspection",
+      "quantity": 1,
+      "unit_price": 2500.00,
+      "amount": 2500.00,
+      "suggested_account": "6500",
+      "suggested_fund": "GEN",
+      "notes": "Emergency repair - compressor replacement"
+    },
+    {
+      "description": "Roof inspection and gutter cleaning",
+      "quantity": 1,
+      "unit_price": 1200.00,
+      "amount": 1200.00,
+      "suggested_account": "6500",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Plumbing repairs - sanctuary restroom",
+      "quantity": 1,
+      "unit_price": 800.00,
+      "amount": 800.00,
+      "suggested_account": "6500",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Electrical service call",
+      "quantity": 1,
+      "unit_price": 600.00,
+      "amount": 600.00,
+      "suggested_account": "6500",
+      "suggested_fund": "GEN"
+    },
+    {
+      "description": "Landscaping and grounds maintenance",
+      "quantity": 1,
+      "unit_price": 700.00,
+      "amount": 700.00,
+      "suggested_account": "6500",
+      "suggested_fund": "GEN"
+    }
+  ],
+  "notes": "Quarterly maintenance and emergency repairs"
+}

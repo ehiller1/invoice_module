@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chart of Accounts — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    .fade-in { animation: fadeIn 0.25s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+    .tab-active { @apply border-b-2 border-navy-700 text-navy-700 font-semibold; }
+    .tab-inactive { @apply text-slate-500 hover:text-slate-700 border-b-2 border-transparent; }
+  </style>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<div class="flex h-full">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-navy-900 flex flex-col shadow-xl">
+    <div class="px-6 py-6 border-b border-navy-700">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-white font-semibold text-sm">EIME</p>
+          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 px-4 py-4 space-y-1">
+      <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        Upload Invoice
+      </a>
+      <a href="/jobs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Processing Jobs
+      </a>
+      <a href="/coa.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-navy-700">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Chart of Accounts
+      </a>
+      <a href="/budget.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Budget
+      </a>
+      <a href="/skills.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        Skill Library
+      </a>
+      <a href="/chat.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        Agent Chat
+      </a>
+    </nav>
+    <div class="px-4 py-4 border-t border-navy-700">
+      <div class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
+        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+        <span class="text-slate-300 text-xs" id="church-name-label">—</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-auto flex flex-col">
+    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-800">Chart of Accounts</h1>
+        <p class="text-sm text-slate-500">Manage accounts, funds, and embedding index for semantic GL matching.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="church-selector" onchange="switchChurch()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="bg-white border-b border-slate-200 px-8 flex-shrink-0">
+      <div class="flex gap-6">
+        <button onclick="showTab('accounts')" id="tab-accounts" class="py-3 text-sm tab-active transition-colors">Accounts</button>
+        <button onclick="showTab('funds')" id="tab-funds" class="py-3 text-sm tab-inactive transition-colors">Funds</button>
+        <button onclick="showTab('search')" id="tab-search" class="py-3 text-sm tab-inactive transition-colors">Semantic Search</button>
+        <button onclick="showTab('import')" id="tab-import" class="py-3 text-sm tab-inactive transition-colors">Import COA</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto px-8 py-6">
+
+      <!-- Accounts tab -->
+      <div id="pane-accounts">
+        <!-- Budget Summary card -->
+        <div id="budget-summary-card" class="hidden bg-white rounded-xl border border-slate-200 p-5 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-slate-700" id="budget-summary-title">Budget Summary</h2>
+            <a href="/budget.html" class="text-xs text-navy-700 hover:underline">View variance report →</a>
+          </div>
+          <div id="budget-summary-content" class="text-sm text-slate-500">Loading…</div>
+        </div>
+        <div id="budget-empty-card" class="hidden bg-white rounded-xl border border-slate-200 p-5 mb-4 flex items-center justify-between">
+          <p class="text-sm text-slate-500">No budget configured for this church.</p>
+          <a href="/budget.html" class="text-xs text-white bg-navy-900 hover:bg-navy-800 rounded-lg px-3 py-2">Upload Budget →</a>
+        </div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <input id="acct-search" oninput="filterAccounts()" placeholder="Filter accounts…" class="text-sm border border-slate-200 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-navy-600 outline-none" />
+            <select id="acct-type-filter" onchange="filterAccounts()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+              <option value="">All types</option>
+              <option>Asset</option><option>Liability</option><option>Equity</option>
+              <option>Revenue</option><option>Expense</option>
+            </select>
+          </div>
+          <button onclick="openAccountForm()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Account
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Number</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Fund</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Restriction</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody id="accounts-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+          <div id="accounts-empty" class="hidden text-center py-12 text-sm text-slate-400">No accounts found.</div>
+        </div>
+      </div>
+
+      <!-- Funds tab -->
+      <div id="pane-funds" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-sm text-slate-500" id="fund-count-label">—</p>
+          <button onclick="openFundForm()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Fund
+          </button>
+        </div>
+        <div id="funds-grid" class="grid grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- Import COA tab -->
+      <div id="pane-import" class="hidden max-w-2xl space-y-6">
+
+        <!-- Create new church -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 class="text-sm font-semibold text-slate-700 mb-1">Create New Church</h2>
+          <p class="text-xs text-slate-500 mb-4">Provision a new church with a minimal skeleton COA, then import accounts below.</p>
+          <form onsubmit="createChurch(event)" class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs font-medium text-slate-600 mb-1 block">Church ID *</label>
+                <input id="new-church-id" required placeholder="e.g. first_baptist" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-navy-600 outline-none" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-slate-600 mb-1 block">Denomination *</label>
+                <select id="new-church-denom" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+                  <option value="NONDENOMINATIONAL">Nondenominational</option>
+                  <option value="UMC">United Methodist (UMC)</option>
+                  <option value="EPISCOPAL">Episcopal (TEC)</option>
+                  <option value="CATHOLIC_PARISH">Catholic Parish</option>
+                  <option value="BAPTIST_INDEPENDENT">Baptist / SBC</option>
+                  <option value="PRESBYTERIAN_PCUSA">Presbyterian (PCUSA)</option>
+                  <option value="AOG">Assemblies of God</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-600 mb-1 block">Church Name *</label>
+              <input id="new-church-name" required placeholder="e.g. First Baptist Church of Springfield" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-navy-600 outline-none" />
+            </div>
+            <div id="create-church-msg" class="hidden text-xs rounded-lg px-3 py-2"></div>
+            <button type="submit" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">Create Church</button>
+          </form>
+        </div>
+
+        <!-- Bulk COA import -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 class="text-sm font-semibold text-slate-700 mb-1">Import Chart of Accounts (JSON)</h2>
+          <p class="text-xs text-slate-500 mb-3">Paste a JSON object with <code class="bg-slate-100 px-1 rounded">accounts</code> and/or <code class="bg-slate-100 px-1 rounded">funds</code> arrays. Existing accounts are upserted by account number.</p>
+
+          <!-- Template -->
+          <details class="mb-3">
+            <summary class="text-xs text-navy-700 cursor-pointer hover:underline">Show JSON template</summary>
+            <pre class="mt-2 text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto text-slate-600">{
+  "church_name": "My Church",
+  "denomination_type": "UMC",
+  "capitalisation_threshold_usd": 2500,
+  "funds": [
+    { "fund_id": "GEN", "fund_name": "General Operating", "restriction_class": "WITHOUT_RESTRICTION", "fund_category": "GENERAL_OPERATING" },
+    { "fund_id": "BLD", "fund_name": "Building Fund", "restriction_class": "WITH_RESTRICTION_PURPOSE", "fund_category": "CAPITAL_CAMPAIGN" }
+  ],
+  "accounts": [
+    { "account_number": "1000", "account_name": "Cash — Checking", "account_type": "Asset", "fund_id": "GEN", "restriction_class": "WITHOUT_RESTRICTION" },
+    { "account_number": "2010", "account_name": "Accounts Payable", "account_type": "Liability", "fund_id": "GEN", "restriction_class": "WITHOUT_RESTRICTION" },
+    { "account_number": "5010", "account_name": "Clergy Salary", "account_type": "Expense", "fund_id": "GEN", "restriction_class": "WITHOUT_RESTRICTION" },
+    { "account_number": "7100", "account_name": "Utilities", "account_type": "Expense", "fund_id": "GEN", "restriction_class": "WITHOUT_RESTRICTION" }
+  ]
+}</pre>
+          </details>
+
+          <div class="mb-3">
+            <label class="text-xs font-medium text-slate-600 mb-1 block">Upload JSON file</label>
+            <input type="file" id="coa-file-input" accept=".json" onchange="loadCOAFile(event)" class="text-sm text-slate-600" />
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-600 mb-1 block">Or paste JSON directly</label>
+            <textarea id="coa-import-json" rows="8" placeholder='{ "accounts": [...], "funds": [...] }'
+              class="w-full text-xs font-mono border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none resize-y"></textarea>
+          </div>
+
+          <div id="import-msg" class="hidden text-xs rounded-lg px-3 py-2 mt-3"></div>
+          <div class="flex gap-3 mt-3">
+            <button onclick="importCOA()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">Import into Selected Church</button>
+            <button onclick="document.getElementById('coa-import-json').value=''" class="text-sm text-slate-500 border border-slate-200 rounded-lg px-4 py-2 hover:bg-slate-50">Clear</button>
+          </div>
+        </div>
+
+        <!-- Spreadsheet import -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 class="text-sm font-semibold text-slate-700 mb-1">Import Chart of Accounts (Spreadsheet)</h2>
+          <p class="text-xs text-slate-500 mb-4">Upload an Excel (.xlsx, .xls) or CSV file with accounts and/or funds. See templates below for column requirements.</p>
+
+          <!-- Accounts template -->
+          <details class="mb-3">
+            <summary class="text-xs text-navy-700 cursor-pointer hover:underline">Show Accounts spreadsheet template</summary>
+            <div class="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto text-xs text-slate-600">
+              <p class="font-medium mb-2">CSV/Excel format (one row per account):</p>
+              <pre>Account Number,Account Name,Account Type,Fund,Is Active
+1000,Cash - Checking,ASSET,GEN,true
+2010,Accounts Payable,LIABILITY,GEN,true
+5010,Clergy Salary,EXPENSE,GEN,true
+7100,Utilities,EXPENSE,GEN,true
+8310,World Service Fund,EXPENSE,GEN,true</pre>
+              <p class="mt-2"><strong>Columns:</strong> account_number (required), account_name (required), account_type (Asset/Liability/Equity/Revenue/Expense), fund (optional), is_active (true/false, default true)</p>
+            </div>
+          </details>
+
+          <!-- Funds template -->
+          <details class="mb-4">
+            <summary class="text-xs text-navy-700 cursor-pointer hover:underline">Show Funds spreadsheet template</summary>
+            <div class="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-auto text-xs text-slate-600">
+              <p class="font-medium mb-2">CSV/Excel format (one row per fund):</p>
+              <pre>Fund ID,Fund Name,Category,Restriction Class
+GEN,General Operating,GENERAL_OPERATING,WITHOUT_RESTRICTION
+BLD,Building Fund,CAPITAL_CAMPAIGN,WITH_RESTRICTION_PURPOSE
+END,Endowment,ENDOWMENT,WITH_RESTRICTION_PERMANENT</pre>
+              <p class="mt-2"><strong>Columns:</strong> fund_id (required), fund_name (required), category (optional), restriction_class (optional)</p>
+            </div>
+          </details>
+
+          <div>
+            <label class="text-xs font-medium text-slate-600 mb-2 block">Upload Excel or CSV file</label>
+            <div class="relative border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-navy-400 hover:bg-navy-50 transition-colors">
+              <input type="file" id="coa-spreadsheet-input" accept=".xlsx,.xls,.csv" onchange="loadSpreadsheetFile(event)" class="hidden" />
+              <label for="coa-spreadsheet-input" class="cursor-pointer block">
+                <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="text-sm text-slate-600 font-medium">Click to upload or drag and drop</p>
+                <p class="text-xs text-slate-500">Excel (.xlsx, .xls) or CSV (.csv)</p>
+              </label>
+            </div>
+          </div>
+
+          <div id="spreadsheet-msg" class="hidden text-xs rounded-lg px-3 py-2 mt-3"></div>
+          <div class="mt-4">
+            <button onclick="importSpreadsheet()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">Import into Selected Church</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Semantic search tab -->
+      <div id="pane-search" class="hidden max-w-2xl">
+        <div class="bg-white rounded-xl border border-slate-200 p-6 mb-5">
+          <h2 class="text-sm font-semibold text-slate-700 mb-3">Embedding-Based COA Search</h2>
+          <p class="text-xs text-slate-500 mb-4">Test how the GL account mapper finds accounts for a given expense description. Uses ChromaDB all-MiniLM-L6-v2 embeddings per FRS §9.13.</p>
+          <div class="flex gap-3">
+            <input id="search-query" placeholder="e.g. HVAC repair, mission trip supplies, electric bill…"
+              class="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none"
+              onkeydown="if(event.key==='Enter') runSearch()" />
+            <button onclick="runSearch()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">Search</button>
+          </div>
+        </div>
+        <div id="search-results" class="space-y-2"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Account Form Modal -->
+<div id="account-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+      <h2 class="text-base font-semibold text-slate-800" id="account-modal-title">Add Account</h2>
+      <button onclick="closeAccountForm()" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="account-form" onsubmit="saveAccount(event)" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Account Number *</label>
+          <input id="f-acct-num" required placeholder="e.g. 7200" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Type *</label>
+          <select id="f-acct-type" required class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+            <option>Asset</option><option>Liability</option><option>Equity</option><option>Revenue</option><option selected>Expense</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600 mb-1 block">Account Name *</label>
+        <input id="f-acct-name" required placeholder="e.g. Utilities - Electric" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Fund *</label>
+          <select id="f-acct-fund" required class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-navy-600 outline-none"></select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Restriction Class *</label>
+          <select id="f-acct-rc" required class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+            <option value="WITHOUT_RESTRICTION">Without Restriction</option>
+            <option value="WITH_RESTRICTION_PURPOSE">With Restriction (Purpose)</option>
+            <option value="WITH_RESTRICTION_PERMANENT">With Restriction (Permanent)</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="f-acct-active" checked class="rounded" />
+        <label class="text-sm text-slate-600">Active</label>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeAccountForm()" class="flex-1 px-4 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+        <button type="submit" class="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-navy-900 hover:bg-navy-800 rounded-lg transition-colors">Save Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Fund Form Modal -->
+<div id="fund-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+      <h2 class="text-base font-semibold text-slate-800">Add / Edit Fund</h2>
+      <button onclick="closeFundForm()" class="text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="fund-form" onsubmit="saveFund(event)" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Fund ID *</label>
+          <input id="f-fund-id" required placeholder="e.g. GEN" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Category *</label>
+          <select id="f-fund-cat" required class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+            <option value="GENERAL_OPERATING">General Operating</option>
+            <option value="TEMP_RESTRICTED_PURPOSE">Temp Restricted (Purpose)</option>
+            <option value="TEMP_RESTRICTED_TIME">Temp Restricted (Time)</option>
+            <option value="PERMANENTLY_RESTRICTED">Permanently Restricted</option>
+            <option value="BOARD_DESIGNATED">Board Designated</option>
+            <option value="CAPITAL_CAMPAIGN">Capital Campaign</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600 mb-1 block">Fund Name *</label>
+        <input id="f-fund-name" required placeholder="e.g. Building Fund" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600 mb-1 block">Restriction Class *</label>
+        <select id="f-fund-rc" required class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:ring-2 focus:ring-navy-600 outline-none">
+          <option value="WITHOUT_RESTRICTION">Without Restriction</option>
+          <option value="WITH_RESTRICTION_PURPOSE">With Restriction (Purpose)</option>
+          <option value="WITH_RESTRICTION_PERMANENT">With Restriction (Permanent)</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600 mb-1 block">Purpose Description</label>
+        <input id="f-fund-purpose" placeholder="e.g. Capital improvements to facilities" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-medium text-slate-600 mb-1 block">Current Balance ($)</label>
+        <input id="f-fund-balance" type="number" step="0.01" placeholder="0.00" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-navy-600 outline-none" />
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeFundForm()" class="flex-1 px-4 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+        <button type="submit" class="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-navy-900 hover:bg-navy-800 rounded-lg transition-colors">Save Fund</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+let currentChurchId = '';
+let allAccounts = [];
+let allFunds = [];
+
+const RC_LABELS = {
+  WITHOUT_RESTRICTION: { label: 'Unrestricted', cls: 'bg-green-100 text-green-700' },
+  WITH_RESTRICTION_PURPOSE: { label: 'Purpose Restricted', cls: 'bg-amber-100 text-amber-700' },
+  WITH_RESTRICTION_PERMANENT: { label: 'Permanently Restricted', cls: 'bg-red-100 text-red-700' },
+};
+
+const FUND_CAT_LABELS = {
+  GENERAL_OPERATING: 'General Operating',
+  TEMP_RESTRICTED_PURPOSE: 'Temp Restricted (Purpose)',
+  TEMP_RESTRICTED_TIME: 'Temp Restricted (Time)',
+  PERMANENTLY_RESTRICTED: 'Permanently Restricted',
+  BOARD_DESIGNATED: 'Board Designated',
+  CAPITAL_CAMPAIGN: 'Capital Campaign',
+};
+
+async function loadChurches() {
+  const res = await fetch(`${API}/api/churches`);
+  const churches = await res.json();
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name}</option>`).join('');
+  if (churches[0]) { currentChurchId = churches[0].church_id; document.getElementById('church-name-label').textContent = churches[0].church_name; }
+  await loadCOA();
+}
+
+async function switchChurch() {
+  currentChurchId = document.getElementById('church-selector').value;
+  await loadCOA();
+}
+
+async function loadCOA() {
+  const [acctRes, fundRes] = await Promise.all([
+    fetch(`${API}/api/churches/${currentChurchId}/accounts`),
+    fetch(`${API}/api/churches/${currentChurchId}/funds`),
+  ]);
+  allAccounts = await acctRes.json();
+  allFunds = await fundRes.json();
+  renderAccounts(allAccounts);
+  renderFunds(allFunds);
+  populateFundSelect();
+  loadBudgetSummary();
+}
+
+async function loadBudgetSummary() {
+  const card = document.getElementById('budget-summary-card');
+  const empty = document.getElementById('budget-empty-card');
+  const content = document.getElementById('budget-summary-content');
+  const title = document.getElementById('budget-summary-title');
+  card.classList.add('hidden');
+  empty.classList.add('hidden');
+  try {
+    const r = await fetch(`${API}/api/churches/${currentChurchId}/budget/variance-report?_=${Date.now()}`);
+    if (r.status === 404) {
+      empty.classList.remove('hidden');
+      return;
+    }
+    const data = await r.json();
+    title.textContent = `Budget Summary (FY ${data.fiscal_year})`;
+    const annual = parseFloat(data.totals.annual_budget || 0);
+    const ytd = parseFloat(data.totals.ytd_actual || 0);
+    const pct = data.totals.consumed_pct;
+    const within = data.buckets.within.length;
+    const atRisk = data.buckets.at_risk.length;
+    const over = data.buckets.over.length;
+    const widthPct = Math.min(pct * 100, 100);
+    content.innerHTML = `
+      <div class="flex items-center gap-4 mb-2">
+        <div class="flex-1">
+          <div class="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+            <div style="width:${widthPct}%; background-color: ${pct >= 1 ? '#e11d48' : pct >= 0.8 ? '#d97706' : '#10b981'}; height:100%;"></div>
+          </div>
+        </div>
+        <span class="text-xs font-semibold text-slate-700">${(pct*100).toFixed(0)}%</span>
+      </div>
+      <p class="text-xs text-slate-500">$${ytd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} of $${annual.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} consumed</p>
+      <div class="mt-3 flex items-center gap-4 text-xs">
+        <span class="text-emerald-700">✓ ${within} within</span>
+        <span class="text-amber-700">⚠ ${atRisk} at risk</span>
+        <span class="text-rose-700">✗ ${over} over budget</span>
+      </div>
+    `;
+    card.classList.remove('hidden');
+  } catch (e) {
+    // silent — show nothing
+  }
+}
+
+function renderAccounts(accounts) {
+  const tbody = document.getElementById('accounts-body');
+  const empty = document.getElementById('accounts-empty');
+  if (!accounts.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = accounts.map(a => {
+    const rc = RC_LABELS[a.restriction_class] || { label: a.restriction_class, cls: 'bg-slate-100 text-slate-600' };
+    const fund = allFunds.find(f => f.fund_id === a.fund_id);
+    return `<tr class="hover:bg-slate-50 transition-colors">
+      <td class="px-4 py-3 font-mono text-xs font-semibold text-navy-700">${a.account_number}</td>
+      <td class="px-4 py-3 text-sm text-slate-800">${a.account_name}</td>
+      <td class="px-4 py-3"><span class="pill bg-slate-100 text-slate-600">${a.account_type}</span></td>
+      <td class="px-4 py-3 text-xs text-slate-600">${fund ? fund.fund_name : a.fund_id}</td>
+      <td class="px-4 py-3"><span class="pill ${rc.cls}">${rc.label}</span></td>
+      <td class="px-4 py-3"><span class="pill ${a.active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}">${a.active ? 'Active' : 'Inactive'}</span></td>
+      <td class="px-4 py-3 text-right">
+        <button onclick="deleteAccount('${a.account_number}')" class="text-red-400 hover:text-red-600 text-xs">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterAccounts() {
+  const q = document.getElementById('acct-search').value.toLowerCase();
+  const type = document.getElementById('acct-type-filter').value;
+  const filtered = allAccounts.filter(a =>
+    (!type || a.account_type === type) &&
+    (!q || a.account_name.toLowerCase().includes(q) || a.account_number.includes(q))
+  );
+  renderAccounts(filtered);
+}
+
+function renderFunds(funds) {
+  document.getElementById('fund-count-label').textContent = `${funds.length} fund${funds.length === 1 ? '' : 's'} configured`;
+  const grid = document.getElementById('funds-grid');
+  grid.innerHTML = funds.map(f => {
+    const rc = RC_LABELS[f.restriction_class] || { label: f.restriction_class, cls: 'bg-slate-100 text-slate-600' };
+    return `<div class="bg-white rounded-xl border border-slate-200 p-5">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-sm font-semibold text-slate-800">${f.fund_name}</p>
+          <p class="text-xs text-slate-400 font-mono mt-0.5">${f.fund_id}</p>
+        </div>
+        <button onclick="deleteFund('${f.fund_id}')" class="text-red-400 hover:text-red-600 text-xs">Delete</button>
+      </div>
+      <div class="space-y-2">
+        <div class="flex gap-1.5 flex-wrap">
+          <span class="pill ${rc.cls}">${rc.label}</span>
+          <span class="pill bg-slate-100 text-slate-600">${FUND_CAT_LABELS[f.fund_category] || f.fund_category}</span>
+        </div>
+        ${f.purpose_description ? `<p class="text-xs text-slate-500">${f.purpose_description}</p>` : ''}
+        <div class="flex items-center justify-between pt-1">
+          <p class="text-xs text-slate-400">Current Balance</p>
+          <p class="text-sm font-semibold text-slate-700">$${Number(f.current_balance).toLocaleString('en-US', {minimumFractionDigits:2})}</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function populateFundSelect() {
+  const sel = document.getElementById('f-acct-fund');
+  sel.innerHTML = allFunds.map(f => `<option value="${f.fund_id}">${f.fund_name} (${f.fund_id})</option>`).join('');
+}
+
+function showTab(tab) {
+  ['accounts','funds','search','import'].forEach(t => {
+    document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`tab-${t}`).className = `py-3 text-sm transition-colors ${t === tab ? 'tab-active' : 'tab-inactive'}`;
+  });
+}
+
+async function createChurch(e) {
+  e.preventDefault();
+  const msgEl = document.getElementById('create-church-msg');
+  const body = {
+    church_id: document.getElementById('new-church-id').value.trim().toLowerCase().replace(/\s+/g,'_'),
+    church_name: document.getElementById('new-church-name').value.trim(),
+    denomination_type: document.getElementById('new-church-denom').value,
+    fiscal_year: new Date().getFullYear(),
+  };
+  try {
+    const res = await fetch(`${API}/api/churches`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-green-50 text-green-700';
+    msgEl.textContent = `✓ Church '${body.church_id}' created. Select it in the dropdown above to manage its COA.`;
+    msgEl.classList.remove('hidden');
+    await loadChurches();
+  } catch (err) {
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-red-50 text-red-700';
+    msgEl.textContent = `✗ ${err.message}`;
+    msgEl.classList.remove('hidden');
+  }
+}
+
+function loadCOAFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('coa-import-json').value = e.target.result; };
+  reader.readAsText(file);
+}
+
+async function importCOA() {
+  const msgEl = document.getElementById('import-msg');
+  const raw = document.getElementById('coa-import-json').value.trim();
+  if (!raw) { msgEl.className='text-xs rounded-lg px-3 py-2 bg-amber-50 text-amber-700'; msgEl.textContent='Paste or upload JSON first.'; msgEl.classList.remove('hidden'); return; }
+  let body;
+  try { body = JSON.parse(raw); } catch { msgEl.className='text-xs rounded-lg px-3 py-2 bg-red-50 text-red-700'; msgEl.textContent='Invalid JSON — check syntax.'; msgEl.classList.remove('hidden'); return; }
+  try {
+    const res = await fetch(`${API}/api/churches/${currentChurchId}/coa/import`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Import failed');
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-green-50 text-green-700';
+    msgEl.textContent = `✓ Imported ${data.accounts_imported} accounts and ${data.funds_imported} funds. Total: ${data.total_accounts} accounts, ${data.total_funds} funds. Embedding index rebuilt.`;
+    msgEl.classList.remove('hidden');
+    await loadCOA();
+  } catch (err) {
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-red-50 text-red-700';
+    msgEl.textContent = `✗ ${err.message}`;
+    msgEl.classList.remove('hidden');
+  }
+}
+
+function loadSpreadsheetFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const msgEl = document.getElementById('spreadsheet-msg');
+  msgEl.textContent = `File selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-blue-50 text-blue-700';
+  msgEl.classList.remove('hidden');
+}
+
+async function importSpreadsheet() {
+  if (!currentChurchId) {
+    alert('Select a church from the dropdown first');
+    return;
+  }
+  const msgEl = document.getElementById('spreadsheet-msg');
+  const fileInput = document.getElementById('coa-spreadsheet-input');
+  const file = fileInput.files[0];
+  if (!file) {
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-amber-50 text-amber-700';
+    msgEl.textContent = 'Select a spreadsheet file first.';
+    msgEl.classList.remove('hidden');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-blue-50 text-blue-700';
+    msgEl.textContent = '⏳ Uploading and parsing...';
+    msgEl.classList.remove('hidden');
+
+    const res = await fetch(`${API}/api/churches/${currentChurchId}/coa/import-spreadsheet`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Import failed');
+
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-green-50 text-green-700';
+    msgEl.textContent = `✓ Imported ${data.accounts_imported} accounts and ${data.funds_imported} funds. Total: ${data.total_accounts} accounts, ${data.total_funds} funds. Embedding index rebuilt.`;
+    msgEl.classList.remove('hidden');
+    fileInput.value = '';
+    await loadCOA();
+  } catch (err) {
+    msgEl.className = 'text-xs rounded-lg px-3 py-2 bg-red-50 text-red-700';
+    msgEl.textContent = `✗ ${err.message}`;
+    msgEl.classList.remove('hidden');
+  }
+}
+
+// Account CRUD
+function openAccountForm() { document.getElementById('account-modal').classList.remove('hidden'); }
+function closeAccountForm() { document.getElementById('account-modal').classList.add('hidden'); document.getElementById('account-form').reset(); }
+
+async function saveAccount(e) {
+  e.preventDefault();
+  await fetch(`${API}/api/churches/${currentChurchId}/accounts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      account_number: document.getElementById('f-acct-num').value.trim(),
+      account_name: document.getElementById('f-acct-name').value.trim(),
+      account_type: document.getElementById('f-acct-type').value,
+      fund_id: document.getElementById('f-acct-fund').value,
+      restriction_class: document.getElementById('f-acct-rc').value,
+      active: document.getElementById('f-acct-active').checked,
+    })
+  });
+  closeAccountForm();
+  await loadCOA();
+}
+
+async function deleteAccount(num) {
+  if (!confirm(`Delete account ${num}?`)) return;
+  await fetch(`${API}/api/churches/${currentChurchId}/accounts/${num}`, { method: 'DELETE' });
+  await loadCOA();
+}
+
+// Fund CRUD
+function openFundForm() { document.getElementById('fund-modal').classList.remove('hidden'); }
+function closeFundForm() { document.getElementById('fund-modal').classList.add('hidden'); document.getElementById('fund-form').reset(); }
+
+async function saveFund(e) {
+  e.preventDefault();
+  await fetch(`${API}/api/churches/${currentChurchId}/funds`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fund_id: document.getElementById('f-fund-id').value.trim().toUpperCase(),
+      fund_name: document.getElementById('f-fund-name').value.trim(),
+      restriction_class: document.getElementById('f-fund-rc').value,
+      fund_category: document.getElementById('f-fund-cat').value,
+      purpose_description: document.getElementById('f-fund-purpose').value.trim() || null,
+      current_balance: parseFloat(document.getElementById('f-fund-balance').value || '0'),
+    })
+  });
+  closeFundForm();
+  await loadCOA();
+}
+
+async function deleteFund(id) {
+  if (!confirm(`Delete fund ${id}?`)) return;
+  await fetch(`${API}/api/churches/${currentChurchId}/funds/${id}`, { method: 'DELETE' });
+  await loadCOA();
+}
+
+// Semantic search
+async function runSearch() {
+  const q = document.getElementById('search-query').value.trim();
+  if (!q) return;
+  const res = await fetch(`${API}/api/churches/${currentChurchId}/search?q=${encodeURIComponent(q)}&k=8`);
+  const results = await res.json();
+  const rc = RC_LABELS;
+  document.getElementById('search-results').innerHTML = results.length ? `
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
+        <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Top ${results.length} semantic matches for "${q}"</p>
+      </div>
+      <div class="divide-y divide-slate-100">
+        ${results.map((r, i) => {
+          const rcInfo = rc[r.restriction_class] || { label: r.restriction_class, cls: 'bg-slate-100 text-slate-600' };
+          return `<div class="px-4 py-3 flex items-center gap-4 hover:bg-slate-50 fade-in">
+            <div class="w-6 h-6 rounded-full bg-navy-100 flex items-center justify-center flex-shrink-0">
+              <span class="text-xs font-bold text-navy-700">${i+1}</span>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-navy-700">${r.account_number}</span>
+                <span class="text-sm text-slate-800">${r.account_name}</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">${r.fund_name} (${r.fund_id})</p>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <span class="pill ${rcInfo.cls} mb-1">${rcInfo.label}</span>
+              <p class="text-xs text-slate-400 mt-1">score ${r.score.toFixed(3)}</p>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : `<div class="text-sm text-slate-400 text-center py-8">No matches found.</div>`;
+}
+
+loadChurches();
+</script>
+</body>
+</html>
