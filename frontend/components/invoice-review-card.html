@@ -1,0 +1,30 @@
+<!--
+  Invoice Review Card — reusable HTML fragment + JS
+  Loaded by injecting into a host page or rendered programmatically by
+  InvoiceReviewCard.render(jobData) (see invoice-review-card.js).
+
+  This file documents the structure produced by the JS module:
+
+  <article class="invoice-review-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <header>
+      Vendor name | Invoice # | Date | Total amount
+    </header>
+    <section class="extracted-summary">
+      Table of extracted line items (description / quantity / amount)
+    </section>
+    <section class="proposed-gl">
+      Per line: account number + name, confidence badge (green/amber/red), override input
+    </section>
+    <section class="budget-impact">
+      Per line: budget remaining, this invoice amount, after, % consumed, status pill (green/amber/red)
+    </section>
+    <footer class="action-bar">
+      Approve / Reject buttons + Override rationale textarea (visible if any GL changed)
+    </footer>
+  </article>
+
+  Use InvoiceReviewCard.render(jobData) which injects this structure
+  into #invoice-review-container.
+
+  NOTE: fraud_assessment is intentionally NOT displayed.
+-->

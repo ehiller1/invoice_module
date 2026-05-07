@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approval Chains — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Approval Chains</h1>
+      <p class="text-sm text-slate-500">Configure budget-owner and treasurer approvers per GL account pattern (FR-05.1).</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="switchChurch()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="addRow()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Add Chain</button>
+      <button onclick="saveAll()" class="bg-gold-500 hover:bg-gold-400 text-white text-sm font-medium px-4 py-2 rounded-lg">Save All</button>
+    </div>
+  </header>
+
+  <div class="px-8 py-6">
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-100 text-slate-600">
+          <tr>
+            <th class="text-left px-3 py-2">Chain ID</th>
+            <th class="text-left px-3 py-2">GL Pattern</th>
+            <th class="text-left px-3 py-2">Primary Approver</th>
+            <th class="text-left px-3 py-2">Email</th>
+            <th class="text-left px-3 py-2">Secondary (Treasurer)</th>
+            <th class="text-left px-3 py-2">Email</th>
+            <th class="text-left px-3 py-2">Deadline (h)</th>
+            <th class="text-left px-3 py-2">Escalation (d)</th>
+            <th class="text-left px-3 py-2">Active</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="chain-rows"></tbody>
+      </table>
+    </div>
+    <p class="text-xs text-slate-500 mt-3">
+      Pattern formats: exact (e.g. <code>6500</code>), prefix wildcard (e.g. <code>65*</code>),
+      or numeric range (e.g. <code>6500-6600</code>). Lookup order: exact → range → wildcard.
+    </p>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+let chains = [];
+
+async function init() {
+  await EIMEShell.mount({ activeNav: 'settings', pageTitle: 'Approval Chains' });
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name || c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    await load();
+  }
+}
+
+async function switchChurch() {
+  activeChurch = document.getElementById('church-selector').value;
+  await load();
+}
+
+async function load() {
+  if (!activeChurch) return;
+  chains = await fetch(`/api/churches/${activeChurch}/approval-chains`).then(r => r.json());
+  render();
+}
+
+function render() {
+  const tbody = document.getElementById('chain-rows');
+  tbody.innerHTML = chains.map((c, i) => `
+    <tr class="border-t border-slate-100">
+      <td class="px-3 py-2"><input class="w-28 border rounded px-2 py-1" value="${esc(c.chain_id)}" oninput="upd(${i},'chain_id',this.value)"></td>
+      <td class="px-3 py-2"><input class="w-24 border rounded px-2 py-1" value="${esc(c.gl_pattern)}" oninput="upd(${i},'gl_pattern',this.value)"></td>
+      <td class="px-3 py-2"><input class="w-40 border rounded px-2 py-1" value="${esc(c.primary_approver_name)}" oninput="upd(${i},'primary_approver_name',this.value)"></td>
+      <td class="px-3 py-2"><input class="w-52 border rounded px-2 py-1" value="${esc(c.primary_approver_email)}" oninput="upd(${i},'primary_approver_email',this.value)"></td>
+      <td class="px-3 py-2"><input class="w-40 border rounded px-2 py-1" value="${esc(c.secondary_approver_name)}" oninput="upd(${i},'secondary_approver_name',this.value)"></td>
+      <td class="px-3 py-2"><input class="w-52 border rounded px-2 py-1" value="${esc(c.secondary_approver_email)}" oninput="upd(${i},'secondary_approver_email',this.value)"></td>
+      <td class="px-3 py-2"><input type="number" class="w-20 border rounded px-2 py-1" value="${c.deadline_hours}" oninput="upd(${i},'deadline_hours',+this.value)"></td>
+      <td class="px-3 py-2"><input type="number" class="w-20 border rounded px-2 py-1" value="${c.escalation_days}" oninput="upd(${i},'escalation_days',+this.value)"></td>
+      <td class="px-3 py-2"><input type="checkbox" ${c.active?'checked':''} onchange="upd(${i},'active',this.checked)"></td>
+      <td class="px-3 py-2"><button onclick="del(${i})" class="text-red-600 hover:underline">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+function esc(s) { return String(s||'').replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c])); }
+
+function upd(i, k, v) { chains[i][k] = v; }
+
+function addRow() {
+  chains.push({
+    chain_id: 'chain_' + (chains.length+1),
+    gl_pattern: '',
+    primary_approver_email: '',
+    primary_approver_name: '',
+    secondary_approver_email: '',
+    secondary_approver_name: '',
+    deadline_hours: 48,
+    escalation_days: 5,
+    active: true,
+  });
+  render();
+}
+
+async function del(i) {
+  const id = chains[i].chain_id;
+  if (id) {
+    await fetch(`/api/churches/${activeChurch}/approval-chains/${id}`, { method: 'DELETE' });
+  }
+  chains.splice(i,1);
+  render();
+}
+
+async function saveAll() {
+  const r = await fetch(`/api/churches/${activeChurch}/approval-chains`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(chains),
+  });
+  if (r.ok) {
+    alert('Saved ' + chains.length + ' chain(s).');
+  } else {
+    alert('Save failed: ' + r.status);
+  }
+}
+
+window.switchChurch = switchChurch;
+window.upd = upd;
+window.addRow = addRow;
+window.del = del;
+window.saveAll = saveAll;
+
+init();
+</script>
+
+</body>
+</html>

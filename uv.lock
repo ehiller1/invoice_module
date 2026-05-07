@@ -707,6 +707,18 @@ wheels = [
 ]
 
 [[package]]
+name = "croniter"
+version = "6.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/de/5832661ed55107b8a09af3f0a2e71e0957226a59eb1dcf0a445cce6daf20/croniter-6.2.2.tar.gz", hash = "sha256:ba60832a5ec8e12e51b8691c3309a113d1cf6526bdf1a48150ce8ec7a532d0ab", size = 113762, upload-time = "2026-03-15T08:43:48.112Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/39/783980e78cb92c2d7bdb1fc7dbc86e94ccc6d58224d76a7f1f51b6c51e30/croniter-6.2.2-py3-none-any.whl", hash = "sha256:a5d17b1060974d36251ea4faf388233eca8acf0d09cbd92d35f4c4ac8f279960", size = 45422, upload-time = "2026-03-15T08:43:46.626Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "48.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -894,6 +906,8 @@ dependencies = [
     { name = "apscheduler" },
     { name = "chromadb" },
     { name = "crewai" },
+    { name = "croniter" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "fpdf2" },
     { name = "jinja2" },
@@ -901,6 +915,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pdfplumber" },
     { name = "pillow" },
+    { name = "plaid-python" },
     { name = "pydantic" },
     { name = "pypdf" },
     { name = "pytesseract" },
@@ -927,6 +942,8 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.10.4" },
     { name = "chromadb", specifier = ">=0.5.20" },
     { name = "crewai", specifier = ">=0.86.0" },
+    { name = "croniter", specifier = ">=2.0.0" },
+    { name = "cryptography", specifier = ">=43.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fpdf2", specifier = ">=2.7.0" },
     { name = "jinja2", specifier = ">=3.1.4" },
@@ -934,6 +951,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "pdfplumber", specifier = ">=0.11.4" },
     { name = "pillow", specifier = ">=10.0" },
+    { name = "plaid-python", specifier = ">=15.0.0" },
     { name = "pydantic", specifier = ">=2.9.0" },
     { name = "pypdf", specifier = ">=5.1.0" },
     { name = "pytesseract", specifier = ">=0.3.10" },
@@ -2043,6 +2061,15 @@ wheels = [
 ]
 
 [[package]]
+name = "nulltype"
+version = "2.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/ce/92289851364b7f816a839c8064aac06c01f3a3ecf33ab04adf9d0a0ab66a/nulltype-2.3.1.zip", hash = "sha256:64aa3cb2ab5e904d1b37175b9b922bea268c13f9ce32e3d373313150ab5ef272", size = 20119, upload-time = "2018-06-03T22:01:01.45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/0f/47dde1a3cceac9858da0bfb92d2279bf5f993ed075b72983e92efc297db3/nulltype-2.3.1-py2.py3-none-any.whl", hash = "sha256:16ae565745118e37e0558441f5821c76351d8c3a789640b5bca277cf65b2271b", size = 11054, upload-time = "2018-06-03T22:01:04.03Z" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2706,6 +2733,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5e/8b/51b0eddcfa2180d60e41f06bd6d0a62202b20b59c68f5a132e615b75aecf/pillow-12.2.0-pp311-pypy311_pp73-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:25373b66e0dd5905ed63fa3cae13c82fbddf3079f2c8bf15c6fb6a35586324c1", size = 6002215, upload-time = "2026-04-01T14:46:08.83Z" },
     { url = "https://files.pythonhosted.org/packages/bc/60/5382c03e1970de634027cee8e1b7d39776b778b81812aaf45b694dfe9e28/pillow-12.2.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:bfa9c230d2fe991bed5318a5f119bd6780cda2915cca595393649fc118ab895e", size = 7080946, upload-time = "2026-04-01T14:46:11.734Z" },
 ]
+
+[[package]]
+name = "plaid-python"
+version = "39.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nulltype" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/72/62/3dff402f2eb80b967ddcc142cd4f77c838740f15bdf3680de5a9bcdae8c8/plaid_python-39.2.0.tar.gz", hash = "sha256:552aff15f8e4dbbf469fcab224465fa2359e68757b60df9c8ed40e8163aa6c20", size = 1208776, upload-time = "2026-04-27T18:30:27.715Z" }
 
 [[package]]
 name = "platformdirs"

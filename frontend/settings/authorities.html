@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budgetary Authorities — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Budgetary Authorities</h1>
+      <p class="text-sm text-slate-500">
+        Map roles to GL ranges, dollar caps, and fund restrictions (FR-NF-Authority).
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="switchChurch()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="addRow()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Add Authority</button>
+      <button onclick="saveAll()" class="bg-gold-500 hover:bg-gold-400 text-white text-sm font-medium px-4 py-2 rounded-lg">Save All</button>
+    </div>
+  </header>
+
+  <div class="px-8 py-6 space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-100 text-slate-600">
+          <tr>
+            <th class="text-left px-3 py-2">ID</th>
+            <th class="text-left px-3 py-2">Role</th>
+            <th class="text-left px-3 py-2">GL Pattern</th>
+            <th class="text-left px-3 py-2">Max Amount</th>
+            <th class="text-left px-3 py-2">Fund Restrictions</th>
+            <th class="text-center px-3 py-2">Override?</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="auth-rows"></tbody>
+      </table>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+      <h2 class="text-sm font-semibold text-slate-700">Test an authority decision</h2>
+      <p class="text-xs text-slate-500">
+        Run a synthetic check against the saved rules. This is the same logic
+        Step 7a uses during invoice routing.
+      </p>
+      <div class="grid grid-cols-4 gap-3 text-sm">
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Role</label>
+          <select id="test-role" class="w-full border rounded px-2 py-1">
+            <option value="FINANCE_STAFF">FINANCE_STAFF</option>
+            <option value="BUDGET_OWNER" selected>BUDGET_OWNER</option>
+            <option value="TREASURER_ADMIN">TREASURER_ADMIN</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">GL</label>
+          <input id="test-gl" class="w-full border rounded px-2 py-1" value="6500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Fund</label>
+          <input id="test-fund" class="w-full border rounded px-2 py-1" value="GEN">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Amount</label>
+          <input id="test-amount" type="number" class="w-full border rounded px-2 py-1" value="1500">
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="runCheck()" class="bg-navy-700 hover:bg-navy-600 text-white text-sm font-medium px-4 py-2 rounded-lg">Run Check</button>
+        <div id="check-result" class="text-sm"></div>
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-500">
+      Pattern formats: exact (e.g. <code>6500</code>), prefix wildcard
+      (e.g. <code>65*</code> or <code>*</code> for all), or numeric range
+      (e.g. <code>6500-6600</code>). Resolution order: exact &rarr; range &rarr;
+      wildcard. The first match within role / amount-cap / fund constraints wins.
+    </p>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+let authorities = [];
+
+async function init() {
+  await EIMEShell.mount({ activeNav: 'settings', pageTitle: 'Budgetary Authorities' });
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name || c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    await load();
+  }
+}
+
+async function switchChurch() {
+  activeChurch = document.getElementById('church-selector').value;
+  await load();
+}
+
+async function load() {
+  if (!activeChurch) return;
+  authorities = await fetch(`/api/churches/${activeChurch}/authorities`).then(r => r.json());
+  render();
+}
+
+function render() {
+  const tbody = document.getElementById('auth-rows');
+  tbody.innerHTML = authorities.map((a, i) => `
+    <tr class="border-t border-slate-100">
+      <td class="px-3 py-2 text-xs text-slate-500">${esc(a.authority_id || '(new)')}</td>
+      <td class="px-3 py-2">
+        <select class="w-40 border rounded px-2 py-1" onchange="upd(${i},'role',this.value)">
+          <option value="FINANCE_STAFF" ${a.role==='FINANCE_STAFF'?'selected':''}>FINANCE_STAFF</option>
+          <option value="BUDGET_OWNER" ${a.role==='BUDGET_OWNER'?'selected':''}>BUDGET_OWNER</option>
+          <option value="TREASURER_ADMIN" ${a.role==='TREASURER_ADMIN'?'selected':''}>TREASURER_ADMIN</option>
+        </select>
+      </td>
+      <td class="px-3 py-2"><input class="w-32 border rounded px-2 py-1 font-mono" value="${esc(a.gl_pattern)}" oninput="upd(${i},'gl_pattern',this.value)"></td>
+      <td class="px-3 py-2"><input type="number" step="0.01" class="w-32 border rounded px-2 py-1" value="${a.max_amount}" oninput="upd(${i},'max_amount',+this.value)"></td>
+      <td class="px-3 py-2"><input class="w-56 border rounded px-2 py-1" value="${esc((a.fund_restrictions||[]).join(','))}" oninput="upd(${i},'fund_restrictions',this.value.split(',').map(s=>s.trim()).filter(Boolean))" placeholder="GEN,OUTREACH (empty = all)"></td>
+      <td class="px-3 py-2 text-center"><input type="checkbox" ${a.can_override_restrictions?'checked':''} onchange="upd(${i},'can_override_restrictions',this.checked)"></td>
+      <td class="px-3 py-2"><button onclick="del(${i})" class="text-red-600 hover:underline">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+function esc(s) { return String(s||'').replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c])); }
+
+function upd(i, k, v) { authorities[i][k] = v; }
+
+function addRow() {
+  authorities.push({
+    authority_id: '',
+    role: 'BUDGET_OWNER',
+    gl_pattern: '',
+    max_amount: 1000.0,
+    can_override_restrictions: false,
+    fund_restrictions: [],
+  });
+  render();
+}
+
+async function del(i) {
+  const id = authorities[i].authority_id;
+  if (id) {
+    const r = await fetch(`/api/churches/${activeChurch}/authorities/${id}`, { method: 'DELETE' });
+    if (!r.ok) {
+      alert('Delete failed: ' + r.status);
+      return;
+    }
+  }
+  authorities.splice(i, 1);
+  render();
+}
+
+async function saveAll() {
+  let okCount = 0;
+  let failCount = 0;
+  for (const a of authorities) {
+    const body = {
+      authority_id: a.authority_id || undefined,
+      role: a.role,
+      gl_pattern: a.gl_pattern,
+      max_amount: a.max_amount,
+      can_override_restrictions: !!a.can_override_restrictions,
+      fund_restrictions: a.fund_restrictions || [],
+    };
+    let url = `/api/churches/${activeChurch}/authorities`;
+    let method = 'POST';
+    if (a.authority_id) {
+      url = `/api/churches/${activeChurch}/authorities/${a.authority_id}`;
+      method = 'PUT';
+    }
+    const r = await fetch(url, {
+      method,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (r.ok) okCount++; else failCount++;
+  }
+  await load();
+  alert(`Saved ${okCount} rule(s)` + (failCount ? `, ${failCount} failed` : '.'));
+}
+
+async function runCheck() {
+  if (!activeChurch) return;
+  const role = document.getElementById('test-role').value;
+  const gl = document.getElementById('test-gl').value;
+  const fund = document.getElementById('test-fund').value;
+  const amount = document.getElementById('test-amount').value;
+  const url = `/api/churches/${activeChurch}/authorities/check?role=${encodeURIComponent(role)}&gl=${encodeURIComponent(gl)}&fund=${encodeURIComponent(fund)}&amount=${encodeURIComponent(amount)}`;
+  const r = await fetch(url);
+  const out = await r.json();
+  const el = document.getElementById('check-result');
+  if (out.allowed) {
+    el.innerHTML = `<span class="text-green-700 font-medium">ALLOWED</span> &mdash; rule <code>${esc(out.authority_id)}</code>`;
+  } else {
+    el.innerHTML = `<span class="text-red-700 font-medium">DENIED</span> &mdash; ${esc(out.reason)}`;
+  }
+}
+
+window.switchChurch = switchChurch;
+window.upd = upd;
+window.addRow = addRow;
+window.del = del;
+window.saveAll = saveAll;
+window.runCheck = runCheck;
+
+init();
+</script>
+
+</body>
+</html>

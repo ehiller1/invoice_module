@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif;">
+  <h2>Approval Request: {{ vendor_name }} — ${{ amount }}</h2>
+  <p>Hello {{ approver_name }},</p>
+  <p>An invoice from <strong>{{ vendor_name }}</strong> dated {{ invoice_date }} for <strong>${{ amount }}</strong> requires your approval.</p>
+
+  <h3>Proposed GL: {{ proposed_gl_code }} ({{ proposed_gl_name }})</h3>
+  <h3>Budget Impact:</h3>
+  <ul>
+    <li>Annual budget: ${{ annual_budget }}</li>
+    <li>YTD spent: ${{ ytd_actual }}</li>
+    <li>This invoice: ${{ amount }}</li>
+    <li>After this invoice: ${{ projected_after }} ({{ projected_pct }}% of budget)</li>
+  </ul>
+
+  <div style="margin: 24px 0;">
+    <a href="{{ approve_url }}" style="background:#10b981; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; margin-right:8px;">&#10003; Approve</a>
+    <a href="{{ correct_url }}" style="background:#f59e0b; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; margin-right:8px;">&#9998; Approve with Correction</a>
+    <a href="{{ reject_url }}" style="background:#ef4444; color:white; padding:12px 24px; text-decoration:none; border-radius:6px;">&#10007; Reject</a>
+  </div>
+
+  <p style="color:#6b7280; font-size:12px;">Token expires in 48 hours. EIME — Holy Comforter Episcopal Church</p>
+</body>
+</html>

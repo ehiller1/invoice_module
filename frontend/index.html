@@ -28,6 +28,7 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
   </style>
+  <link rel="stylesheet" href="/responsive.css" />
 </head>
 <body class="h-full bg-slate-50 font-sans">
 
@@ -328,6 +329,21 @@ const API = 'http://localhost:8001';
 let currentJobId = null;
 let pollInterval = null;
 
+// Redirect to setup wizard if not configured
+(async () => {
+  try {
+    const res = await fetch(`${API}/api/setup/status`);
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.setup_complete) {
+        window.location.href = '/setup-wizard.html';
+      }
+    }
+  } catch (e) {
+    // Backend not available, continue loading normally
+  }
+})();
+
 // Load churches
 async function loadChurches() {
   const res = await fetch(`${API}/api/churches`);
@@ -495,5 +511,6 @@ loadChurches();
 checkHITL();
 setInterval(checkHITL, 15000);
 </script>
+<script src="/eime-responsive.js"></script>
 </body>
 </html>

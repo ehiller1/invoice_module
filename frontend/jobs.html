@@ -24,6 +24,7 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
   </style>
+  <link rel="stylesheet" href="/responsive.css" />
 </head>
 <body class="h-full bg-slate-50 font-sans">
 <div class="flex h-full">
@@ -553,5 +554,6 @@ loadChurch();
 loadJobs();
 setInterval(loadJobs, 5000);
 </script>
+<script src="/eime-responsive.js"></script>
 </body>
 </html>

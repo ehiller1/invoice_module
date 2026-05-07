@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge Base — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    .fade-in { animation: fadeIn 0.25s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .drop-zone.dragover { background-color: #f0f9ff; border-color: #2d5399; }
+    mark { background: #fef3c7; padding: 0 2px; border-radius: 2px; }
+  </style>
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 id="kb-title" class="text-lg font-semibold text-slate-800">Knowledge Base</h1>
+      <p class="text-sm text-slate-500">
+        Search and manage church-specific accounting reference documents.
+        Combined with denominational canon (TEC, UMC, PC(USA), etc.) on every chat turn.
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector"
+        class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+    </div>
+  </header>
+
+  <div class="px-8 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- LEFT (search + results) — spans 2 cols -->
+    <section class="lg:col-span-2 space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <form id="kb-search-form" class="flex gap-2">
+          <input id="kb-search-input" type="text" autocomplete="off"
+            placeholder="Search the knowledge base, e.g. 'discretionary fund disbursement rules'"
+            class="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-navy-600 outline-none" />
+          <button type="submit"
+            class="bg-navy-900 hover:bg-navy-800 text-white rounded-lg px-4 py-2 text-sm font-medium">
+            Search
+          </button>
+        </form>
+        <p class="text-[11px] text-slate-400 mt-1.5">
+          Searches both the global denominational canon and this church's uploaded documents.
+        </p>
+      </div>
+
+      <div id="kb-results" class="space-y-3">
+        <div class="text-center text-slate-400 text-sm py-12">
+          Run a search above to see relevant passages with citations.
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT (uploaded docs + upload zone) -->
+    <aside class="space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-800 mb-2">Upload reference document</h3>
+        <p class="text-xs text-slate-500 mb-3">
+          PDF, Markdown (.md), or plain text (.txt). Drag and drop, or click to browse.
+        </p>
+        <div id="drop-zone" class="drop-zone border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 transition-colors">
+          <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <p class="text-xs text-slate-600">Drop a file here or <span class="text-navy-700 underline">browse</span></p>
+          <input id="file-input" type="file" accept=".pdf,.md,.markdown,.txt,.rst" class="hidden" />
+        </div>
+        <div id="upload-status" class="hidden mt-3 text-xs"></div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-800 mb-3">Uploaded documents</h3>
+        <ul id="kb-file-list" class="space-y-2">
+          <li class="text-xs text-slate-400">Loading…</li>
+        </ul>
+      </div>
+    </aside>
+
+  </div>
+</template>
+
+<script>
+const API = (window.EIME_API) || 'http://localhost:8001';
+let activeChurch = null;
+
+async function init() {
+  const tpl = document.getElementById('page-center-content');
+  await EIMEShell.mount({
+    activeNav: 'kb',
+    centerContent: tpl.innerHTML,
+    onMounted: bootstrap,
+  });
+}
+
+async function bootstrap() {
+  const churches = await fetch(`${API}/api/churches`).then(r => r.json()).catch(() => []);
+  const sel = document.getElementById('church-selector');
+  if (!sel) return;
+  sel.innerHTML = churches.map(c =>
+    `<option value="${c.church_id}">${escapeHtml(c.church_name || c.church_id)}</option>`
+  ).join('');
+
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    document.getElementById('kb-title').textContent =
+      `Knowledge Base — ${churches[0].church_name || activeChurch}`;
+    // Tell the chat rail which church we're focused on
+    if (window.eime && window.eime.dispatchAction) {
+      window.eime.dispatchAction('SET_CONTEXT', {
+        page: 'kb', payload: { church_id: activeChurch },
+      });
+    }
+    if (window.eime && window.eime.setActiveChurch) {
+      window.eime.setActiveChurch(activeChurch);
+    }
+    await loadFileList();
+  }
+
+  sel.addEventListener('change', async () => {
+    activeChurch = sel.value;
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('kb-title').textContent =
+      `Knowledge Base — ${opt.textContent}`;
+    if (window.eime && window.eime.setActiveChurch) {
+      window.eime.setActiveChurch(activeChurch);
+    }
+    await loadFileList();
+  });
+
+  // Search
+  document.getElementById('kb-search-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const q = document.getElementById('kb-search-input').value.trim();
+    if (!q || !activeChurch) return;
+    await runSearch(q);
+  });
+
+  // Upload — click + drag
+  const dz = document.getElementById('drop-zone');
+  const fi = document.getElementById('file-input');
+  dz.addEventListener('click', () => fi.click());
+  fi.addEventListener('change', () => {
+    if (fi.files && fi.files[0]) handleUpload(fi.files[0]);
+  });
+  ['dragenter', 'dragover'].forEach((ev) => {
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach((ev) => {
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('dragover'); });
+  });
+  dz.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUpload(e.dataTransfer.files[0]);
+    }
+  });
+}
+
+async function runSearch(query) {
+  const root = document.getElementById('kb-results');
+  root.innerHTML = '<div class="text-center text-slate-400 text-sm py-8">Searching…</div>';
+  let hits;
+  try {
+    const url = `${API}/api/churches/${encodeURIComponent(activeChurch)}/kb/search?q=${encodeURIComponent(query)}&k=5`;
+    hits = await fetch(url).then(r => r.json());
+  } catch (e) {
+    root.innerHTML = `<div class="text-red-600 text-sm">Search failed: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  if (!hits || hits.length === 0) {
+    root.innerHTML = '<div class="text-center text-slate-400 text-sm py-8">No matches.</div>';
+    return;
+  }
+  root.innerHTML = hits.map((h) => {
+    const source = h.church_id
+      ? `${escapeHtml(h.source_filename || '')} <span class="text-slate-400">(parish)</span>`
+      : `${escapeHtml(h.denomination || 'Canon')} <span class="text-slate-400">(global)</span>`;
+    const citation = escapeHtml(h.citation || '—');
+    const text = escapeHtml((h.text || '').slice(0, 600));
+    const score = (h.score || 0).toFixed(3);
+    return `<article class="bg-white rounded-xl border border-slate-200 p-4 fade-in">
+      <div class="flex items-center justify-between mb-1">
+        <p class="text-xs font-semibold text-navy-800">${citation}</p>
+        <span class="text-[10px] text-slate-400">score ${score}</span>
+      </div>
+      <p class="text-[11px] text-slate-500 mb-2">Source: ${source}</p>
+      <p class="text-sm text-slate-700 whitespace-pre-wrap">${text}</p>
+    </article>`;
+  }).join('');
+}
+
+async function handleUpload(file) {
+  if (!activeChurch) return;
+  const status = document.getElementById('upload-status');
+  status.classList.remove('hidden');
+  status.className = 'mt-3 text-xs text-slate-600';
+  status.textContent = `Uploading ${file.name}…`;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch(
+      `${API}/api/churches/${encodeURIComponent(activeChurch)}/kb/upload`,
+      { method: 'POST', body: fd },
+    );
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Upload failed');
+    status.className = 'mt-3 text-xs text-emerald-700';
+    status.textContent = `Uploaded ${data.filename} — ${data.chunk_count} chunks indexed.`;
+    await loadFileList();
+  } catch (e) {
+    status.className = 'mt-3 text-xs text-red-700';
+    status.textContent = `Upload failed: ${e.message}`;
+  }
+}
+
+async function loadFileList() {
+  const ul = document.getElementById('kb-file-list');
+  if (!ul || !activeChurch) return;
+  let files;
+  try {
+    files = await fetch(
+      `${API}/api/churches/${encodeURIComponent(activeChurch)}/kb/list`,
+    ).then(r => r.json());
+  } catch (e) {
+    ul.innerHTML = `<li class="text-xs text-red-600">Failed to load: ${escapeHtml(e.message)}</li>`;
+    return;
+  }
+  if (!files || files.length === 0) {
+    ul.innerHTML = '<li class="text-xs text-slate-400">No documents uploaded yet.</li>';
+    return;
+  }
+  ul.innerHTML = files.map((f) => {
+    const sizeKb = ((f.size_bytes || 0) / 1024).toFixed(1);
+    return `<li class="flex items-center justify-between gap-2 text-xs">
+      <div class="min-w-0 flex-1">
+        <p class="font-medium text-slate-800 truncate" title="${escapeHtml(f.filename)}">${escapeHtml(f.filename)}</p>
+        <p class="text-slate-500">${f.chunk_count} chunks · ${sizeKb} KB</p>
+      </div>
+      <button data-fn="${escapeHtml(f.filename)}" class="kb-delete text-red-600 hover:text-red-800">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+      </button>
+    </li>`;
+  }).join('');
+  ul.querySelectorAll('.kb-delete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const fn = btn.getAttribute('data-fn');
+      if (!confirm(`Delete ${fn}? This will also remove its chunks from the knowledge base.`)) return;
+      try {
+        const r = await fetch(
+          `${API}/api/churches/${encodeURIComponent(activeChurch)}/kb/${encodeURIComponent(fn)}`,
+          { method: 'DELETE' },
+        );
+        if (!r.ok) throw new Error('Delete failed');
+        await loadFileList();
+      } catch (e) {
+        alert(`Delete failed: ${e.message}`);
+      }
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+init();
+</script>
+</body>
+</html>

@@ -501,6 +501,10 @@ class ProcessingJob(BaseModel):
     reminders_sent: List[Dict[str, Any]] = Field(default_factory=list)
     budget_owner_decision: Optional[Dict[str, Any]] = None
     treasurer_decision: Optional[Dict[str, Any]] = None
+    # FR-NF-Authority: budgetary authority routing
+    primary_approver_role: Optional[str] = None  # role used for authority check
+    escalation_reason: Optional[str] = None
+    escalation_level: Optional[str] = None  # "TREASURER" when authority lacks
 
 
 # ===== FR-05 Approval Chain =====
@@ -515,3 +519,199 @@ class ApprovalChain(BaseModel):
     deadline_hours: int = 48
     escalation_days: int = 5
     active: bool = True
+
+
+# ===== FR-07 Bank Reconciliation =====
+
+class BankTransaction(BaseModel):
+    """A single bank-side transaction parsed from CSV/OFX/QFX."""
+    txn_id: str  # generated unique id
+    date: date
+    description: str
+    amount: Decimal  # positive=deposit, negative=withdrawal
+    type: str = "DEBIT"  # CHECK, ACH, CREDIT, DEBIT, TRANSFER, FEE, INTEREST
+    raw: Optional[Dict[str, Any]] = None
+    source_filename: Optional[str] = None
+
+
+class MatchResult(BaseModel):
+    """A successful match between a bank txn and an ACS-side entry."""
+    bank_txn_id: str
+    acs_txn_ref: Optional[str] = None  # ProcessingJob.job_id or Manual JE entry_id
+    match_type: str  # "EXACT", "FUZZY", "VANCO_PATTERN"
+    confidence: float = 1.0
+
+
+class ReconException(BaseModel):
+    """An unmatched item or amount discrepancy needing review."""
+    exception_id: str
+    bank_txn_id: Optional[str] = None  # if in bank but not ACS
+    acs_txn_ref: Optional[str] = None  # if in ACS but not bank
+    issue: str  # "BANK_ONLY", "ACS_ONLY", "AMOUNT_MISMATCH"
+    proposed_correction: Optional[Dict[str, Any]] = None  # draft JE
+    resolved: bool = False
+
+
+# ===== FR-08 Payment Initiation =====
+
+
+class PaymentMethod(str, Enum):
+    ACH = "ACH"
+    CHECK = "CHECK"
+    CREDIT_CARD = "CREDIT_CARD"
+    WIRE = "WIRE"
+
+
+class Vendor(BaseModel):
+    vendor_id: str
+    church_id: str
+    name: str
+    payment_methods: List[PaymentMethod] = Field(default_factory=list)
+    preferred_method: Optional[PaymentMethod] = None
+    ach_routing: Optional[str] = None
+    ach_account_enc: Optional[str] = None  # Fernet-encrypted
+    ach_account_last4: Optional[str] = None  # display-safe
+    address: Optional[str] = None
+    w9_on_file: bool = False
+    notes: Optional[str] = None
+
+
+class PaymentStatus(str, Enum):
+    DRAFT = "DRAFT"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    SENT = "SENT"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class ACHRecord(BaseModel):
+    routing_number: str
+    account_number_last4: str
+    amount: Decimal
+    payment_date: date
+    memo: Optional[str] = None
+
+
+class CheckRecord(BaseModel):
+    payee: str
+    amount: Decimal
+    address: Optional[str] = None
+    memo: Optional[str] = None
+    check_date: date
+    check_number: Optional[str] = None
+
+
+class CreditCardMemo(BaseModel):
+    card_last4: Optional[str] = None
+    amount: Decimal
+    vendor_name: str
+    description: str
+    instruction: str  # human-executable instruction text
+
+
+class PaymentInstruction(BaseModel):
+    payment_id: str
+    church_id: str
+    vendor_id: Optional[str] = None
+    je_id: Optional[str] = None
+    method: PaymentMethod
+    amount: Decimal
+    status: PaymentStatus = PaymentStatus.DRAFT
+    ach_record: Optional[ACHRecord] = None
+    check_record: Optional[CheckRecord] = None
+    cc_memo: Optional[CreditCardMemo] = None
+    requested_by: Optional[str] = None
+    approved_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    notes: Optional[str] = None
+
+
+class ReconciliationSession(BaseModel):
+    """A multi-fund bank reconciliation session for a single period."""
+    session_id: str
+    church_id: str
+    period: str  # e.g. "2026-04"
+    fund_ids: List[str] = Field(default_factory=list)
+    statement_files: List[str] = Field(default_factory=list)
+    bank_transactions: List[BankTransaction] = Field(default_factory=list)
+    matches: List[MatchResult] = Field(default_factory=list)
+    exceptions: List[ReconException] = Field(default_factory=list)
+    status: str = "OPEN"  # OPEN, MATCHING, EXCEPTIONS_REVIEW, BALANCED, SUBMITTED
+    opening_balance: Optional[Decimal] = None
+    closing_balance: Optional[Decimal] = None
+    acs_balance: Optional[Decimal] = None
+    variance: Optional[Decimal] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ===== FR-NF-Authority: Budgetary Authority Routing Matrix =====
+
+class BudgetaryAuthority(BaseModel):
+    """A role-/GL-/amount-based authority rule for invoice approvals.
+
+    Used by the Step 7a+ check to verify a primary approver actually has
+    authority to approve a given GL line at a given amount, in a given fund.
+    """
+    authority_id: str
+    church_id: str
+    role: str  # FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN
+    gl_pattern: str  # "6*" or "6500-6600" or "8410" (exact)
+    max_amount: float  # Dollar limit per transaction
+    can_override_restrictions: bool = False  # Can approve restricted-fund violations?
+    fund_restrictions: List[str] = Field(default_factory=list)  # Empty = all funds
+    created_at: datetime
+    updated_at: datetime
+
+
+# ===== FR-Bank-Integration: Plaid API =====
+
+class PlaidAccount(BaseModel):
+    """A linked bank account (sourced from Plaid)."""
+    account_id: str
+    church_id: str
+    access_token_enc: str  # Fernet encrypted
+    account_number: str = ""  # Last4 typically; full account never stored
+    routing_number: str = ""
+    account_type: str  # "depository", etc.
+    account_subtype: str  # "checking", "savings", "money_market"
+    mask: str  # Last 4
+    name: str  # Display name
+    current_balance: float = 0.0
+    available_balance: float = 0.0
+    balance_updated_at: datetime
+    linked_at: datetime
+    is_ach_enabled: bool = True
+    created_at: datetime
+
+
+class PlaidTransaction(BaseModel):
+    """A transaction fetched from Plaid for reconciliation."""
+    txn_id: str
+    account_id: str
+    date: date
+    description: str
+    amount: float  # Plaid: positive = outflow
+    category: str = ""
+    merchant_name: Optional[str] = None
+    fetched_at: datetime
+
+
+# ===== Phase 3.8: Recurring JEs =====
+
+class RecurringJE(BaseModel):
+    """A recurring journal-entry schedule. The scheduler clones the template
+    JE and persists it as a DRAFT JE on each cron firing."""
+    recurring_id: str
+    church_id: str
+    template_je: Dict[str, Any]  # JournalEntry payload
+    schedule_cron: str  # 5-field cron expression e.g. "0 2 1 * *"
+    active: bool = True
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    last_drafted_at: Optional[datetime] = None
+    next_run: Optional[datetime] = None
+    draft_count: int = 0

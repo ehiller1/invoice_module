@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Journal Entries</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <h1 class="text-2xl font-bold mb-4">Journal Entries</h1>
+
+  <div class="border-b mb-4 flex items-center justify-between">
+    <nav class="flex gap-4">
+      <button class="je-tab" data-state="DRAFT">Drafts</button>
+      <button class="je-tab" data-state="OPEN">Open</button>
+      <button class="je-tab" data-state="PENDING_TREASURER">Pending Treasurer</button>
+      <button class="je-tab" data-state="APPROVED">Approved</button>
+      <button class="je-tab" data-state="POSTED">Posted</button>
+      <button class="je-tab" data-state="REJECTED">Rejected</button>
+      <button class="je-tab" data-state="RECURRING">Recurring</button>
+    </nav>
+    <div class="flex gap-2">
+      <input id="csv-file-input" type="file" accept=".csv" class="hidden" />
+      <button id="csv-import-btn" class="px-3 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700">Import CSV</button>
+    </div>
+  </div>
+
+  <div id="je-list" class="space-y-3"></div>
+  <div id="csv-result" class="mt-4"></div>
+</div>
+
+<!-- FR-NF: ACS confirmation gate modal -->
+<div id="acs-confirm-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="acs-confirm-title">
+  <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+    <h2 id="acs-confirm-title" class="text-xl font-bold text-red-700 mb-2 flex items-center gap-2">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      Confirm ACS Realm Posting
+    </h2>
+    <p class="text-gray-700 mb-3">You are about to post journal entry <code id="acs-confirm-jeid" class="font-mono bg-gray-100 px-1 rounded"></code> to the live ACS Realm system.</p>
+    <ul class="text-sm text-gray-600 mb-4 list-disc ml-5 space-y-1">
+      <li>This action runs browser automation against the live ACS system.</li>
+      <li>This action <strong>cannot be undone</strong>.</li>
+      <li>The journal entry will be permanently recorded.</li>
+      <li>Only the treasurer is authorized to take this action.</li>
+    </ul>
+    <label class="flex items-start gap-2 mb-4 text-sm">
+      <input id="acs-confirm-checkbox" type="checkbox" class="mt-0.5" />
+      <span>I am the treasurer authorizing this post and I understand it cannot be undone.</span>
+    </label>
+    <div class="flex justify-end gap-2">
+      <button id="acs-cancel-btn" class="px-4 py-2 text-sm rounded bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</button>
+      <button id="acs-confirm-btn" class="px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed" disabled>Post to ACS</button>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+let currentChurch = 'holy_comforter';
+let currentRole = 'TREASURER_ADMIN';  // TODO: read from /api/me
+
+EIMEShell.mount({
+  activeNav: 'jobs',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    setupTabs();
+  }
+});
+
+function setupTabs() {
+  document.querySelectorAll('.je-tab').forEach(tab => {
+    tab.className = 'je-tab px-3 py-2 text-sm font-medium border-b-2 border-transparent';
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.je-tab').forEach(t => t.classList.remove('border-blue-500', 'text-blue-600'));
+      tab.classList.add('border-blue-500', 'text-blue-600');
+      const state = tab.dataset.state;
+      if (state === 'RECURRING') {
+        loadRecurring();
+      } else {
+        loadJes(state);
+      }
+    });
+  });
+  document.querySelector('.je-tab[data-state="DRAFT"]').click();
+  setupCsvImport();
+}
+
+function setupCsvImport() {
+  const btn = document.getElementById('csv-import-btn');
+  const input = document.getElementById('csv-file-input');
+  const resultBox = document.getElementById('csv-result');
+  if (!btn || !input) return;
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    resultBox.innerHTML = '<div class="text-gray-500">Uploading...</div>';
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('church_id', currentChurch);
+    try {
+      const res = await fetch('/api/jes/import-csv', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Import failed');
+      const errsHtml = (data.errors && data.errors.length)
+        ? `<details class="mt-2"><summary class="cursor-pointer text-red-600">${data.errors.length} row error(s)</summary>
+            <ul class="list-disc ml-6 text-sm text-red-600">${data.errors.map(e => `<li>${typeof e === 'string' ? e : (e.error || JSON.stringify(e))}</li>`).join('')}</ul>
+          </details>`
+        : '';
+      resultBox.innerHTML = `
+        <div class="border border-green-200 bg-green-50 text-green-800 rounded p-3">
+          Imported ${data.drafted_count || 0} JEs from <code>${file.name}</code>.
+          ${errsHtml}
+        </div>`;
+      // Refresh draft list.
+      const draftTab = document.querySelector('.je-tab[data-state="DRAFT"]');
+      if (draftTab) draftTab.click();
+    } catch (err) {
+      resultBox.innerHTML = `<div class="border border-red-200 bg-red-50 text-red-700 rounded p-3">Error: ${err.message}</div>`;
+    } finally {
+      input.value = '';
+    }
+  });
+}
+
+async function loadRecurring() {
+  const list = document.getElementById('je-list');
+  list.innerHTML = '<div class="text-gray-500">Loading recurring schedules...</div>';
+  try {
+    const url = `/api/jes/recurring?church_id=${encodeURIComponent(currentChurch)}`;
+    const res = await fetch(url);
+    const items = await res.json();
+    if (!Array.isArray(items) || !items.length) {
+      list.innerHTML = '<div class="text-gray-500 italic">No recurring schedules configured.</div>';
+      return;
+    }
+    list.innerHTML = items.map(renderRecurringCard).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+  }
+}
+
+function renderRecurringCard(rec) {
+  const tpl = rec.template_je || {};
+  const memo = tpl.description || tpl.memo || '(no memo)';
+  const cron = rec.schedule_cron || '';
+  const next = rec.next_run ? new Date(rec.next_run).toLocaleString() : '—';
+  const last = rec.last_drafted_at ? new Date(rec.last_drafted_at).toLocaleString() : 'never';
+  const draftCount = rec.draft_count || 0;
+  const activeBadge = rec.active
+    ? '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700">ACTIVE</span>'
+    : '<span class="px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-600">PAUSED</span>';
+  return `
+    <div class="border rounded-lg p-4 bg-white shadow-sm">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-sm text-gray-500">${rec.recurring_id} · cron <code>${cron}</code></div>
+          <div class="font-semibold">${memo} ${activeBadge}</div>
+          <div class="text-xs text-gray-500 mt-1">Next: ${next} · Last: ${last} · Drafted ${draftCount}×</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="rec-action px-3 py-1 text-sm rounded bg-yellow-100 text-yellow-800" data-rec="${rec.recurring_id}" data-action="toggle" data-active="${rec.active}">${rec.active ? 'Pause' : 'Resume'}</button>
+          <button class="rec-action px-3 py-1 text-sm rounded bg-blue-100 text-blue-700" data-rec="${rec.recurring_id}" data-action="edit-cron" data-cron="${cron}">Edit cron</button>
+          <button class="rec-action px-3 py-1 text-sm rounded bg-red-100 text-red-700" data-rec="${rec.recurring_id}" data-action="delete">Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('rec-action')) return;
+  const rid = e.target.dataset.rec;
+  const action = e.target.dataset.action;
+  let body = null;
+  let method = 'PUT';
+  if (action === 'toggle') {
+    body = { active: e.target.dataset.active !== 'true' };
+  } else if (action === 'edit-cron') {
+    const next = prompt('5-field cron expression:', e.target.dataset.cron || '0 2 1 * *');
+    if (!next) return;
+    body = { schedule_cron: next };
+  } else if (action === 'delete') {
+    if (!confirm(`Delete recurring schedule ${rid}? This cannot be undone.`)) return;
+    method = 'DELETE';
+  } else {
+    return;
+  }
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`/api/jes/recurring/${encodeURIComponent(rid)}`, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Update failed');
+    loadRecurring();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+});
+
+async function loadJes(state) {
+  const list = document.getElementById('je-list');
+  list.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  try {
+    const url = `/api/jes?church_id=${encodeURIComponent(currentChurch)}&status=${encodeURIComponent(state)}`;
+    const res = await fetch(url);
+    const jes = await res.json();
+    if (!jes.length) {
+      list.innerHTML = '<div class="text-gray-500 italic">No journal entries in this state.</div>';
+      return;
+    }
+    list.innerHTML = jes.map(je => renderJeCard(je, state)).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+  }
+}
+
+function lineDebit(l) {
+  return parseFloat(l.debit ?? l.debit_amount ?? 0) || 0;
+}
+function lineCredit(l) {
+  return parseFloat(l.credit ?? l.credit_amount ?? 0) || 0;
+}
+
+function renderJeCard(je, state) {
+  const lines = je.lines || [];
+  const totalDebit = lines.reduce((s, l) => s + lineDebit(l), 0);
+  const actions = [];
+  if (state === 'DRAFT') actions.push({ label: 'Submit for Review', toState: 'OPEN', role: currentRole });
+  if (state === 'OPEN') actions.push({ label: 'Send to Treasurer', toState: 'PENDING_TREASURER', role: currentRole });
+  if (state === 'PENDING_TREASURER') {
+    actions.push({ label: 'Approve to Post', toState: 'APPROVED', role: currentRole });
+    actions.push({ label: 'Reject', toState: 'REJECTED', role: currentRole });
+  }
+  if (state === 'APPROVED') actions.push({ label: 'Post to ACS Realm', toState: 'POSTED', role: currentRole, isPost: true });
+
+  const memoText = je.description || je.memo || 'Journal Entry';
+
+  return `
+    <div class="border rounded-lg p-4 bg-white shadow-sm">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-sm text-gray-500">${je.entry_id} · ${je.entry_date || 'No date'}</div>
+          <div class="font-semibold">${memoText}</div>
+        </div>
+        <div class="text-lg font-bold">$${totalDebit.toFixed(2)}</div>
+      </div>
+      <div class="mt-3 text-sm">
+        ${lines.slice(0, 3).map(l => {
+          const dr = lineDebit(l), cr = lineCredit(l);
+          const amt = dr > 0 ? dr : cr;
+          return `
+          <div class="flex justify-between text-gray-600">
+            <span>${l.account_number || ''} · ${l.fund_id || ''}</span>
+            <span>${dr > 0 ? 'Dr' : 'Cr'} $${amt.toFixed(2)}</span>
+          </div>`;
+        }).join('')}
+        ${lines.length > 3 ? `<div class="text-gray-400">+${lines.length - 3} more lines</div>` : ''}
+      </div>
+      <div class="mt-3 flex gap-2">
+        ${actions.map(a => `<button class="je-action px-3 py-1 text-sm rounded ${a.isPost ? 'bg-green-600 text-white' : 'bg-blue-100 text-blue-700'}" data-je="${je.entry_id}" data-state="${a.toState}" data-ispost="${a.isPost || false}">${a.label}</button>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// FR-NF: ACS confirmation gate modal helper. Returns Promise<boolean>.
+function openAcsConfirmModal(jeId) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('acs-confirm-modal');
+    const idEl = document.getElementById('acs-confirm-jeid');
+    const checkbox = document.getElementById('acs-confirm-checkbox');
+    const confirmBtn = document.getElementById('acs-confirm-btn');
+    const cancelBtn = document.getElementById('acs-cancel-btn');
+    if (!modal || !idEl || !checkbox || !confirmBtn || !cancelBtn) {
+      // Fallback to native confirm if modal is missing for any reason.
+      resolve(window.confirm(`Post JE ${jeId} to ACS Realm? This cannot be undone.`));
+      return;
+    }
+    idEl.textContent = jeId;
+    checkbox.checked = false;
+    confirmBtn.disabled = true;
+    modal.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      checkbox.removeEventListener('change', onCheck);
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onCheck() { confirmBtn.disabled = !checkbox.checked; }
+    function onConfirm() { if (checkbox.checked) cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onBackdrop(ev) { if (ev.target === modal) cleanup(false); }
+    function onKey(ev) { if (ev.key === 'Escape') cleanup(false); }
+
+    checkbox.addEventListener('change', onCheck);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('je-action')) return;
+  const jeId = e.target.dataset.je;
+  const toState = e.target.dataset.state;
+  const isPost = e.target.dataset.ispost === 'true';
+
+  if (isPost) {
+    // FR-NF: ACS confirmation gate — explicit modal with checkbox attestation.
+    const confirmed = await openAcsConfirmModal(jeId);
+    if (!confirmed) return;
+    e.target.disabled = true;
+    e.target.textContent = 'Posting...';
+    try {
+      const res = await fetch(`/api/jes/${encodeURIComponent(jeId)}/post`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Role': 'TREASURER_ADMIN',
+        },
+        body: JSON.stringify({ confirmed: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Posting failed');
+      alert(`Posted! ACS Reference: ${data.acs_reference}${data.mock ? ' (MOCK MODE)' : ''}`);
+      document.querySelector('.je-tab.border-blue-500').click();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      e.target.disabled = false;
+    }
+  } else {
+    try {
+      const res = await fetch(`/api/jes/${encodeURIComponent(jeId)}/transition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_state: toState, role: currentRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Transition failed');
+      document.querySelector('.je-tab.border-blue-500').click();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+});
+</script>
+
+</body>
+</html>

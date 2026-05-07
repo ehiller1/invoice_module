@@ -21,7 +21,7 @@ if _env_file.exists():
     print(f"[EIME] Loaded {len(_env_vars)} env vars from {_env_file}", flush=True)
     print(f"[EIME] ANTHROPIC_API_KEY = {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:20]}...", flush=True)
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +39,7 @@ from .tools import approval_chain_resolver, approval_audit
 from .integrations.email import tokens as email_tokens
 from . import flow
 from . import scheduler as approval_scheduler
+from . import setup_wizard as _setup_wizard
 
 UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -59,6 +60,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Setup wizard endpoints (/api/setup/*)
+app.include_router(_setup_wizard.router)
 
 
 @app.on_event("startup")
@@ -536,8 +540,22 @@ class YTDResetBody(BaseModel):
 
 
 @app.put("/api/churches/{church_id}/budget/ytd-reset")
-async def ytd_reset(church_id: str, body: YTDResetBody) -> JSONResponse:
-    """Reset YTD actuals to zero. Requires explicit confirmation."""
+async def ytd_reset(
+    church_id: str,
+    body: YTDResetBody,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Reset YTD actuals to zero. Requires explicit confirmation.
+
+    RBAC: requires TREASURER_ADMIN role (FR-4.1).
+    """
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
     if not body.confirm:
         raise HTTPException(400, "ytd-reset requires `confirm: true`")
     ctx = coa_store.load_accounting_context(church_id)
@@ -1002,23 +1020,57 @@ async def list_approval_chains(church_id: str) -> JSONResponse:
 
 
 @app.put("/api/churches/{church_id}/approval-chains")
-async def replace_approval_chains(church_id: str,
-                                  body: List[ApprovalChainBody]) -> JSONResponse:
+async def replace_approval_chains(
+    church_id: str,
+    body: List[ApprovalChainBody],
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Replace approval chains. RBAC: requires TREASURER_ADMIN (FR-4.1)."""
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
     chains = [ApprovalChain(**c.model_dump()) for c in body]
     approval_chain_resolver.save_chains(church_id, chains)
     return _json({"ok": True, "count": len(chains)})
 
 
 @app.post("/api/churches/{church_id}/approval-chains")
-async def add_approval_chain(church_id: str,
-                             body: ApprovalChainBody) -> JSONResponse:
+async def add_approval_chain(
+    church_id: str,
+    body: ApprovalChainBody,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Add an approval chain. RBAC: requires TREASURER_ADMIN (FR-4.1)."""
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
     chain = ApprovalChain(**body.model_dump())
     chains = approval_chain_resolver.add_chain(church_id, chain)
     return _json({"ok": True, "count": len(chains)})
 
 
 @app.delete("/api/churches/{church_id}/approval-chains/{chain_id}")
-async def delete_approval_chain(church_id: str, chain_id: str) -> JSONResponse:
+async def delete_approval_chain(
+    church_id: str,
+    chain_id: str,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Delete an approval chain. RBAC: requires TREASURER_ADMIN (FR-4.1)."""
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
     chains = approval_chain_resolver.remove_chain(church_id, chain_id)
     return _json({"ok": True, "count": len(chains)})
 
@@ -1114,8 +1166,23 @@ class TreasurerDecisionBody(BaseModel):
 
 
 @app.post("/api/jobs/{job_id}/treasurer-decision")
-async def treasurer_decision(job_id: str, body: TreasurerDecisionBody,
-                             background_tasks: BackgroundTasks) -> JSONResponse:
+async def treasurer_decision(
+    job_id: str,
+    body: TreasurerDecisionBody,
+    background_tasks: BackgroundTasks,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Treasurer makes APPROVE/REJECT decision on a job.
+
+    RBAC: requires TREASURER_ADMIN role (FR-4.1).
+    """
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
     job = flow.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1291,9 +1358,30 @@ def _update_je_in_store(je: Any, church_id: str) -> None:
 
 
 @app.post("/api/jes/{je_id}/post")
-async def post_je_to_acs(je_id: str) -> JSONResponse:
-    """Post an APPROVED journal entry to ACS Realm via browser automation."""
+async def post_je_to_acs(je_id: str, request: Request, body: Optional[Dict[str, Any]] = None) -> JSONResponse:
+    """Post an APPROVED journal entry to ACS Realm via browser automation.
+
+    RBAC: requires TREASURER_ADMIN role (or higher).
+    Requires explicit `confirmed=true` in body (ACS confirmation gate).
+    """
+    from .auth import get_caller_role, has_role
     from .models.schemas import JEStatus
+
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
+
+    body = body or {}
+    if not body.get("confirmed"):
+        raise HTTPException(
+            428,
+            "ACS confirmation required. POST again with {confirmed: true} "
+            "after the treasurer confirms.",
+        )
+
     je, church_id = _find_journal_entry(je_id)
     if not je:
         raise HTTPException(404, "JE not found")
@@ -1439,14 +1527,900 @@ def list_jes(
     return _json(jes)
 
 
+# =====================================================================
+# Phase 3.7 — Payment Initiation endpoints
+# =====================================================================
+
+PAYMENT_DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def _payments_path(church_id: str) -> Path:
+    safe = "".join(c for c in church_id if c.isalnum() or c in "_-") or "default"
+    return PAYMENT_DATA_DIR / f"payments_{safe}.jsonl"
+
+
+def _persist_payment(church_id: str, payment_dict: Dict[str, Any]) -> None:
+    PAYMENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path = _payments_path(church_id)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payment_dict, default=str) + "\n")
+
+
+def _load_payments(church_id: str) -> List[Dict[str, Any]]:
+    p = _payments_path(church_id)
+    if not p.exists():
+        return []
+    out: List[Dict[str, Any]] = []
+    for line in p.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def _find_payment(payment_id: str):
+    """Return (payment_dict, church_id) or (None, None)."""
+    for f in PAYMENT_DATA_DIR.glob("payments_*.jsonl"):
+        cid = f.stem.replace("payments_", "")
+        try:
+            content = f.read_text()
+        except Exception:
+            continue
+        # Walk backwards to get the latest record for this payment_id.
+        latest = None
+        for line in content.splitlines():
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if data.get("payment_id") == payment_id:
+                latest = data
+        if latest is not None:
+            return latest, cid
+    return None, None
+
+
+def _vendor_total_amount(je) -> Decimal:
+    total = Decimal("0")
+    for line in je.lines:
+        d = getattr(line, "debit", None) or Decimal("0")
+        try:
+            total += Decimal(str(d))
+        except Exception:
+            pass
+    return total
+
+
+@app.post("/api/jes/{je_id}/payment")
+async def create_payment_for_je(je_id: str, body: Dict[str, Any]) -> JSONResponse:
+    """FR-08: Create a payment instruction for an APPROVED JE.
+
+    Body: {method?: "ACH"|"CHECK"|"CREDIT_CARD"|"WIRE", vendor_name?: str}
+    Returns the PaymentInstruction plus a recommendation block.
+    """
+    from .models.schemas import (
+        PaymentInstruction, PaymentMethod, PaymentStatus,
+        ACHRecord, CheckRecord, CreditCardMemo,
+    )
+    from .tools import vendor_store
+    from .tools.payment_recommender import recommend_payment_method
+
+    je, church_id = _find_journal_entry(je_id)
+    if je is None:
+        raise HTTPException(404, f"JE {je_id} not found")
+
+    vendor_name = (body or {}).get("vendor_name") or je.vendor_name or "Unknown Vendor"
+    vendor = vendor_store.find_vendor_by_name(church_id, vendor_name)
+
+    recommendation = recommend_payment_method(je, vendor)
+    requested_method = (body or {}).get("method") or recommendation["recommended"]
+    try:
+        method = PaymentMethod(requested_method)
+    except ValueError:
+        raise HTTPException(422, f"Invalid payment method: {requested_method}")
+
+    amount = _vendor_total_amount(je)
+    now = datetime.utcnow()
+    payment_id = f"PMT-{je.entry_id}-{now.strftime('%Y%m%d%H%M%S')}"
+
+    ach_record = None
+    check_record = None
+    cc_memo = None
+    pay_date = je.entry_date if hasattr(je, "entry_date") else datetime.utcnow().date()
+
+    if method == PaymentMethod.ACH:
+        if vendor and vendor.ach_routing:
+            ach_record = ACHRecord(
+                routing_number=vendor.ach_routing,
+                account_number_last4=vendor.ach_account_last4 or "0000",
+                amount=amount,
+                payment_date=pay_date,
+                memo=je.description,
+            )
+        else:
+            ach_record = ACHRecord(
+                routing_number="000000000",
+                account_number_last4="0000",
+                amount=amount,
+                payment_date=pay_date,
+                memo=je.description,
+            )
+    elif method == PaymentMethod.CHECK:
+        check_record = CheckRecord(
+            payee=vendor_name,
+            amount=amount,
+            address=(vendor.address if vendor else None),
+            memo=je.description,
+            check_date=pay_date,
+        )
+    elif method == PaymentMethod.CREDIT_CARD:
+        cc_memo = CreditCardMemo(
+            amount=amount,
+            vendor_name=vendor_name,
+            description=je.description or "",
+            instruction=(
+                f"Charge ${amount} to organization credit card on file for "
+                f"{vendor_name}. JE {je.entry_id}."
+            ),
+        )
+
+    inst = PaymentInstruction(
+        payment_id=payment_id,
+        church_id=church_id,
+        vendor_id=(vendor.vendor_id if vendor else None),
+        je_id=je.entry_id,
+        method=method,
+        amount=amount,
+        status=PaymentStatus.PENDING_APPROVAL,
+        ach_record=ach_record,
+        check_record=check_record,
+        cc_memo=cc_memo,
+        requested_by=(body or {}).get("requested_by"),
+        created_at=now,
+        updated_at=now,
+    )
+
+    _persist_payment(church_id, inst.model_dump())
+
+    # Audit
+    try:
+        approval_audit.append_event(church_id, {
+            "event_type": "PAYMENT_CREATED",
+            "payment_id": payment_id,
+            "je_id": je.entry_id,
+            "method": method.value,
+            "amount": str(amount),
+            "actor": (body or {}).get("requested_by"),
+        })
+    except Exception:
+        pass
+
+    out = inst.model_dump()
+    out["recommendation"] = recommendation
+    return _json(out)
+
+
+@app.post("/api/payments/{payment_id}/approve")
+async def approve_payment(
+    payment_id: str,
+    body: Dict[str, Any],
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Treasurer approves a payment instruction → status=APPROVED.
+
+    RBAC: requires TREASURER_ADMIN role. Header check is **enforced when an
+    `X-User-Role` header is present** so we don't break legacy clients during
+    rollout; absent header is allowed for backward-compat.
+    """
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if actual is not None and not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual}' lacks TREASURER_ADMIN",
+        )
+
+    from .models.schemas import PaymentInstruction, PaymentStatus
+
+    data, church_id = _find_payment(payment_id)
+    if data is None:
+        raise HTTPException(404, f"Payment {payment_id} not found")
+
+    inst = PaymentInstruction(**data)
+    if inst.status not in (PaymentStatus.PENDING_APPROVAL, PaymentStatus.DRAFT):
+        raise HTTPException(
+            400, f"Cannot approve payment in status {inst.status}"
+        )
+
+    approver = (body or {}).get("approver_email") or (body or {}).get("approver")
+    if not approver:
+        raise HTTPException(422, "approver_email required")
+
+    inst.status = PaymentStatus.APPROVED
+    inst.approved_by = approver
+    inst.updated_at = datetime.utcnow()
+
+    _persist_payment(church_id, inst.model_dump())
+
+    try:
+        approval_audit.append_event(church_id, {
+            "event_type": "PAYMENT_APPROVED",
+            "payment_id": payment_id,
+            "actor": approver,
+        })
+    except Exception:
+        pass
+
+    return _json(inst.model_dump())
+
+
+@app.get("/api/payments/{payment_id}/ach-file")
+async def download_ach_file(payment_id: str):
+    """Return the NACHA ACH file as plain text."""
+    from .models.schemas import PaymentInstruction, PaymentMethod
+    from .tools.nacha_generator import generate_nacha_file
+
+    data, church_id = _find_payment(payment_id)
+    if data is None:
+        raise HTTPException(404, f"Payment {payment_id} not found")
+    inst = PaymentInstruction(**data)
+    if inst.method != PaymentMethod.ACH:
+        raise HTTPException(400, "Payment is not an ACH instruction")
+
+    content = generate_nacha_file([inst])
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(
+        content,
+        headers={"Content-Disposition": f'attachment; filename="{payment_id}.ach"'},
+    )
+
+
+@app.get("/api/payments/{payment_id}/check-pdf")
+async def download_check_pdf(payment_id: str):
+    """Generate a check PDF and return it as a file."""
+    from .models.schemas import PaymentInstruction, PaymentMethod
+    from .tools.check_generator import generate_check_pdf
+    import tempfile
+
+    data, church_id = _find_payment(payment_id)
+    if data is None:
+        raise HTTPException(404, f"Payment {payment_id} not found")
+    inst = PaymentInstruction(**data)
+    if inst.method != PaymentMethod.CHECK:
+        raise HTTPException(400, "Payment is not a check instruction")
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp.close()
+    out = generate_check_pdf(inst, tmp.name)
+    return FileResponse(
+        out,
+        media_type="application/pdf",
+        filename=f"{payment_id}.pdf",
+    )
+
+
+@app.get("/api/churches/{church_id}/payments")
+async def list_payments(church_id: str, status: Optional[str] = None) -> JSONResponse:
+    """List all payments for a church, optionally filtered by status."""
+    from .models.schemas import PaymentInstruction
+    payments = _load_payments(church_id)
+    # Dedup by payment_id keeping latest
+    by_id: Dict[str, Dict[str, Any]] = {}
+    for p in payments:
+        pid = p.get("payment_id")
+        if pid:
+            by_id[pid] = p
+    out = list(by_id.values())
+    if status:
+        out = [p for p in out if p.get("status") == status]
+    return _json(out)
+
+
+# ---- Vendor CRUD endpoints ----
+
+@app.get("/api/churches/{church_id}/vendors")
+async def list_vendors(church_id: str) -> JSONResponse:
+    from .tools import vendor_store
+    return _json([v.model_dump() for v in vendor_store.load_vendors(church_id)])
+
+
+@app.post("/api/churches/{church_id}/vendors")
+async def create_vendor(church_id: str, body: Dict[str, Any]) -> JSONResponse:
+    from .models.schemas import Vendor
+    from .tools import vendor_store
+    body = dict(body or {})
+    body["church_id"] = church_id
+    if not body.get("vendor_id"):
+        body["vendor_id"] = f"V-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    try:
+        v = Vendor(**body)
+    except Exception as e:
+        raise HTTPException(422, f"Invalid vendor: {e}") from e
+    saved = vendor_store.upsert_vendor(church_id, v)
+    return _json(saved.model_dump())
+
+
+@app.get("/api/churches/{church_id}/vendors/{vendor_id}")
+async def get_vendor(church_id: str, vendor_id: str) -> JSONResponse:
+    from .tools import vendor_store
+    for v in vendor_store.load_vendors(church_id):
+        if v.vendor_id == vendor_id:
+            return _json(v.model_dump())
+    raise HTTPException(404, f"Vendor {vendor_id} not found")
+
+
+@app.put("/api/churches/{church_id}/vendors/{vendor_id}")
+async def update_vendor(church_id: str, vendor_id: str, body: Dict[str, Any]) -> JSONResponse:
+    from .models.schemas import Vendor
+    from .tools import vendor_store
+    body = dict(body or {})
+    body["vendor_id"] = vendor_id
+    body["church_id"] = church_id
+    try:
+        v = Vendor(**body)
+    except Exception as e:
+        raise HTTPException(422, f"Invalid vendor: {e}") from e
+    saved = vendor_store.upsert_vendor(church_id, v)
+    return _json(saved.model_dump())
+
+
+@app.delete("/api/churches/{church_id}/vendors/{vendor_id}")
+async def delete_vendor(church_id: str, vendor_id: str) -> JSONResponse:
+    from .tools import vendor_store
+    vendors = vendor_store.load_vendors(church_id)
+    remaining = [v for v in vendors if v.vendor_id != vendor_id]
+    if len(remaining) == len(vendors):
+        raise HTTPException(404, f"Vendor {vendor_id} not found")
+    vendor_store.save_vendors(church_id, remaining)
+    return _json({"ok": True, "vendor_id": vendor_id})
+
+
+# =====================================================================
+# Phase 3.8 — Recurring JEs + CSV Import
+# =====================================================================
+
+RECURRING_DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def _recurring_path(church_id: str) -> Path:
+    safe = "".join(c for c in church_id if c.isalnum() or c in "_-") or "default"
+    return RECURRING_DATA_DIR / f"recurring_{safe}.jsonl"
+
+
+def _load_recurring(church_id: str) -> List[Dict[str, Any]]:
+    p = _recurring_path(church_id)
+    if not p.exists():
+        return []
+    out: List[Dict[str, Any]] = []
+    by_id: Dict[str, Dict[str, Any]] = {}
+    for line in p.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if d.get("recurring_id"):
+            by_id[d["recurring_id"]] = d
+    return list(by_id.values())
+
+
+def _persist_recurring(church_id: str, rec: Dict[str, Any]) -> None:
+    RECURRING_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path = _recurring_path(church_id)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, default=str) + "\n")
+
+
+@app.post("/api/jes/recurring")
+async def create_recurring_je(body: Dict[str, Any]) -> JSONResponse:
+    """Create a recurring JE schedule.
+
+    Body: {church_id, template_je: JournalEntry dict, schedule_cron: str,
+           created_by?: str, active?: bool}
+    """
+    from .models.schemas import JournalEntry
+    from .tools import recurring_store
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Body required")
+    church_id = body.get("church_id")
+    template = body.get("template_je")
+    cron = body.get("schedule_cron")
+    if not church_id or not template or not cron:
+        raise HTTPException(422, "church_id, template_je, schedule_cron required")
+    try:
+        JournalEntry(**template)
+    except Exception as e:
+        raise HTTPException(422, f"Invalid template_je: {e}") from e
+    # Honor RECURRING_DATA_DIR override (used by tests).
+    recurring_store.DATA_DIR = RECURRING_DATA_DIR
+    try:
+        rec = recurring_store.create_recurring(
+            church_id=str(church_id),
+            template_je=template,
+            cron=str(cron),
+            created_by=body.get("created_by"),
+            active=bool(body.get("active", True)),
+        )
+    except Exception as e:
+        raise HTTPException(422, f"Could not create recurring: {e}") from e
+    return _json(rec.model_dump())
+
+
+@app.get("/api/jes/recurring")
+async def list_recurring_jes(church_id: Optional[str] = None) -> JSONResponse:
+    if church_id:
+        return _json(_load_recurring(church_id))
+    out: List[Dict[str, Any]] = []
+    for f in RECURRING_DATA_DIR.glob("recurring_*.jsonl"):
+        cid = f.stem.replace("recurring_", "")
+        out.extend(_load_recurring(cid))
+    return _json(out)
+
+
+@app.put("/api/jes/recurring/{recurring_id}")
+async def update_recurring_je(recurring_id: str, body: Dict[str, Any]) -> JSONResponse:
+    from .tools import recurring_store
+    recurring_store.DATA_DIR = RECURRING_DATA_DIR
+    body = dict(body or {})
+    for f in RECURRING_DATA_DIR.glob("recurring_*.jsonl"):
+        cid = f.stem.replace("recurring_", "")
+        rec = recurring_store.find_recurring(cid, recurring_id)
+        if rec is None:
+            continue
+        # Apply allowed updates.
+        if "schedule_cron" in body:
+            rec.schedule_cron = str(body["schedule_cron"])
+            nxt = recurring_store.calculate_next_cron(rec.schedule_cron)
+            if nxt is not None:
+                rec.next_run = nxt
+        if "active" in body:
+            rec.active = bool(body["active"])
+        if "template_je" in body and isinstance(body["template_je"], dict):
+            rec.template_je = body["template_je"]
+        recurring_store.update_recurring(cid, rec)
+        return _json(rec.model_dump())
+    raise HTTPException(404, f"Recurring {recurring_id} not found")
+
+
+@app.delete("/api/jes/recurring/{recurring_id}")
+async def delete_recurring_je(recurring_id: str) -> JSONResponse:
+    from .tools import recurring_store
+    recurring_store.DATA_DIR = RECURRING_DATA_DIR
+    for f in RECURRING_DATA_DIR.glob("recurring_*.jsonl"):
+        cid = f.stem.replace("recurring_", "")
+        if recurring_store.delete_recurring(cid, recurring_id):
+            return _json({"ok": True, "recurring_id": recurring_id})
+    raise HTTPException(404, f"Recurring {recurring_id} not found")
+
+
+@app.post("/api/jes/import-csv")
+async def import_jes_csv(
+    file: UploadFile = File(...),
+    church_id: str = Form(...),
+    created_by: Optional[str] = Form(None),
+) -> JSONResponse:
+    """Batch CSV import: columns memo, from_account, to_account, amount, fund."""
+    from .tools.je_csv_importer import import_je_csv
+    raw = await file.read()
+    result = import_je_csv(
+        file_bytes=raw,
+        church_id=church_id,
+        created_by=created_by,
+        data_dir=JE_DATA_DIR,
+    )
+    return _json(result.to_dict())
+
+
+# =====================================================================
+# Phase 3.10 — Audit chain verify, model config
+# =====================================================================
+
+@app.get("/api/audit-chain/verify")
+@app.get("/api/audit/verify")
+async def audit_verify(church_id: Optional[str] = None) -> JSONResponse:
+    """Verify the SHA-256 hash chain integrity for one or all churches."""
+    from .tools.approval_audit import verify_chain
+    if church_id:
+        ok = verify_chain(church_id)
+        return _json({"valid": bool(ok), "church_id": church_id})
+    # Verify across all known churches
+    results: Dict[str, bool] = {}
+    audit_dir = Path(__file__).resolve().parent / "audit_trails"
+    if audit_dir.exists():
+        for f in audit_dir.glob("approvals_*.jsonl"):
+            cid = f.stem.replace("approvals_", "")
+            results[cid] = bool(verify_chain(cid))
+    all_valid = all(results.values()) if results else True
+    return _json({"valid": all_valid, "by_church": results})
+
+
+@app.get("/api/model-config")
+async def get_model_config() -> JSONResponse:
+    from .tools.model_router import load_model_config
+    return _json(load_model_config())
+
+
+@app.put("/api/model-config")
+async def put_model_config(
+    body: Dict[str, Any],
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Admin-only: override the LLM model used per agent.
+
+    RBAC: requires TREASURER_ADMIN role (FR-4.4).
+    """
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
+    from .tools.model_router import save_model_config
+    if not isinstance(body, dict):
+        raise HTTPException(422, "Body must be {agent: model_id}")
+    saved = save_model_config(body)
+    return _json(saved)
+
+
+@app.get("/api/model-config/{agent_name}")
+async def get_model_for_agent(agent_name: str) -> JSONResponse:
+    from .tools.model_router import resolve_model
+    return _json({"agent": agent_name, "model": resolve_model(agent_name)})
+
+
+# ===== FR-NF-Authority: Budgetary Authority Routing Matrix =====
+
+class BudgetaryAuthorityBody(BaseModel):
+    authority_id: Optional[str] = None
+    role: str
+    gl_pattern: str
+    max_amount: float
+    can_override_restrictions: bool = False
+    fund_restrictions: List[str] = []
+
+
+@app.get("/api/churches/{church_id}/authorities")
+async def list_authorities(church_id: str) -> JSONResponse:
+    from .tools import budgetary_authority as ba
+    rows = ba.load_authorities(church_id)
+    return _json([a.model_dump() for a in rows])
+
+
+@app.post("/api/churches/{church_id}/authorities")
+async def add_authority_endpoint(
+    church_id: str,
+    body: BudgetaryAuthorityBody,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Create a budgetary-authority rule. RBAC: TREASURER_ADMIN."""
+    from .auth import get_caller_role, has_role
+    from .tools import budgetary_authority as ba
+    from .models.schemas import BudgetaryAuthority
+    import uuid
+
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(
+            403,
+            f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN",
+        )
+    now = datetime.utcnow()
+    auth = BudgetaryAuthority(
+        authority_id=body.authority_id or f"auth-{uuid.uuid4().hex[:10]}",
+        church_id=church_id,
+        role=body.role,
+        gl_pattern=body.gl_pattern,
+        max_amount=body.max_amount,
+        can_override_restrictions=body.can_override_restrictions,
+        fund_restrictions=body.fund_restrictions or [],
+        created_at=now,
+        updated_at=now,
+    )
+    rows = ba.add_authority(church_id, auth)
+    return _json({"ok": True, "count": len(rows), "authority_id": auth.authority_id})
+
+
+@app.put("/api/churches/{church_id}/authorities/{authority_id}")
+async def update_authority_endpoint(
+    church_id: str,
+    authority_id: str,
+    body: BudgetaryAuthorityBody,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Update a rule. RBAC: TREASURER_ADMIN."""
+    from .auth import get_caller_role, has_role
+    from .tools import budgetary_authority as ba
+
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(403, f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN")
+
+    updates = {
+        "role": body.role,
+        "gl_pattern": body.gl_pattern,
+        "max_amount": body.max_amount,
+        "can_override_restrictions": body.can_override_restrictions,
+        "fund_restrictions": body.fund_restrictions or [],
+    }
+    updated = ba.update_authority(church_id, authority_id, updates)
+    if not updated:
+        raise HTTPException(404, f"Authority {authority_id} not found")
+    return _json(updated.model_dump())
+
+
+@app.delete("/api/churches/{church_id}/authorities/{authority_id}")
+async def delete_authority_endpoint(
+    church_id: str,
+    authority_id: str,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    """Delete a rule. RBAC: TREASURER_ADMIN."""
+    from .auth import get_caller_role, has_role
+    from .tools import budgetary_authority as ba
+
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(403, f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN")
+    rows = ba.remove_authority(church_id, authority_id)
+    return _json({"ok": True, "count": len(rows)})
+
+
+@app.get("/api/churches/{church_id}/authorities/check")
+async def check_authority_endpoint(
+    church_id: str,
+    role: str,
+    gl: str,
+    fund: str,
+    amount: float,
+) -> JSONResponse:
+    """Check if a (role, gl, fund, amount) combo is approvable."""
+    from .tools import budgetary_authority as ba
+    auth, reason = ba.get_authority_for_role_and_gl(church_id, role, gl, fund, amount)
+    return _json({
+        "allowed": auth is not None,
+        "reason": reason,
+        "authority_id": auth.authority_id if auth else None,
+        "can_override_restrictions": bool(auth and auth.can_override_restrictions),
+    })
+
+
+# ===== FR-Bank-Integration: Plaid =====
+
+class PlaidCompleteAuthBody(BaseModel):
+    public_token: str
+
+
+class PlaidSyncBody(BaseModel):
+    account_id: str
+    days_back: int = 60
+
+
+@app.post("/api/churches/{church_id}/plaid/create-link-token")
+async def plaid_create_link_token(church_id: str) -> JSONResponse:
+    """Generate a Plaid Link token for the UI to open Plaid Link."""
+    from .integrations import plaid_client
+    try:
+        churches = coa_store.list_churches()
+        church_name = next(
+            (c.get("church_name", church_id) for c in churches if c.get("church_id") == church_id),
+            church_id,
+        )
+        mgr = plaid_client.get_manager()
+        out = mgr.create_link_token(user_id=church_id, church_name=church_name)
+        return _json(out)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+
+
+@app.post("/api/churches/{church_id}/plaid/complete-auth")
+async def plaid_complete_auth(
+    church_id: str,
+    body: PlaidCompleteAuthBody,
+) -> JSONResponse:
+    """Exchange the public_token, fetch + store the accounts."""
+    from .integrations import plaid_client
+    from .tools import plaid_store
+    from .models.schemas import PlaidAccount
+
+    try:
+        mgr = plaid_client.get_manager()
+        access_token = mgr.exchange_public_token(body.public_token)
+        accounts_raw = mgr.get_accounts(access_token)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+
+    enc_token = plaid_store.encrypt_token(access_token)
+    saved = []
+    now = datetime.utcnow()
+    for entry in accounts_raw:
+        balances = entry.get("balances", {}) or {}
+        try:
+            acct = PlaidAccount(
+                account_id=entry["account_id"],
+                church_id=church_id,
+                access_token_enc=enc_token,
+                account_type=entry.get("type") or "depository",
+                account_subtype=entry.get("subtype") or "",
+                mask=entry.get("mask") or "",
+                name=entry.get("name") or "Account",
+                current_balance=float(balances.get("current") or 0.0),
+                available_balance=float(balances.get("available") or 0.0),
+                balance_updated_at=now,
+                linked_at=now,
+                is_ach_enabled=True,
+                created_at=now,
+            )
+            plaid_store.save_plaid_account(church_id, acct)
+            saved.append({
+                "account_id": acct.account_id,
+                "name": acct.name,
+                "mask": acct.mask,
+                "balance": acct.current_balance,
+            })
+        except Exception as exc:
+            print(f"[Plaid] failed to persist account: {exc}", flush=True)
+            continue
+    return _json({"accounts": saved})
+
+
+@app.get("/api/churches/{church_id}/plaid/accounts")
+async def list_plaid_accounts(church_id: str) -> JSONResponse:
+    from .tools import plaid_store
+    rows = plaid_store.load_plaid_accounts(church_id)
+    return _json([
+        {
+            "account_id": a.account_id,
+            "name": a.name,
+            "mask": a.mask,
+            "account_type": a.account_type,
+            "account_subtype": a.account_subtype,
+            "current_balance": a.current_balance,
+            "available_balance": a.available_balance,
+            "balance_updated_at": a.balance_updated_at.isoformat(),
+            "linked_at": a.linked_at.isoformat(),
+            "is_ach_enabled": a.is_ach_enabled,
+        }
+        for a in rows
+    ])
+
+
+@app.get("/api/churches/{church_id}/plaid/accounts/{account_id}/refresh")
+async def refresh_plaid_account(church_id: str, account_id: str) -> JSONResponse:
+    from .tools import plaid_store
+    try:
+        a = plaid_store.refresh_account_balances(church_id, account_id)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+    if not a:
+        raise HTTPException(404, f"Account {account_id} not found")
+    return _json({
+        "current_balance": a.current_balance,
+        "available_balance": a.available_balance,
+        "refreshed_at": a.balance_updated_at.isoformat(),
+    })
+
+
+@app.delete("/api/churches/{church_id}/plaid/accounts/{account_id}")
+async def delete_plaid_account_endpoint(
+    church_id: str,
+    account_id: str,
+    request: Request = None,  # type: ignore[assignment]
+) -> JSONResponse:
+    from .auth import get_caller_role, has_role
+    actual = get_caller_role(request)
+    if not has_role(actual, "TREASURER_ADMIN"):
+        raise HTTPException(403, f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN")
+    from .tools import plaid_store
+    rows = plaid_store.delete_plaid_account(church_id, account_id)
+    return _json({"ok": True, "count": len(rows)})
+
+
+@app.post("/api/churches/{church_id}/plaid/sync-transactions")
+async def sync_plaid_transactions(
+    church_id: str,
+    body: PlaidSyncBody,
+) -> JSONResponse:
+    from .tools import plaid_store
+    from datetime import date as _date, timedelta as _td
+
+    try:
+        new_txns = plaid_store.fetch_and_store_transactions(
+            church_id, body.account_id, days_back=body.days_back,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+
+    end = _date.today()
+    start = end - _td(days=body.days_back)
+    return _json({
+        "transactions_synced": len(new_txns),
+        "date_range": f"{start.isoformat()} to {end.isoformat()}",
+    })
+
+
+@app.get("/api/churches/{church_id}/plaid/transactions")
+async def list_plaid_transactions(
+    church_id: str,
+    account_id: Optional[str] = None,
+    from_: Optional[str] = None,
+    to: Optional[str] = None,
+) -> JSONResponse:
+    from .tools import plaid_store
+    from datetime import date as _date
+
+    df = _date.fromisoformat(from_) if from_ else None
+    dt = _date.fromisoformat(to) if to else None
+    rows = plaid_store.load_plaid_transactions(
+        church_id, account_id=account_id, date_from=df, date_to=dt,
+    )
+    return _json([
+        {
+            "txn_id": t.txn_id,
+            "account_id": t.account_id,
+            "date": t.date.isoformat(),
+            "description": t.description,
+            "amount": t.amount,
+            "category": t.category,
+            "merchant_name": t.merchant_name,
+        }
+        for t in rows
+    ])
+
+
+@app.post("/api/churches/{church_id}/plaid/webhook")
+async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
+    """Receive Plaid webhook events. We just persist them to the audit log."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    audit_path = Path(__file__).resolve().parent / "data" / f"plaid_webhook_{church_id}.jsonl"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    with audit_path.open("a") as fh:
+        fh.write(json.dumps({
+            "ts": datetime.utcnow().isoformat(),
+            "body": body,
+        }) + "\n")
+    return _json({"ok": True})
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index() -> HTMLResponse:
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
 
 
+_STATIC_MEDIA_TYPES = {
+    ".js": "application/javascript",
+    ".mjs": "application/javascript",
+    ".css": "text/css",
+    ".map": "application/json",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".webp": "image/webp",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+}
+
+
 @app.get("/{path:path}", response_class=HTMLResponse)
-async def serve_page(path: str) -> HTMLResponse:
+async def serve_page(path: str):
     p = FRONTEND_DIR / path
-    if p.exists() and p.suffix == ".html":
-        return HTMLResponse(p.read_text())
+    if p.exists() and p.is_file():
+        if p.suffix == ".html":
+            return HTMLResponse(p.read_text())
+        media_type = _STATIC_MEDIA_TYPES.get(p.suffix.lower(), "application/octet-stream")
+        return FileResponse(str(p), media_type=media_type)
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text())

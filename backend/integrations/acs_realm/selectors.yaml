@@ -1,0 +1,18 @@
+login:
+  username_field: "input[name='username']"
+  password_field: "input[name='password']"
+  submit_button: "button[type='submit']"
+  success_indicator: "text=Dashboard"
+
+journal_entry:
+  new_entry_button: "a:has-text('New Journal Entry')"
+  entry_date_field: "input[name='entry_date']"
+  reference_field: "input[name='reference']"
+  memo_field: "textarea[name='memo']"
+  add_line_button: "button:has-text('Add Line')"
+  account_field: "input[name='account_{idx}']"
+  fund_field: "input[name='fund_{idx}']"
+  debit_field: "input[name='debit_{idx}']"
+  credit_field: "input[name='credit_{idx}']"
+  save_button: "button:has-text('Save')"
+  confirmation: "text=Entry saved"

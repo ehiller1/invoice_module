@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bank Linking — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+
+  <!-- Plaid Link drop-in (loaded only when "Link a Bank Account" is clicked). -->
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Bank Linking</h1>
+      <p class="text-sm text-slate-500">
+        Connect church bank accounts via Plaid for balance + transaction sync (FR-Bank-Integration).
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="switchChurch()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button id="link-btn" onclick="openPlaidLink()" class="bg-navy-900 hover:bg-navy-800 text-white text-sm font-medium px-4 py-2 rounded-lg">
+        + Link a Bank Account
+      </button>
+    </div>
+  </header>
+
+  <div class="px-8 py-6 space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <h2 class="text-sm font-semibold text-slate-700">Linked Accounts</h2>
+        <button onclick="refreshAll()" class="text-xs text-navy-700 hover:underline">Refresh balances</button>
+      </div>
+      <table class="w-full text-sm">
+        <thead class="bg-slate-100 text-slate-600">
+          <tr>
+            <th class="text-left px-4 py-2">Account</th>
+            <th class="text-left px-3 py-2">Type</th>
+            <th class="text-left px-3 py-2">Mask</th>
+            <th class="text-right px-3 py-2">Current</th>
+            <th class="text-right px-3 py-2">Available</th>
+            <th class="text-left px-3 py-2">Updated</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="account-rows"></tbody>
+      </table>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-700">Recent Transactions</h2>
+          <p class="text-xs text-slate-500">Sync the most recent transactions to power reconciliation.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="txn-account" class="text-xs border rounded px-2 py-1"></select>
+          <input id="txn-days" type="number" min="1" max="365" value="60" class="text-xs border rounded px-2 py-1 w-20">
+          <button onclick="syncTxns()" class="bg-gold-500 hover:bg-gold-400 text-white text-xs font-medium px-3 py-1.5 rounded">
+            Sync
+          </button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-100 text-slate-600">
+            <tr>
+              <th class="text-left px-3 py-2">Date</th>
+              <th class="text-left px-3 py-2">Merchant</th>
+              <th class="text-left px-3 py-2">Description</th>
+              <th class="text-right px-3 py-2">Amount</th>
+              <th class="text-left px-3 py-2">Category</th>
+            </tr>
+          </thead>
+          <tbody id="txn-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-500">
+      Access tokens are encrypted at rest with the EIME vault key. Plaid never
+      shares full account or routing numbers; only the last 4 digits ("mask")
+      are surfaced here.
+    </p>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+let accounts = [];
+
+async function init() {
+  await EIMEShell.mount({ activeNav: 'settings', pageTitle: 'Bank Linking' });
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name || c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    await load();
+  }
+}
+
+async function switchChurch() {
+  activeChurch = document.getElementById('church-selector').value;
+  await load();
+}
+
+async function load() {
+  if (!activeChurch) return;
+  accounts = await fetch(`/api/churches/${activeChurch}/plaid/accounts`).then(r => r.json());
+  renderAccounts();
+  renderTxnAccountSelector();
+  await loadTxns();
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c])); }
+
+function fmtMoney(n) {
+  return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderAccounts() {
+  const tbody = document.getElementById('account-rows');
+  if (!accounts.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No accounts linked yet. Click <em>Link a Bank Account</em> to begin.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = accounts.map(a => `
+    <tr class="border-t border-slate-100">
+      <td class="px-4 py-2">${esc(a.name)}</td>
+      <td class="px-3 py-2 text-xs text-slate-600">${esc(a.account_type)}/${esc(a.account_subtype)}</td>
+      <td class="px-3 py-2 font-mono text-xs">****${esc(a.mask)}</td>
+      <td class="px-3 py-2 text-right">${fmtMoney(a.current_balance)}</td>
+      <td class="px-3 py-2 text-right">${fmtMoney(a.available_balance)}</td>
+      <td class="px-3 py-2 text-xs text-slate-500">${esc((a.balance_updated_at||'').replace('T',' ').split('.')[0])}</td>
+      <td class="px-3 py-2 flex items-center gap-2">
+        <button onclick="refreshAccount('${esc(a.account_id)}')" class="text-xs text-navy-700 hover:underline">Refresh</button>
+        <button onclick="deleteAccount('${esc(a.account_id)}')" class="text-xs text-red-600 hover:underline">Unlink</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderTxnAccountSelector() {
+  const sel = document.getElementById('txn-account');
+  sel.innerHTML = ['<option value="">All accounts</option>',
+    ...accounts.map(a => `<option value="${esc(a.account_id)}">${esc(a.name)} (${esc(a.mask)})</option>`)].join('');
+}
+
+async function refreshAll() {
+  for (const a of accounts) {
+    await fetch(`/api/churches/${activeChurch}/plaid/accounts/${a.account_id}/refresh`).catch(() => {});
+  }
+  await load();
+}
+
+async function refreshAccount(id) {
+  const r = await fetch(`/api/churches/${activeChurch}/plaid/accounts/${id}/refresh`);
+  if (!r.ok) {
+    alert('Refresh failed: ' + r.status);
+    return;
+  }
+  await load();
+}
+
+async function deleteAccount(id) {
+  if (!confirm('Unlink this account? Stored balances and transactions remain for audit, but new sync will stop.')) return;
+  const r = await fetch(`/api/churches/${activeChurch}/plaid/accounts/${id}`, { method: 'DELETE' });
+  if (!r.ok) {
+    alert('Delete failed: ' + r.status);
+    return;
+  }
+  await load();
+}
+
+async function syncTxns() {
+  const account_id = document.getElementById('txn-account').value;
+  const days_back = parseInt(document.getElementById('txn-days').value || '60', 10);
+  if (!account_id) {
+    alert('Pick an account first.');
+    return;
+  }
+  const r = await fetch(`/api/churches/${activeChurch}/plaid/sync-transactions`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ account_id, days_back }),
+  });
+  if (!r.ok) {
+    alert('Sync failed: ' + r.status);
+    return;
+  }
+  const out = await r.json();
+  alert(`Synced ${out.transactions_synced} transactions (${out.date_range}).`);
+  await loadTxns();
+}
+
+async function loadTxns() {
+  const account_id = document.getElementById('txn-account').value;
+  let url = `/api/churches/${activeChurch}/plaid/transactions`;
+  if (account_id) url += `?account_id=${encodeURIComponent(account_id)}`;
+  const txns = await fetch(url).then(r => r.json()).catch(() => []);
+  const tbody = document.getElementById('txn-rows');
+  if (!txns.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-slate-500 text-xs">No transactions cached. Use <em>Sync</em> above.</td></tr>`;
+    return;
+  }
+  txns.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  tbody.innerHTML = txns.slice(0, 100).map(t => `
+    <tr class="border-t border-slate-100">
+      <td class="px-3 py-2 text-xs">${esc(t.date)}</td>
+      <td class="px-3 py-2">${esc(t.merchant_name || '')}</td>
+      <td class="px-3 py-2 text-xs text-slate-600">${esc(t.description)}</td>
+      <td class="px-3 py-2 text-right ${t.amount < 0 ? 'text-green-700' : ''}">${fmtMoney(t.amount)}</td>
+      <td class="px-3 py-2 text-xs text-slate-600">${esc(t.category)}</td>
+    </tr>
+  `).join('');
+}
+
+async function openPlaidLink() {
+  if (!activeChurch) return;
+  const btn = document.getElementById('link-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  try {
+    const r = await fetch(`/api/churches/${activeChurch}/plaid/create-link-token`, { method: 'POST' });
+    if (!r.ok) {
+      const txt = await r.text();
+      alert('Could not create Plaid link token: ' + txt);
+      return;
+    }
+    const { link_token } = await r.json();
+
+    // Lazy-load Plaid Link SDK only when needed.
+    if (!window.Plaid) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Plaid SDK failed to load'));
+        document.head.appendChild(s);
+      });
+    }
+
+    const handler = window.Plaid.create({
+      token: link_token,
+      onSuccess: async (public_token) => {
+        const resp = await fetch(`/api/churches/${activeChurch}/plaid/complete-auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ public_token }),
+        });
+        if (!resp.ok) {
+          alert('Account linking failed: ' + resp.status);
+          return;
+        }
+        const data = await resp.json();
+        alert(`Linked ${data.accounts.length} account(s).`);
+        await load();
+      },
+      onExit: (err) => {
+        if (err) console.warn('Plaid exit:', err);
+      },
+    });
+    handler.open();
+  } catch (e) {
+    alert('Plaid Link error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '+ Link a Bank Account';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Wire account-selector change to reload txns.
+  setTimeout(() => {
+    const el = document.getElementById('txn-account');
+    if (el) el.addEventListener('change', loadTxns);
+  }, 100);
+});
+
+window.switchChurch = switchChurch;
+window.refreshAll = refreshAll;
+window.refreshAccount = refreshAccount;
+window.deleteAccount = deleteAccount;
+window.openPlaidLink = openPlaidLink;
+window.syncTxns = syncTxns;
+window.loadTxns = loadTxns;
+
+init();
+</script>
+
+</body>
+</html>

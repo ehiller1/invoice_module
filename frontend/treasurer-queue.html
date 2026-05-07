@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treasurer Queue — EIME</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Treasurer Queue</h1>
+      <p class="text-sm text-slate-500">Final approval for invoices that have passed budget-owner review (FR-05.3).</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="loadJobs()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="loadJobs()" class="text-sm text-navy-700 hover:underline">Refresh</button>
+    </div>
+  </header>
+
+  <div class="px-8 py-6">
+    <div id="job-cards" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    <div id="empty" class="hidden text-center py-12 text-slate-400">No jobs awaiting treasurer approval.</div>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+
+async function init() {
+  await EIMEShell.mount({ activeNav: 'jes', pageTitle: 'Treasurer Queue' });
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    await loadJobs();
+  }
+}
+
+async function loadJobs() {
+  activeChurch = document.getElementById('church-selector').value;
+  const all = await fetch(`/api/jobs?church_id=${activeChurch}`).then(r => r.json());
+  const jobs = all.filter(j => j.status === 'PENDING_TREASURER');
+  const root = document.getElementById('job-cards');
+  document.getElementById('empty').classList.toggle('hidden', jobs.length > 0);
+  root.innerHTML = jobs.map(j => render(j)).join('');
+}
+
+function render(j) {
+  const inv = j.invoice_document || {};
+  const bo = j.budget_owner_decision || {};
+  const reasons = (j.reviewed_allocations?.lines || []).flatMap(l => l.reasons || []);
+  return `
+    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-slate-800">${esc(inv.vendor_name || j.filename)}</h3>
+        <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">PENDING_TREASURER</span>
+      </div>
+      <p class="text-sm text-slate-600 mb-1">Amount: <strong>$${esc(inv.total_amount || '?')}</strong></p>
+      <p class="text-sm text-slate-600 mb-1">Invoice #: ${esc(inv.invoice_number || '')}</p>
+      <p class="text-sm text-slate-600 mb-1">Budget owner: ${esc(bo.actor_email || '—')} (${esc(bo.action || '')})</p>
+      ${reasons.length ? `<div class="text-xs text-slate-500 mt-2"><strong>Reviewer notes:</strong><ul class="list-disc ml-4">${reasons.slice(0,3).map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}
+      <div class="mt-3 flex gap-2">
+        <button onclick="decide('${j.job_id}','approve')" class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded">Approve to Post</button>
+        <button onclick="decide('${j.job_id}','reject')" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+function esc(s) { return String(s==null?'':s).replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c])); }
+
+async function decide(jobId, action) {
+  const treasurer = prompt('Treasurer ID / email:');
+  if (!treasurer) return;
+  const notes = prompt('Notes (optional):') || '';
+  const r = await fetch(`/api/jobs/${jobId}/treasurer-decision`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action, treasurer_id: treasurer, notes }),
+  });
+  if (r.ok) {
+    alert('Decision recorded.');
+    await loadJobs();
+  } else {
+    alert('Failed: ' + r.status);
+  }
+}
+
+window.loadJobs = loadJobs;
+window.decide = decide;
+
+init();
+</script>
+
+</body>
+</html>

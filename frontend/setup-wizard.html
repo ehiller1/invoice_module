@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EIME Setup Wizard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    .step-circle {
+      width: 32px; height: 32px; border-radius: 9999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 13px;
+      transition: all 0.25s ease;
+    }
+    .step-circle.pending { background: #e5e7eb; color: #6b7280; }
+    .step-circle.active { background: #1e3a6e; color: white; box-shadow: 0 0 0 4px #c7d2fe; }
+    .step-circle.done { background: #10b981; color: white; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .progress-fill { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .test-result { transition: opacity 0.3s ease; }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #1e3a6e;
+      box-shadow: 0 0 0 3px rgba(30, 58, 110, 0.1);
+    }
+    .spinner {
+      border: 3px solid #f3f4f6;
+      border-top-color: #1e3a6e;
+      border-radius: 9999px;
+      width: 18px; height: 18px;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<div class="min-h-screen flex items-center justify-center py-8 px-4">
+  <div class="w-full max-w-3xl">
+
+    <!-- Header brand -->
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center gap-3">
+        <div class="w-10 h-10 bg-navy-900 rounded-lg flex items-center justify-center text-gold-400 font-bold text-lg">E</div>
+        <div class="text-left">
+          <div class="text-xl font-bold text-navy-900">EIME</div>
+          <div class="text-xs text-gray-500 -mt-0.5">Embark Invoice Mapping Engine</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="mb-6" id="progress-container">
+      <div class="flex justify-between text-sm text-gray-600 mb-2">
+        <span>Step <span id="current-step">0</span> of 9</span>
+        <span id="step-title" class="font-medium">Welcome</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div id="progress-fill" class="bg-navy-700 h-2 progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between mt-3 px-1" id="step-circles"></div>
+    </div>
+
+    <!-- Step Card -->
+    <div id="step-card" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 fade-in"></div>
+
+    <!-- Navigation -->
+    <div class="flex justify-between mt-6" id="nav-bar">
+      <button id="btn-back" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
+        &larr; Back
+      </button>
+      <div class="flex gap-3">
+        <button id="btn-skip" class="px-4 py-2.5 text-gray-500 hover:text-gray-700 transition">
+          Skip for now
+        </button>
+        <button id="btn-next" class="px-6 py-2.5 bg-navy-700 text-white rounded-lg hover:bg-navy-800 font-medium transition disabled:opacity-50">
+          Next &rarr;
+        </button>
+      </div>
+    </div>
+
+    <div class="text-center text-xs text-gray-400 mt-6">
+      Estimated time: 10 minutes &middot; Your progress is saved automatically
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = window.location.origin.includes('8001') ? '' : 'http://localhost:8001';
+const WIZARD_STATE_KEY = 'eime_wizard_state';
+const TOTAL_STEPS = 9;
+
+// ----- State -----
+const STEP_TITLES = [
+  'Welcome',
+  'Church Profile',
+  'Chart of Accounts',
+  'Plaid Credentials',
+  'ACS Realm',
+  'Email (SMTP)',
+  'User Accounts',
+  'Approval Chains',
+  'Budget Import',
+  'Review & Complete'
+];
+
+let state = loadState() || {
+  step: 0,
+  churchProfile: {
+    church_id: '',
+    church_name: '',
+    denomination: 'EPISCOPAL',
+    fiscal_year_month: 1,
+    fiscal_year: new Date().getFullYear(),
+    address: ''
+  },
+  coa: { imported: false, account_count: 0 },
+  plaid: { client_id: '', env: 'sandbox', tested: false, success: false },
+  acs: { username: '', base_url: 'https://realm.acsedu.org', tested: false, success: false },
+  smtp: { from_email: '', smtp_host: '', smtp_port: 587, username: '', tested: false, success: false },
+  users: [],
+  approvalChains: [],
+  budget: { imported: false, total: 0, account_count: 0 },
+  skipped: {}
+};
+
+function saveState() {
+  // Strip secrets defensively before persistence
+  const safe = JSON.parse(JSON.stringify(state));
+  if (safe.plaid) delete safe.plaid.secret;
+  if (safe.acs) delete safe.acs.password;
+  if (safe.smtp) delete safe.smtp.password;
+  localStorage.setItem(WIZARD_STATE_KEY, JSON.stringify(safe));
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(WIZARD_STATE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+}
+
+function clearState() {
+  localStorage.removeItem(WIZARD_STATE_KEY);
+}
+
+// ----- Progress UI -----
+function renderProgress() {
+  const pct = Math.round((state.step / TOTAL_STEPS) * 100);
+  document.getElementById('current-step').textContent = state.step;
+  document.getElementById('step-title').textContent = STEP_TITLES[state.step] || '';
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  const circles = document.getElementById('step-circles');
+  let html = '';
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    let cls = 'pending';
+    if (i < state.step) cls = 'done';
+    else if (i === state.step) cls = 'active';
+    const label = i < state.step ? '✓' : i;
+    html += `<div class="step-circle ${cls}" title="${STEP_TITLES[i]}">${label}</div>`;
+  }
+  circles.innerHTML = html;
+}
+
+// ----- Navigation -----
+function go(step) {
+  if (step < 0 || step > TOTAL_STEPS) return;
+  state.step = step;
+  saveState();
+  render();
+}
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  if (state.step > 0) go(state.step - 1);
+});
+
+document.getElementById('btn-skip').addEventListener('click', () => {
+  state.skipped[state.step] = true;
+  saveState();
+  go(state.step + 1);
+});
+
+document.getElementById('btn-next').addEventListener('click', async () => {
+  const handler = window['handleNext_' + state.step];
+  if (typeof handler === 'function') {
+    const ok = await handler();
+    if (ok === false) return;
+  }
+  if (state.step < TOTAL_STEPS) go(state.step + 1);
+});
+
+// ----- Render dispatcher -----
+function render() {
+  renderProgress();
+  const card = document.getElementById('step-card');
+  card.classList.remove('fade-in');
+  void card.offsetWidth; // restart animation
+  card.classList.add('fade-in');
+  const renderer = window['render_' + state.step];
+  if (typeof renderer === 'function') {
+    card.innerHTML = renderer();
+    if (typeof window['bind_' + state.step] === 'function') {
+      window['bind_' + state.step]();
+    }
+  }
+  updateNavButtons();
+}
+
+function updateNavButtons() {
+  const back = document.getElementById('btn-back');
+  const skip = document.getElementById('btn-skip');
+  const next = document.getElementById('btn-next');
+
+  back.disabled = state.step === 0;
+  back.style.visibility = state.step === 0 ? 'hidden' : 'visible';
+
+  // Skip allowed for steps 2,3,4,5,7,8
+  const skippable = [2, 3, 4, 5, 7, 8];
+  skip.style.visibility = skippable.includes(state.step) ? 'visible' : 'hidden';
+
+  if (state.step === 0) {
+    next.textContent = 'Start Setup →';
+  } else if (state.step === TOTAL_STEPS) {
+    next.textContent = 'Complete Setup';
+    next.classList.remove('bg-navy-700', 'hover:bg-navy-800');
+    next.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+  } else {
+    next.textContent = 'Next →';
+    next.classList.add('bg-navy-700', 'hover:bg-navy-800');
+    next.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+  }
+}
+
+// ----- Helpers -----
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function showResult(elId, success, message) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (success) {
+    el.innerHTML = `<div class="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 text-sm">✅ ${esc(message)}</div>`;
+  } else {
+    el.innerHTML = `<div class="text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-sm">❌ ${esc(message)}</div>`;
+  }
+}
+
+function showLoading(elId, message = 'Testing...') {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = `<div class="text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm flex items-center gap-2"><span class="spinner"></span> ${esc(message)}</div>`;
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function apiPostFile(path, file, extraQs = '') {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(API + path + extraQs, { method: 'POST', body: fd });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+function slugifyChurchId(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+    .slice(0, 12) || 'church';
+}
+
+// ============================================================
+// Step 0: Welcome
+// ============================================================
+window.render_0 = () => `
+  <div class="text-center py-8">
+    <div class="w-20 h-20 bg-navy-900 rounded-2xl flex items-center justify-center text-gold-400 font-bold text-3xl mx-auto mb-6">E</div>
+    <h1 class="text-3xl font-bold text-navy-900 mb-3">Welcome to EIME Setup</h1>
+    <p class="text-lg text-gray-600 mb-2">Church Accounting Automation</p>
+    <p class="text-gray-500 max-w-lg mx-auto mb-8">
+      This wizard will configure your church profile, integrations, users, and approval workflows.
+      You can skip any step and return to it later in Settings.
+    </p>
+    <div class="grid grid-cols-3 gap-3 max-w-xl mx-auto text-left">
+      <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+        <div class="text-blue-700 font-semibold text-sm mb-1">Configure</div>
+        <div class="text-xs text-gray-600">Church profile &amp; chart of accounts</div>
+      </div>
+      <div class="bg-amber-50 border border-amber-100 rounded-lg p-4">
+        <div class="text-amber-700 font-semibold text-sm mb-1">Connect</div>
+        <div class="text-xs text-gray-600">Plaid, ACS Realm, &amp; email</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-4">
+        <div class="text-emerald-700 font-semibold text-sm mb-1">Approve</div>
+        <div class="text-xs text-gray-600">Users &amp; approval chains</div>
+      </div>
+    </div>
+    <div class="text-xs text-gray-400 mt-6">Estimated time: ~10 minutes</div>
+  </div>
+`;
+
+// ============================================================
+// Step 1: Church Profile
+// ============================================================
+window.render_1 = () => {
+  const cp = state.churchProfile;
+  const denoms = [
+    ['EPISCOPAL', 'Episcopal'],
+    ['METHODIST', 'Methodist / UMC'],
+    ['BAPTIST', 'Baptist'],
+    ['CATHOLIC', 'Catholic'],
+    ['PRESBYTERIAN', 'Presbyterian'],
+    ['LUTHERAN', 'Lutheran'],
+    ['NONDENOMINATIONAL', 'Non-denominational'],
+    ['OTHER', 'Other']
+  ];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">Church Profile</h1>
+    <p class="text-gray-500 mb-6">Tell us about your church. This information appears on reports and journal entries.</p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Church Name <span class="text-red-500">*</span></label>
+        <input id="f-church_name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required value="${esc(cp.church_name)}" placeholder="Holy Comforter Episcopal Church"/>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Denomination <span class="text-red-500">*</span></label>
+          <select id="f-denomination" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+            ${denoms.map(([v,l]) => `<option value="${v}" ${cp.denomination===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Church ID</label>
+          <input id="f-church_id" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(cp.church_id)}" placeholder="auto-generated from name"/>
+          <p class="text-xs text-gray-400 mt-1">Short identifier (letters/digits, max 12)</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fiscal Year Start Month</label>
+          <select id="f-fiscal_year_month" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+            ${months.map((m,i) => `<option value="${i+1}" ${cp.fiscal_year_month===(i+1)?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
+          <input id="f-fiscal_year" type="number" min="2000" max="2100" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${cp.fiscal_year}"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Church Address <span class="text-gray-400">(optional)</span></label>
+        <textarea id="f-address" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="123 Main St, City, State ZIP">${esc(cp.address)}</textarea>
+      </div>
+    </div>
+
+    <div id="step1-result" class="mt-4"></div>
+  `;
+};
+
+window.bind_1 = () => {
+  const fields = ['church_name','denomination','church_id','fiscal_year_month','fiscal_year','address'];
+  fields.forEach(f => {
+    const el = document.getElementById('f-' + f);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      let v = el.value;
+      if (f === 'fiscal_year_month' || f === 'fiscal_year') v = parseInt(v, 10) || 0;
+      state.churchProfile[f] = v;
+      saveState();
+    });
+  });
+};
+
+window.handleNext_1 = async () => {
+  const cp = state.churchProfile;
+  if (!cp.church_name || !cp.church_name.trim()) {
+    showResult('step1-result', false, 'Church name is required');
+    return false;
+  }
+  if (!cp.church_id) cp.church_id = slugifyChurchId(cp.church_name);
+
+  showLoading('step1-result', 'Saving profile...');
+  // Build fiscal_year_start as ISO date (YYYY-MM-01)
+  const mm = String(cp.fiscal_year_month).padStart(2, '0');
+  const fyStart = `${cp.fiscal_year}-${mm}-01`;
+  const { ok, data } = await apiPost('/api/setup/church-profile', {
+    church_id: cp.church_id,
+    church_name: cp.church_name,
+    denomination: cp.denomination,
+    fiscal_year_start: fyStart,
+    address: cp.address || null
+  });
+  if (!ok) {
+    showResult('step1-result', false, data.detail || 'Failed to save profile');
+    return false;
+  }
+  showResult('step1-result', true, `Profile saved (${cp.church_id})`);
+  saveState();
+  return true;
+};
+
+// ============================================================
+// Step 2: Chart of Accounts
+// ============================================================
+window.render_2 = () => `
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Chart of Accounts</h1>
+  <p class="text-gray-500 mb-6">Upload your chart of accounts (Excel or CSV). Common columns: account_number, account_name, account_type, fund.</p>
+
+  <label class="block">
+    <div class="border-2 border-dashed border-gray-300 hover:border-navy-700 rounded-xl p-10 text-center cursor-pointer transition">
+      <div class="text-4xl mb-2">\u{1F4C4}</div>
+      <div class="text-gray-700 font-medium">Click to upload, or drag &amp; drop</div>
+      <div class="text-xs text-gray-400 mt-1">.xlsx, .xls, or .csv</div>
+    </div>
+    <input id="coa-file" type="file" accept=".xlsx,.xls,.csv" class="hidden"/>
+  </label>
+
+  <div id="coa-result" class="mt-4">
+    ${state.coa.imported ? `<div class="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 text-sm">✅ ${state.coa.account_count} accounts loaded</div>` : ''}
+  </div>
+  <div id="coa-preview" class="mt-3"></div>
+`;
+
+window.bind_2 = () => {
+  const input = document.getElementById('coa-file');
+  input.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!state.churchProfile.church_id) {
+      showResult('coa-result', false, 'Complete Step 1 first');
+      return;
+    }
+    showLoading('coa-result', 'Parsing spreadsheet...');
+    const { ok, data } = await apiPostFile(
+      '/api/setup/coa-import',
+      file,
+      `?church_id=${encodeURIComponent(state.churchProfile.church_id)}`
+    );
+    if (!ok) {
+      showResult('coa-result', false, data.detail || 'Failed to import');
+      return;
+    }
+    state.coa = { imported: true, account_count: data.account_count };
+    saveState();
+    showResult('coa-result', true, `${data.account_count} accounts loaded`);
+    if (data.preview && data.preview.length) {
+      const rows = data.preview.map(p =>
+        `<tr><td class="px-3 py-1.5 text-gray-700 border-b">${esc(p.account_number)}</td><td class="px-3 py-1.5 text-gray-700 border-b">${esc(p.account_name)}</td></tr>`
+      ).join('');
+      document.getElementById('coa-preview').innerHTML = `
+        <div class="text-xs text-gray-500 mb-2">Preview (first ${data.preview.length}):</div>
+        <table class="w-full text-sm border border-gray-200 rounded">
+          <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Account #</th><th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Name</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+  });
+};
+
+// ============================================================
+// Step 3: Plaid
+// ============================================================
+window.render_3 = () => {
+  const p = state.plaid;
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">Plaid Credentials</h1>
+    <p class="text-gray-500 mb-6">Plaid connects your bank accounts for balance checking and reconciliation.
+      <a href="https://dashboard.plaid.com" target="_blank" class="text-navy-700 underline">Get credentials at dashboard.plaid.com</a>
+    </p>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+        <input id="f-plaid_client" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(p.client_id)}"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Secret</label>
+        <input id="f-plaid_secret" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="not stored after this session"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Environment</label>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2"><input type="radio" name="plaid_env" value="sandbox" ${p.env==='sandbox'?'checked':''}/> <span class="text-sm">Sandbox</span></label>
+          <label class="flex items-center gap-2"><input type="radio" name="plaid_env" value="production" ${p.env==='production'?'checked':''}/> <span class="text-sm">Production</span></label>
+        </div>
+      </div>
+      <div>
+        <button id="btn-test-plaid" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium">Test Plaid Connection</button>
+      </div>
+      <div id="plaid-result"></div>
+    </div>
+  `;
+};
+
+window.bind_3 = () => {
+  document.getElementById('f-plaid_client').addEventListener('input', e => { state.plaid.client_id = e.target.value; saveState(); });
+  document.getElementById('f-plaid_secret').addEventListener('input', e => { state.plaid.secret = e.target.value; /* not saved */ });
+  document.querySelectorAll('input[name="plaid_env"]').forEach(r => r.addEventListener('change', e => { state.plaid.env = e.target.value; saveState(); }));
+  document.getElementById('btn-test-plaid').addEventListener('click', async () => {
+    showLoading('plaid-result', 'Calling Plaid...');
+    const { ok, data } = await apiPost('/api/setup/plaid-test', {
+      client_id: state.plaid.client_id,
+      secret: state.plaid.secret || '',
+      env: state.plaid.env
+    });
+    if (!ok) {
+      showResult('plaid-result', false, data.detail || 'Request failed');
+      return;
+    }
+    state.plaid.tested = true;
+    state.plaid.success = !!data.success;
+    saveState();
+    showResult('plaid-result', data.success, data.message || (data.success ? 'Connected' : 'Failed'));
+  });
+};
+
+// ============================================================
+// Step 4: ACS Realm
+// ============================================================
+window.render_4 = () => {
+  const a = state.acs;
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">ACS Realm</h1>
+    <p class="text-gray-500 mb-6">ACS Realm is your church management system. EIME posts journal entries automatically.</p>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input id="f-acs_user" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(a.username)}"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input id="f-acs_pw" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="not stored after this session"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+        <input id="f-acs_url" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(a.base_url)}"/>
+      </div>
+      <div>
+        <button id="btn-test-acs" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium">Test ACS Connection</button>
+      </div>
+      <div id="acs-result"></div>
+    </div>
+  `;
+};
+
+window.bind_4 = () => {
+  document.getElementById('f-acs_user').addEventListener('input', e => { state.acs.username = e.target.value; saveState(); });
+  document.getElementById('f-acs_pw').addEventListener('input', e => { state.acs.password = e.target.value; });
+  document.getElementById('f-acs_url').addEventListener('input', e => { state.acs.base_url = e.target.value; saveState(); });
+  document.getElementById('btn-test-acs').addEventListener('click', async () => {
+    showLoading('acs-result', 'Connecting to ACS...');
+    const { ok, data } = await apiPost('/api/setup/acs-test', {
+      username: state.acs.username,
+      password: state.acs.password || '',
+      base_url: state.acs.base_url
+    });
+    if (!ok) {
+      showResult('acs-result', false, data.detail || 'Request failed');
+      return;
+    }
+    state.acs.tested = true;
+    state.acs.success = !!data.success;
+    saveState();
+    showResult('acs-result', data.success, data.message || (data.success ? 'Connected' : 'Login failed'));
+  });
+};
+
+// ============================================================
+// Step 5: SMTP
+// ============================================================
+window.render_5 = () => {
+  const s = state.smtp;
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">Email (SMTP)</h1>
+    <p class="text-gray-500 mb-6">Email sends approval notifications to your finance team.</p>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">From Email</label>
+        <input id="f-smtp_from" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(s.from_email)}" placeholder="noreply@church.org"/>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
+          <input id="f-smtp_host" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(s.smtp_host)}" placeholder="smtp.sendgrid.net"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Port</label>
+          <input id="f-smtp_port" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${s.smtp_port}"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Username</label>
+        <input id="f-smtp_user" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" value="${esc(s.username)}"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Password</label>
+        <input id="f-smtp_pw" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="not stored after this session"/>
+      </div>
+      <div>
+        <button id="btn-test-smtp" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium">Send Test Email</button>
+      </div>
+      <div id="smtp-result"></div>
+    </div>
+  `;
+};
+
+window.bind_5 = () => {
+  const map = {
+    'f-smtp_from': 'from_email', 'f-smtp_host': 'smtp_host',
+    'f-smtp_port': 'smtp_port', 'f-smtp_user': 'username'
+  };
+  Object.entries(map).forEach(([id, key]) => {
+    document.getElementById(id).addEventListener('input', e => {
+      let v = e.target.value;
+      if (key === 'smtp_port') v = parseInt(v, 10) || 587;
+      state.smtp[key] = v;
+      saveState();
+    });
+  });
+  document.getElementById('f-smtp_pw').addEventListener('input', e => { state.smtp.password = e.target.value; });
+  document.getElementById('btn-test-smtp').addEventListener('click', async () => {
+    showLoading('smtp-result', 'Sending test email...');
+    const { ok, data } = await apiPost('/api/setup/smtp-test', {
+      from_email: state.smtp.from_email,
+      smtp_host: state.smtp.smtp_host,
+      smtp_port: state.smtp.smtp_port,
+      username: state.smtp.username,
+      password: state.smtp.password || ''
+    });
+    if (!ok) {
+      showResult('smtp-result', false, data.detail || 'Request failed');
+      return;
+    }
+    state.smtp.tested = true;
+    state.smtp.success = !!data.success;
+    saveState();
+    showResult('smtp-result', data.success, data.message || (data.success ? 'Test email sent' : 'Send failed'));
+  });
+};
+
+// ============================================================
+// Step 6: Users
+// ============================================================
+window.render_6 = () => {
+  const rows = state.users.map((u, i) => `
+    <tr>
+      <td class="px-3 py-2 text-sm border-b">${esc(u.name)}</td>
+      <td class="px-3 py-2 text-sm border-b">${esc(u.email)}</td>
+      <td class="px-3 py-2 text-sm border-b"><span class="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs">${esc(u.role)}</span></td>
+      <td class="px-3 py-2 text-sm border-b text-right"><button data-rm-user="${i}" class="text-red-600 text-xs hover:underline">Remove</button></td>
+    </tr>
+  `).join('');
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">User Accounts</h1>
+    <p class="text-gray-500 mb-6">Create accounts for your finance team. You can add more later in Settings.</p>
+
+    <div class="grid grid-cols-12 gap-3 items-end mb-3">
+      <div class="col-span-4">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
+        <input id="user-name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Alice Smith"/>
+      </div>
+      <div class="col-span-4">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Email</label>
+        <input id="user-email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="alice@church.org"/>
+      </div>
+      <div class="col-span-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Role</label>
+        <select id="user-role" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+          <option value="TREASURER_ADMIN">Treasurer / Admin</option>
+          <option value="BUDGET_OWNER">Budget Owner</option>
+          <option value="FINANCE_STAFF">Finance Staff</option>
+        </select>
+      </div>
+      <div class="col-span-1">
+        <button id="btn-add-user" class="w-full px-3 py-2 bg-navy-700 text-white rounded-lg text-sm hover:bg-navy-800">+ Add</button>
+      </div>
+    </div>
+
+    ${state.users.length ? `
+      <table class="w-full border border-gray-200 rounded mt-4">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Name</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Email</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Role</th>
+            <th class="px-3 py-2 border-b"></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    ` : '<div class="text-sm text-gray-400 italic mt-4">No users added yet</div>'}
+
+    <div id="users-result" class="mt-4"></div>
+  `;
+};
+
+window.bind_6 = () => {
+  document.getElementById('btn-add-user').addEventListener('click', () => {
+    const name = document.getElementById('user-name').value.trim();
+    const email = document.getElementById('user-email').value.trim();
+    const role = document.getElementById('user-role').value;
+    if (!name || !email) {
+      showResult('users-result', false, 'Name and email required');
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      showResult('users-result', false, 'Invalid email');
+      return;
+    }
+    state.users.push({ name, email, role });
+    saveState();
+    render();
+  });
+  document.querySelectorAll('[data-rm-user]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.getAttribute('data-rm-user'), 10);
+      state.users.splice(i, 1);
+      saveState();
+      render();
+    });
+  });
+};
+
+window.handleNext_6 = async () => {
+  if (state.users.length === 0) return true; // allow empty
+  showLoading('users-result', 'Saving users...');
+  const { ok, data } = await apiPost('/api/setup/users', {
+    church_id: state.churchProfile.church_id,
+    users: state.users
+  });
+  if (!ok) {
+    showResult('users-result', false, data.detail || 'Failed to save users');
+    return false;
+  }
+  showResult('users-result', true, `${data.created_count} user(s) saved`);
+  return true;
+};
+
+// ============================================================
+// Step 7: Approval Chains
+// ============================================================
+window.render_7 = () => {
+  const opts = state.users.map(u =>
+    `<option value="${esc(u.email)}">${esc(u.email)}</option>`
+  ).join('');
+  const rows = state.approvalChains.map((c, i) => `
+    <tr>
+      <td class="px-3 py-2 text-sm border-b font-mono">${esc(c.gl_pattern)}</td>
+      <td class="px-3 py-2 text-sm border-b">${esc(c.primary_email)}</td>
+      <td class="px-3 py-2 text-sm border-b text-gray-500">${esc(c.secondary_email || '—')}</td>
+      <td class="px-3 py-2 text-sm border-b">${c.deadline_hours}h</td>
+      <td class="px-3 py-2 text-sm border-b text-right"><button data-rm-chain="${i}" class="text-red-600 text-xs hover:underline">Remove</button></td>
+    </tr>
+  `).join('');
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">Approval Chains</h1>
+    <p class="text-gray-500 mb-6">Configure who approves invoices based on GL account code. Patterns: <code class="px-1 bg-gray-100 rounded text-xs">6000-6999</code>, <code class="px-1 bg-gray-100 rounded text-xs">65*</code>, or <code class="px-1 bg-gray-100 rounded text-xs">8410</code>.</p>
+
+    <div class="grid grid-cols-12 gap-3 items-end mb-3">
+      <div class="col-span-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1">GL Pattern</label>
+        <input id="chain-pattern" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="6000-6999"/>
+      </div>
+      <div class="col-span-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Primary Approver</label>
+        ${state.users.length
+          ? `<select id="chain-primary" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"><option value="">— select —</option>${opts}</select>`
+          : `<input id="chain-primary" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="alice@church.org"/>`
+        }
+      </div>
+      <div class="col-span-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Secondary <span class="text-gray-400">(optional)</span></label>
+        ${state.users.length
+          ? `<select id="chain-secondary" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"><option value="">— none —</option>${opts}</select>`
+          : `<input id="chain-secondary" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"/>`
+        }
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Deadline (hours)</label>
+        <input id="chain-deadline" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" value="48"/>
+      </div>
+      <div class="col-span-1">
+        <button id="btn-add-chain" class="w-full px-3 py-2 bg-navy-700 text-white rounded-lg text-sm hover:bg-navy-800">+ Add</button>
+      </div>
+    </div>
+
+    ${state.approvalChains.length ? `
+      <table class="w-full border border-gray-200 rounded mt-4">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">GL Pattern</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Primary</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Secondary</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 border-b">Deadline</th>
+            <th class="px-3 py-2 border-b"></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    ` : '<div class="text-sm text-gray-400 italic mt-4">No chains added yet</div>'}
+
+    <div id="chains-result" class="mt-4"></div>
+  `;
+};
+
+window.bind_7 = () => {
+  document.getElementById('btn-add-chain').addEventListener('click', () => {
+    const pattern = document.getElementById('chain-pattern').value.trim();
+    const primary = document.getElementById('chain-primary').value.trim();
+    const secondary = document.getElementById('chain-secondary').value.trim();
+    const deadline = parseInt(document.getElementById('chain-deadline').value, 10) || 48;
+    if (!pattern) { showResult('chains-result', false, 'GL pattern required'); return; }
+    if (!primary) { showResult('chains-result', false, 'Primary approver required'); return; }
+    if (!/^\d+(-\d+)?$|^\d*\*$/.test(pattern)) {
+      showResult('chains-result', false, 'Invalid pattern (use 6000, 6000-6999, or 65*)');
+      return;
+    }
+    state.approvalChains.push({
+      gl_pattern: pattern, primary_email: primary,
+      secondary_email: secondary || null, deadline_hours: deadline
+    });
+    saveState();
+    render();
+  });
+  document.querySelectorAll('[data-rm-chain]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.getAttribute('data-rm-chain'), 10);
+      state.approvalChains.splice(i, 1);
+      saveState();
+      render();
+    });
+  });
+};
+
+window.handleNext_7 = async () => {
+  if (state.approvalChains.length === 0) return true;
+  showLoading('chains-result', 'Saving chains...');
+  const { ok, data } = await apiPost('/api/setup/approval-chains', {
+    church_id: state.churchProfile.church_id,
+    chains: state.approvalChains
+  });
+  if (!ok) {
+    showResult('chains-result', false, data.detail || 'Failed to save');
+    return false;
+  }
+  showResult('chains-result', true, `${data.created_count} chain(s) saved`);
+  return true;
+};
+
+// ============================================================
+// Step 8: Budget
+// ============================================================
+window.render_8 = () => `
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Budget Import</h1>
+  <p class="text-gray-500 mb-6">Optional: import your annual budget. You can also do this later from the Budget page.</p>
+
+  <label class="block">
+    <div class="border-2 border-dashed border-gray-300 hover:border-navy-700 rounded-xl p-10 text-center cursor-pointer transition">
+      <div class="text-4xl mb-2">\u{1F4CA}</div>
+      <div class="text-gray-700 font-medium">Click to upload budget spreadsheet</div>
+      <div class="text-xs text-gray-400 mt-1">.xlsx, .xls, or .csv</div>
+    </div>
+    <input id="budget-file" type="file" accept=".xlsx,.xls,.csv" class="hidden"/>
+  </label>
+
+  <div id="budget-result" class="mt-4">
+    ${state.budget.imported ? `<div class="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 text-sm">✅ Budget loaded — Annual total: $${state.budget.total.toLocaleString()}, ${state.budget.account_count} accounts</div>` : ''}
+  </div>
+`;
+
+window.bind_8 = () => {
+  document.getElementById('budget-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!state.churchProfile.church_id) {
+      showResult('budget-result', false, 'Complete Step 1 first');
+      return;
+    }
+    showLoading('budget-result', 'Parsing budget...');
+    const { ok, data } = await apiPostFile(
+      '/api/setup/budget-import',
+      file,
+      `?church_id=${encodeURIComponent(state.churchProfile.church_id)}`
+    );
+    if (!ok) {
+      showResult('budget-result', false, data.detail || 'Failed to import');
+      return;
+    }
+    state.budget = {
+      imported: true,
+      total: data.budget_total || 0,
+      account_count: data.account_count || 0
+    };
+    saveState();
+    showResult('budget-result', true, `Budget loaded — Annual total: $${state.budget.total.toLocaleString()}, ${state.budget.account_count} accounts`);
+  });
+};
+
+// ============================================================
+// Step 9: Review & Complete
+// ============================================================
+function statusLine(label, ok, detail, skipped) {
+  let icon, cls;
+  if (skipped) { icon = '⏭️'; cls = 'text-gray-500'; }
+  else if (ok) { icon = '✅'; cls = 'text-emerald-700'; }
+  else { icon = '⚠️'; cls = 'text-amber-700'; }
+  return `<div class="flex justify-between items-center py-2 border-b border-gray-100">
+    <div class="flex items-center gap-3"><span class="text-lg">${icon}</span><span class="font-medium text-gray-800">${esc(label)}</span></div>
+    <div class="text-sm ${cls}">${esc(detail)}</div>
+  </div>`;
+}
+
+window.render_9 = () => {
+  const cp = state.churchProfile;
+  const lines = [
+    statusLine('Church Profile', !!cp.church_name, cp.church_name || 'Not set', false),
+    statusLine('Chart of Accounts', state.coa.imported, state.coa.imported ? `${state.coa.account_count} accounts loaded` : 'Skipped', state.skipped[2]),
+    statusLine('Plaid', state.plaid.success, state.plaid.success ? `Connected (${state.plaid.env})` : (state.skipped[3] ? 'Skipped — configure in Settings' : 'Not connected'), state.skipped[3]),
+    statusLine('ACS Realm', state.acs.success, state.acs.success ? 'Connected' : (state.skipped[4] ? 'Skipped — configure in Settings' : 'Not connected'), state.skipped[4]),
+    statusLine('Email (SMTP)', state.smtp.success, state.smtp.success ? 'Connected' : (state.skipped[5] ? 'Skipped — configure in Settings' : 'Not connected'), state.skipped[5]),
+    statusLine('Users', state.users.length > 0, `${state.users.length} created`, false),
+    statusLine('Approval Chains', state.approvalChains.length > 0, state.approvalChains.length ? `${state.approvalChains.length} configured` : (state.skipped[7] ? 'Skipped' : 'None'), state.skipped[7]),
+    statusLine('Budget', state.budget.imported, state.budget.imported ? `$${state.budget.total.toLocaleString()}` : 'Skipped — import in Budget page', state.skipped[8] || !state.budget.imported)
+  ].join('');
+  return `
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">Review &amp; Complete</h1>
+    <p class="text-gray-500 mb-6">Review your setup. Click "Complete Setup" to finish.</p>
+    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+      ${lines}
+    </div>
+    <div id="complete-result" class="mt-4"></div>
+  `;
+};
+
+window.handleNext_9 = async () => {
+  showLoading('complete-result', 'Finalizing...');
+  const { ok, data } = await apiPost('/api/setup/complete', {
+    church_id: state.churchProfile.church_id || 'default',
+    force: false
+  });
+  if (!ok) {
+    if (data && data.detail && /already complete/i.test(data.detail)) {
+      // Setup was already complete — proceed to redirect
+      showResult('complete-result', true, 'Setup was already complete. Redirecting...');
+    } else {
+      showResult('complete-result', false, (data && data.detail) || 'Failed to complete');
+      return false;
+    }
+  } else {
+    showResult('complete-result', true, '\u{1F389} Setup complete! Redirecting to dashboard...');
+  }
+  clearState();
+  setTimeout(() => { window.location.href = '/index.html'; }, 3000);
+  return true;
+};
+
+// ----- Init -----
+(async () => {
+  // If already complete, jump straight to dashboard
+  try {
+    const res = await fetch(API + '/api/setup/status');
+    if (res.ok) {
+      const d = await res.json();
+      if (d.setup_complete) {
+        // user manually visited wizard, but setup done — let them re-run anyway
+      }
+    }
+  } catch {}
+  render();
+})();
+</script>
+</body>
+</html>

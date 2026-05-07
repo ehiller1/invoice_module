@@ -11,6 +11,10 @@ from .schemas import (
     ChatRequest, ChatResponse,
     BudgetMonth, BudgetPlan, BudgetStatus, BudgetCheck,
     ApprovalChain,
+    BankTransaction, MatchResult, ReconException, ReconciliationSession,
+    PaymentMethod, Vendor, PaymentStatus, ACHRecord, CheckRecord,
+    CreditCardMemo, PaymentInstruction,
+    BudgetaryAuthority, PlaidAccount, PlaidTransaction,
 )
 
 __all__ = [
@@ -26,4 +30,8 @@ __all__ = [
     "ChatRequest", "ChatResponse",
     "BudgetMonth", "BudgetPlan", "BudgetStatus", "BudgetCheck",
     "ApprovalChain",
+    "BankTransaction", "MatchResult", "ReconException", "ReconciliationSession",
+    "PaymentMethod", "Vendor", "PaymentStatus", "ACHRecord", "CheckRecord",
+    "CreditCardMemo", "PaymentInstruction",
+    "BudgetaryAuthority", "PlaidAccount", "PlaidTransaction",
 ]

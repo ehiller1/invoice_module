@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Configuration — EIME Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { navy: { 900:'#0f1f3d', 800:'#162952' }, gold:{500:'#c9a227'} },
+        fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<div id="eime-shell-mount" class="h-full"></div>
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<template id="model-config-page">
+  <div class="p-4 lg:p-8 max-w-3xl mx-auto">
+    <h1 class="text-2xl font-semibold text-navy-900 mb-2">LLM Model Configuration</h1>
+    <p class="text-slate-600 mb-6 text-sm">Admin-only. Override the model used per agent. Changes apply immediately to subsequent invocations.</p>
+
+    <div id="role-warning" class="hidden mb-4 p-3 bg-amber-50 text-amber-800 rounded text-sm">
+      You must include header <code>X-User-Role: ADMIN</code> in production. (Header is sent automatically here for development.)
+    </div>
+
+    <form id="model-form" class="bg-white rounded-lg shadow-sm divide-y divide-slate-100">
+      <div class="p-6">
+        <p class="text-slate-500 text-sm">Loading…</p>
+      </div>
+    </form>
+
+    <div class="mt-4 flex gap-2">
+      <button id="save-btn" class="px-4 py-2 bg-navy-900 text-white rounded-lg text-sm min-h-[44px]">Save</button>
+      <button id="reset-btn" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm min-h-[44px]">Reset to defaults</button>
+      <span id="status-msg" class="text-sm self-center"></span>
+    </div>
+  </div>
+</template>
+
+<script>
+(async () => {
+  await EIMEShell.mount('eime-shell-mount');
+  const center = document.getElementById('eime-center');
+  center.appendChild(document.getElementById('model-config-page').content.cloneNode(true));
+
+  const KNOWN_MODELS = [
+    'claude-opus-4-7-20251231',
+    'claude-sonnet-4-5-20250929',
+    'claude-haiku-4-5-20251015',
+    'claude-sonnet-3-5-20241022',
+  ];
+
+  async function load() {
+    const res = await fetch('/api/model-config');
+    const cfg = await res.json();
+    const form = document.getElementById('model-form');
+    form.innerHTML = '';
+    Object.entries(cfg).forEach(([agent, model]) => {
+      const row = document.createElement('div');
+      row.className = 'p-4 flex flex-col lg:flex-row lg:items-center gap-2';
+      row.innerHTML = `
+        <label class="lg:w-48 font-medium text-navy-900 text-sm">${agent}</label>
+        <select name="${agent}" class="flex-1 border border-slate-300 rounded px-3 py-2 text-sm min-h-[44px]">
+          ${KNOWN_MODELS.map(m => `<option value="${m}" ${m===model?'selected':''}>${m}</option>`).join('')}
+          ${KNOWN_MODELS.includes(model) ? '' : `<option value="${model}" selected>${model}</option>`}
+        </select>
+      `;
+      form.appendChild(row);
+    });
+  }
+
+  async function save() {
+    const form = document.getElementById('model-form');
+    const data = {};
+    form.querySelectorAll('select').forEach(s => { data[s.name] = s.value; });
+    const res = await fetch('/api/model-config', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Role': 'ADMIN',
+      },
+      body: JSON.stringify(data),
+    });
+    const status = document.getElementById('status-msg');
+    if (res.ok) {
+      status.textContent = 'Saved.';
+      status.className = 'text-sm self-center text-green-600';
+    } else {
+      status.textContent = 'Save failed: ' + res.status;
+      status.className = 'text-sm self-center text-red-600';
+    }
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  }
+
+  document.getElementById('save-btn').addEventListener('click', save);
+  document.getElementById('reset-btn').addEventListener('click', async () => {
+    await fetch('/api/model-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': 'ADMIN' },
+      body: JSON.stringify({}),
+    });
+    load();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
