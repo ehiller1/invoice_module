@@ -1,376 +1,166 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Budget — EIME</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
-            gold: { 500: '#c9a227', 400: '#d4ad3a' },
-          },
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
-        }
+<title>EIME — Budget Tracking</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
       }
     }
-  </script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    .fade-in { animation: fadeIn 0.25s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-    .progress-bar { height: 8px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; }
-    .progress-fill { height: 100%; transition: width 0.3s ease; }
-  </style>
-  <link rel="stylesheet" href="/responsive.css" />
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
 </head>
-<body class="h-full bg-slate-50 font-sans">
-<div class="flex h-full">
+<body>
 
-  <!-- Sidebar -->
-  <aside class="w-64 bg-navy-900 flex flex-col shadow-xl">
-    <div class="px-6 py-6 border-b border-navy-700">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-        </div>
-        <div>
-          <p class="text-white font-semibold text-sm">EIME</p>
-          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
-        </div>
-      </div>
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <h1 class="text-3xl font-bold text-slate-900 mb-2">Budget Tracking</h1>
+  <p class="text-slate-600 mb-6">Monitor GL lines, track spending, and project year-end positions</p>
+
+  <div class="grid grid-cols-3 gap-4 mb-8">
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Total Budget</p>
+      <p class="text-3xl font-bold text-slate-900" id="total-budget">$0</p>
     </div>
-    <nav class="flex-1 px-4 py-4 space-y-1">
-      <a href="/" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-        Upload Invoice
-      </a>
-      <a href="/jobs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        Processing Jobs
-      </a>
-      <a href="/coa.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-        Chart of Accounts
-      </a>
-      <a href="/budget.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-navy-700">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        Budget
-      </a>
-      <a href="/skills.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-        Skill Library
-      </a>
-      <a href="/chat.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        Agent Chat
-      </a>
-    </nav>
-    <div class="px-4 py-4 border-t border-navy-700">
-      <div class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
-        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-        <span class="text-slate-300 text-xs" id="church-name-label">—</span>
-      </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">YTD Spent</p>
+      <p class="text-3xl font-bold text-orange-600" id="ytd-spent">$0</p>
     </div>
-  </aside>
-
-  <main class="flex-1 overflow-auto flex flex-col">
-    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
-      <div>
-        <h1 class="text-lg font-semibold text-slate-800">Budget <span id="fy-label" class="text-slate-400 font-normal text-base"></span></h1>
-        <p class="text-sm text-slate-500">Annual budget, YTD actuals, and variance tracking.</p>
-      </div>
-      <div class="flex items-center gap-3">
-        <select id="church-selector" onchange="switchChurch()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
-      </div>
-    </header>
-
-    <div class="flex-1 overflow-auto px-8 py-6 space-y-6">
-
-      <!-- Upload card -->
-      <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-700">Upload Budget Spreadsheet</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Excel (.xlsx, .xls) or CSV with columns: <code class="bg-slate-100 px-1 rounded">account_number</code>, <code class="bg-slate-100 px-1 rounded">jan…dec</code>, <code class="bg-slate-100 px-1 rounded">annual_budget</code></p>
-          </div>
-          <a href="/templates/budget-template.xlsx" download class="text-xs text-navy-700 border border-navy-200 rounded-lg px-3 py-2 hover:bg-navy-50">Download Template</a>
-        </div>
-        <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-navy-400 hover:bg-navy-50 transition-colors">
-          <input type="file" id="budget-file-input" accept=".xlsx,.xls,.csv" onchange="uploadBudget(event)" class="hidden" />
-          <label for="budget-file-input" class="cursor-pointer block">
-            <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-            <p class="text-sm text-slate-600 font-medium">Click to upload budget</p>
-            <p class="text-xs text-slate-500 mt-1">.xlsx, .xls, or .csv</p>
-          </label>
-        </div>
-        <div id="upload-msg" class="hidden text-xs rounded-lg px-3 py-2 mt-3"></div>
-      </div>
-
-      <!-- Threshold -->
-      <div class="bg-white rounded-xl border border-slate-200 p-6">
-        <div class="flex items-center justify-between mb-2">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-700">Warning Threshold</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Lines crossing this percentage of annual budget trigger a WARNING (informational); over 100% triggers HITL escalation.</p>
-          </div>
-          <span class="text-2xl font-bold text-navy-700"><span id="threshold-value">80</span>%</span>
-        </div>
-        <input type="range" id="threshold-slider" min="0" max="100" step="1" value="80" oninput="document.getElementById('threshold-value').textContent=this.value" onchange="setThreshold(this.value)" class="w-full" />
-        <div class="text-xs text-slate-400 flex justify-between mt-1"><span>0%</span><span>50%</span><span>100%</span></div>
-      </div>
-
-      <!-- Variance summary cards -->
-      <div id="variance-cards" class="grid grid-cols-4 gap-4">
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-          <p class="text-xs uppercase tracking-wide text-slate-500 font-medium">Annual Budget</p>
-          <p class="text-2xl font-bold text-slate-800 mt-2" id="card-annual">—</p>
-        </div>
-        <div class="bg-white rounded-xl border border-emerald-200 p-5">
-          <p class="text-xs uppercase tracking-wide text-emerald-600 font-medium">Within Budget</p>
-          <p class="text-2xl font-bold text-emerald-700 mt-2" id="card-within">—</p>
-        </div>
-        <div class="bg-white rounded-xl border border-amber-200 p-5">
-          <p class="text-xs uppercase tracking-wide text-amber-600 font-medium">At Risk</p>
-          <p class="text-2xl font-bold text-amber-700 mt-2" id="card-at-risk">—</p>
-        </div>
-        <div class="bg-white rounded-xl border border-rose-200 p-5">
-          <p class="text-xs uppercase tracking-wide text-rose-600 font-medium">Over Budget</p>
-          <p class="text-2xl font-bold text-rose-700 mt-2" id="card-over">—</p>
-        </div>
-      </div>
-
-      <!-- Budget table -->
-      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-slate-700">Account Budget Detail</h2>
-          <div class="flex items-center gap-2">
-            <button onclick="ytdReset()" class="text-xs text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">Reset YTD</button>
-            <button onclick="yearEndReset()" class="text-xs text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">Year-End Roll</button>
-          </div>
-        </div>
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Account #</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Annual</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">YTD Actual</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Remaining</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-72">Used</th>
-            </tr>
-          </thead>
-          <tbody id="budget-body" class="divide-y divide-slate-100"></tbody>
-        </table>
-        <div id="budget-empty" class="hidden text-center py-12 text-sm text-slate-400">No budget configured. Upload a file above to get started.</div>
-      </div>
-
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Remaining</p>
+      <p class="text-3xl font-bold text-green-600" id="remaining">$0</p>
     </div>
-  </main>
+  </div>
+
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-4">GL Line Balances</h2>
+    <div id="budget-lines" class="space-y-3"></div>
+  </div>
+
+  <!-- Line Detail Modal -->
+  <div id="line-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4" id="modal-line-name">GL Account</h2>
+      <div id="modal-line-content" class="space-y-4 mb-6"></div>
+      <button onclick="closeLineModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+    </div>
+  </div>
 </div>
+</template>
 
 <script>
-let currentChurch = null;
-let allChurches = [];
-let currentBudget = null;
-let currentVariance = null;
+const API = 'http://localhost:8000';
+let selectedLine = null;
 
-async function init() {
-  const r = await fetch('/api/churches');
-  allChurches = await r.json();
-  const sel = document.getElementById('church-selector');
-  sel.innerHTML = allChurches.map(c => `<option value="${c.church_id}">${c.church_name}</option>`).join('');
-  if (allChurches.length) {
-    currentChurch = allChurches[0].church_id;
-    sel.value = currentChurch;
-    document.getElementById('church-name-label').textContent = allChurches[0].church_name;
-    await loadAll();
+EIMEShell.mount({
+  activeNav: 'budget',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    loadBudget();
+    setInterval(loadBudget, 10000);
   }
-}
-
-function switchChurch() {
-  const sel = document.getElementById('church-selector');
-  currentChurch = sel.value;
-  const c = allChurches.find(x => x.church_id === currentChurch);
-  document.getElementById('church-name-label').textContent = c ? c.church_name : '—';
-  loadAll();
-}
-
-async function loadAll() {
-  await loadBudget();
-  await loadVariance();
-}
+});
 
 async function loadBudget() {
-  if (!currentChurch) return;
   try {
-    const r = await fetch(`/api/churches/${currentChurch}/budget?_=${Date.now()}`);
-    if (r.status === 404) {
-      currentBudget = null;
-      document.getElementById('fy-label').textContent = '— FY ?';
-      document.getElementById('budget-empty').classList.remove('hidden');
-      document.getElementById('budget-body').innerHTML = '';
-      document.getElementById('threshold-value').textContent = '80';
-      document.getElementById('threshold-slider').value = 80;
-      return;
-    }
-    const data = await r.json();
-    currentBudget = data;
-    const fy = data.budget && data.budget.fiscal_year;
-    document.getElementById('fy-label').textContent = fy ? `— FY ${fy}` : '';
-    const thresholdPct = Math.round((data.budget_warning_threshold || 0.8) * 100);
-    document.getElementById('threshold-value').textContent = thresholdPct;
-    document.getElementById('threshold-slider').value = thresholdPct;
-  } catch (e) {
-    showMsg('upload-msg', 'Failed to load budget: ' + e, 'error');
-  }
-}
-
-async function loadVariance() {
-  if (!currentChurch) return;
-  const r = await fetch(`/api/churches/${currentChurch}/budget/variance-report?_=${Date.now()}`);
-  if (r.status === 404) {
-    document.getElementById('card-annual').textContent = '—';
-    document.getElementById('card-within').textContent = '—';
-    document.getElementById('card-at-risk').textContent = '—';
-    document.getElementById('card-over').textContent = '—';
-    return;
-  }
-  const data = await r.json();
-  currentVariance = data;
-  document.getElementById('card-annual').textContent = '$' + fmt(data.totals.annual_budget);
-  document.getElementById('card-within').textContent = data.buckets.within.length;
-  document.getElementById('card-at-risk').textContent = data.buckets.at_risk.length;
-  document.getElementById('card-over').textContent = data.buckets.over.length;
-  renderBudgetTable(data);
-}
-
-function renderBudgetTable(data) {
-  const all = [
-    ...data.buckets.within.map(r => ({...r, _bucket: 'within'})),
-    ...data.buckets.at_risk.map(r => ({...r, _bucket: 'at_risk'})),
-    ...data.buckets.over.map(r => ({...r, _bucket: 'over'})),
-  ].sort((a, b) => a.account_number.localeCompare(b.account_number));
-
-  const empty = document.getElementById('budget-empty');
-  const body = document.getElementById('budget-body');
-
-  if (!all.length) {
-    empty.classList.remove('hidden');
-    body.innerHTML = '';
-    return;
-  }
-  empty.classList.add('hidden');
-
-  body.innerHTML = all.map(r => {
-    const pct = Math.min(r.pct, 1.5);
-    const widthPct = Math.min(pct * 100, 100);
-    const bg = r._bucket === 'over' ? 'bg-rose-50' : r._bucket === 'at_risk' ? 'bg-amber-50' : 'bg-emerald-50';
-    const fillColor = r._bucket === 'over' ? '#e11d48' : r._bucket === 'at_risk' ? '#d97706' : '#10b981';
-    return `
-      <tr class="${bg}">
-        <td class="px-4 py-3 font-mono text-xs">${r.account_number}</td>
-        <td class="px-4 py-3 text-slate-700">${r.account_name}</td>
-        <td class="px-4 py-3 text-right text-slate-700">$${fmt(r.annual)}</td>
-        <td class="px-4 py-3 text-right text-slate-700">$${fmt(r.ytd)}</td>
-        <td class="px-4 py-3 text-right text-slate-700">$${fmt(r.remaining)}</td>
-        <td class="px-4 py-3">
-          <div class="flex items-center gap-3">
-            <div class="progress-bar flex-1">
-              <div class="progress-fill" style="width:${widthPct}%; background-color:${fillColor};"></div>
+    const res = await fetch(`${API}/api/budget/variance?church_id=holy_comforter`);
+    const data = await res.json();
+    
+    const total = data.lines.reduce((sum, l) => sum + (l.annual_budget || 0), 0);
+    const spent = data.lines.reduce((sum, l) => sum + (l.ytd_actual || 0), 0);
+    const remaining = total - spent;
+    
+    document.getElementById('total-budget').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('ytd-spent').textContent = `$${spent.toFixed(2)}`;
+    document.getElementById('remaining').textContent = `$${remaining.toFixed(2)}`;
+    
+    const lines = data.lines.map(line => {
+      const pct = (line.ytd_actual / line.annual_budget * 100).toFixed(0);
+      const health = pct < 70 ? 'text-green-600' : pct < 90 ? 'text-yellow-600' : 'text-red-600';
+      return `
+        <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="showLine('${line.gl_code}')">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="font-medium text-slate-900">${line.gl_name || line.gl_code}</p>
+              <p class="text-xs text-slate-500">${line.gl_code}</p>
             </div>
-            <span class="text-xs font-semibold text-slate-600 w-12 text-right">${(r.pct * 100).toFixed(0)}%</span>
+            <div class="text-right">
+              <p class="font-bold ${health}">${pct}%</p>
+              <p class="text-sm text-slate-600">$${(line.ytd_actual || 0).toFixed(2)} / $${(line.annual_budget || 0).toFixed(2)}</p>
+            </div>
           </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function fmt(v) {
-  const n = parseFloat(v || 0);
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-async function uploadBudget(ev) {
-  const file = ev.target.files[0];
-  if (!file || !currentChurch) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  showMsg('upload-msg', 'Uploading…', 'info');
-  try {
-    const r = await fetch(`/api/churches/${currentChurch}/budget/import-spreadsheet`, {
-      method: 'POST', body: fd,
-    });
-    if (!r.ok) {
-      const err = await r.json();
-      showMsg('upload-msg', 'Upload failed: ' + (err.detail || r.status), 'error');
-      return;
-    }
-    const data = await r.json();
-    let msg = `Loaded ${data.accounts_loaded} accounts, $${fmt(data.annual_total)} total.`;
-    if (data.warnings && data.warnings.length) msg += ` Warnings: ${data.warnings.length}.`;
-    showMsg('upload-msg', msg, 'success');
-    ev.target.value = '';
-    await loadAll();
+          <div class="w-full bg-slate-200 rounded-full h-2">
+            <div class="bg-slate-700 h-2 rounded-full transition-all" style="width: ${Math.min(pct, 100)}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('budget-lines').innerHTML = lines;
   } catch (e) {
-    showMsg('upload-msg', 'Upload error: ' + e, 'error');
+    console.error('Error loading budget:', e);
   }
 }
 
-async function setThreshold(pctValue) {
-  const threshold = parseInt(pctValue, 10) / 100;
-  if (!currentChurch) return;
-  await fetch(`/api/churches/${currentChurch}/budget-warning-threshold`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ threshold }),
-  });
-  await loadVariance();
+async function showLine(glCode) {
+  try {
+    const res = await fetch(`${API}/api/budget/variance?church_id=holy_comforter`);
+    const data = await res.json();
+    const line = data.lines.find(l => l.gl_code === glCode);
+    
+    if (!line) return;
+    
+    const pct = (line.ytd_actual / line.annual_budget * 100).toFixed(0);
+    const projected = line.ytd_actual / (new Date().getMonth() + 1) * 12;
+    
+    document.getElementById('modal-line-name').textContent = `${line.gl_name || line.gl_code}`;
+    document.getElementById('modal-line-content').innerHTML = `
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-slate-50 rounded p-3">
+          <p class="text-xs text-slate-500 mb-1">Annual Budget</p>
+          <p class="text-2xl font-bold text-slate-900">$${(line.annual_budget || 0).toFixed(2)}</p>
+        </div>
+        <div class="bg-slate-50 rounded p-3">
+          <p class="text-xs text-slate-500 mb-1">YTD Spent</p>
+          <p class="text-2xl font-bold text-slate-900">$${(line.ytd_actual || 0).toFixed(2)}</p>
+        </div>
+        <div class="bg-slate-50 rounded p-3">
+          <p class="text-xs text-slate-500 mb-1">Remaining</p>
+          <p class="text-2xl font-bold text-green-600">$${(line.annual_budget - line.ytd_actual).toFixed(2)}</p>
+        </div>
+        <div class="bg-slate-50 rounded p-3">
+          <p class="text-xs text-slate-500 mb-1">Utilization</p>
+          <p class="text-2xl font-bold text-slate-900">${pct}%</p>
+        </div>
+      </div>
+      <div class="bg-blue-50 border border-blue-200 rounded p-3">
+        <p class="text-sm text-blue-800"><strong>Projected Year-End:</strong> $${projected.toFixed(2)} (${((projected / line.annual_budget) * 100).toFixed(0)}%)</p>
+      </div>
+    `;
+    
+    document.getElementById('line-modal').classList.remove('hidden');
+  } catch (e) {
+    console.error('Error loading line:', e);
+  }
 }
 
-async function ytdReset() {
-  if (!currentChurch) return;
-  if (!confirm('Reset all YTD actuals to zero? This cannot be undone.')) return;
-  const r = await fetch(`/api/churches/${currentChurch}/budget/ytd-reset`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ confirm: true, reset_to_zero: true }),
-  });
-  if (r.ok) loadAll();
+function closeLineModal() {
+  document.getElementById('line-modal').classList.add('hidden');
+  selectedLine = null;
 }
-
-async function yearEndReset() {
-  if (!currentChurch || !currentBudget) return;
-  const next = parseInt(prompt('Next fiscal year? (e.g., 2027)', currentBudget.budget.fiscal_year + 1), 10);
-  if (!next) return;
-  const roll = confirm('Roll the current budget plan forward into the new year? (Cancel = clear plan)');
-  const r = await fetch(`/api/churches/${currentChurch}/budget/year-end-reset`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ next_fiscal_year: next, roll_forward_plan: roll, confirm: true }),
-  });
-  if (r.ok) loadAll();
-}
-
-function showMsg(id, text, kind) {
-  const el = document.getElementById(id);
-  el.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'bg-rose-50', 'text-rose-700', 'bg-slate-50', 'text-slate-700');
-  if (kind === 'success') el.classList.add('bg-emerald-50', 'text-emerald-700');
-  else if (kind === 'error') el.classList.add('bg-rose-50', 'text-rose-700');
-  else el.classList.add('bg-slate-50', 'text-slate-700');
-  el.textContent = text;
-}
-
-init();
 </script>
-<script src="/eime-responsive.js"></script>
+
 </body>
 </html>

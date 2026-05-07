@@ -17,7 +17,7 @@
  */
 (function () {
   const SHELL_URL = '/_shell.html';
-  const API = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8001';
+  const API = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
 
   async function mount(opts) {
     opts = opts || {};

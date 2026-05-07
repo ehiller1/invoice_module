@@ -1,516 +1,286 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EIME — Embark Invoice Mapping Engine</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
-            gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
-          },
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
-        }
+<title>EIME — Upload Invoice</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
       }
     }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    .drop-zone { transition: all 0.2s ease; }
-    .drop-zone.drag-over { @apply border-navy-700 bg-blue-50; }
-    .step-bar { transition: width 0.6s ease; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-    .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
-  </style>
-  <link rel="stylesheet" href="/responsive.css" />
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  .drop-zone { transition: all 0.2s ease; }
+  .drop-zone.drag-over { @apply border-navy-700 bg-blue-50; }
+  .step-bar { transition: width 0.6s ease; }
+  .fade-in { animation: fadeIn 0.3s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .pill { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+</style>
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
 </head>
-<body class="h-full bg-slate-50 font-sans">
+<body>
 
-<!-- Sidebar + layout -->
-<div class="flex h-full">
+<template id="page-center-content">
+<div class="max-w-4xl mx-auto p-6">
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">Upload Invoice</h1>
+    <p class="text-slate-600">Process a PDF invoice or payment document through the multi-agent COA mapping pipeline.</p>
+  </div>
 
-  <!-- Sidebar -->
-  <aside class="w-64 bg-navy-900 flex flex-col shadow-xl">
-    <div class="px-6 py-6 border-b border-navy-700">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+  <!-- Church Selector -->
+  <div class="mb-6 flex items-end gap-4">
+    <div class="flex-1">
+      <label class="text-sm font-semibold text-slate-700 mb-2 block">Select Church</label>
+      <select id="church-selector" class="w-full text-sm border border-slate-300 rounded-lg px-4 py-2.5 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 focus:border-transparent outline-none">
+        <option value="">Loading churches…</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Upload Card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6">
+    <h2 class="text-lg font-semibold text-slate-800 mb-1">Document Upload</h2>
+    <p class="text-sm text-slate-500 mb-6">Accepts PDF invoices, utility bills, credit memos, and payment remittances. Max 50 MB.</p>
+
+    <div id="drop-zone"
+      class="drop-zone border-2 border-dashed border-slate-300 rounded-xl p-12 text-center cursor-pointer hover:border-navy-600 hover:bg-slate-50 transition-all"
+      ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+      onclick="document.getElementById('file-input').click()">
+      <div class="flex flex-col items-center gap-3">
+        <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+          <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
           </svg>
         </div>
         <div>
-          <p class="text-white font-semibold text-sm leading-tight">EIME</p>
-          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
+          <p class="text-slate-600 font-medium text-sm">Drop PDF here or click to browse</p>
+          <p class="text-slate-400 text-xs mt-1">PDF only • Up to 50 MB</p>
         </div>
       </div>
+      <input type="file" id="file-input" accept=".pdf" class="hidden" />
     </div>
 
-    <nav class="flex-1 px-4 py-4 space-y-1">
-      <a href="/" id="nav-upload" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-navy-700 hover:bg-navy-600 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-        </svg>
-        Upload Invoice
-      </a>
-      <a href="/jobs.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-        </svg>
-        Processing Jobs
-        <span id="hitl-badge" class="hidden ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">!</span>
-      </a>
-      <a href="/coa.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-        </svg>
-        Chart of Accounts
-      </a>
-      <a href="/budget.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        Budget
-      </a>
-      <a href="/skills.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-        </svg>
-        Skill Library
-      </a>
-      <a href="/chat.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        Agent Chat
-      </a>
-    </nav>
-
-    <div class="px-4 py-4 border-t border-navy-700">
-      <div id="church-badge" class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
-        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-        <span class="text-slate-300 text-xs" id="church-name-label">Loading…</span>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <main class="flex-1 overflow-auto">
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+    <div class="mt-6 grid grid-cols-2 gap-4">
       <div>
-        <h1 class="text-lg font-semibold text-slate-800">Upload Invoice</h1>
-        <p class="text-sm text-slate-500">Process a PDF invoice or payment document through the multi-agent COA mapping pipeline.</p>
-      </div>
-      <div class="flex items-center gap-3">
-        <select id="church-selector" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 focus:border-transparent outline-none">
-          <option value="">Loading churches…</option>
+        <label class="text-xs font-medium text-slate-600 mb-1.5 block">Document Type</label>
+        <select id="doc-type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none">
+          <option value="INVOICE">Invoice</option>
+          <option value="UTILITY_BILL">Utility Bill</option>
+          <option value="PAYMENT_REMITTANCE">Payment Remittance</option>
+          <option value="CREDIT_MEMO">Credit Memo</option>
+          <option value="DONATION_RECEIPT">Donation Receipt</option>
         </select>
       </div>
-    </header>
-
-    <div class="px-8 py-8 max-w-4xl">
-
-      <!-- Upload card -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6">
-        <h2 class="text-base font-semibold text-slate-800 mb-1">Document Upload</h2>
-        <p class="text-sm text-slate-500 mb-6">Accepts PDF invoices, utility bills, credit memos, and payment remittances. Max 50 MB.</p>
-
-        <div id="drop-zone"
-          class="drop-zone border-2 border-dashed border-slate-300 rounded-xl p-12 text-center cursor-pointer hover:border-navy-600 hover:bg-slate-50 transition-all"
-          onclick="document.getElementById('file-input').click()">
-          <div class="flex flex-col items-center gap-3">
-            <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
-              <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-slate-600 font-medium text-sm" id="drop-label">Drop PDF here or click to browse</p>
-              <p class="text-slate-400 text-xs mt-1">PDF only • Up to 50 MB</p>
-            </div>
-          </div>
-          <input type="file" id="file-input" accept=".pdf" class="hidden" />
-        </div>
-
-        <div class="mt-6 grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-xs font-medium text-slate-600 mb-1.5 block">Document Type</label>
-            <select id="doc-type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none">
-              <option value="INVOICE">Invoice</option>
-              <option value="UTILITY_BILL">Utility Bill</option>
-              <option value="PAYMENT_REMITTANCE">Payment Remittance</option>
-              <option value="CREDIT_MEMO">Credit Memo</option>
-              <option value="DONATION_RECEIPT">Donation Receipt</option>
-            </select>
-          </div>
-          <div class="flex items-end">
-            <button id="upload-btn" onclick="uploadInvoice()"
-              class="w-full bg-navy-900 hover:bg-navy-800 text-white font-medium text-sm py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-              Process Invoice
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pipeline status -->
-      <div id="pipeline-panel" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6 fade-in">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-base font-semibold text-slate-800">Processing Pipeline</h2>
-          <span id="pipeline-status-badge" class="pill bg-blue-100 text-blue-800">Running</span>
-        </div>
-
-        <!-- Steps -->
-        <div class="space-y-3" id="pipeline-steps">
-          <div class="step-item flex items-center gap-4" data-step="EXTRACTING">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">PDF Extraction</p>
-              <p class="text-xs text-slate-400">Extract structured invoice data and line items</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-          <div class="step-item flex items-center gap-4" data-step="CLASSIFYING">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">Line Item Classification</p>
-              <p class="text-xs text-slate-400">Classify expense categories and ministry areas</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-          <div class="step-item flex items-center gap-4" data-step="MAPPING">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">GL Account Mapping</p>
-              <p class="text-xs text-slate-400">Semantic search → best-fit GL account + fund</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-          <div class="step-item flex items-center gap-4" data-step="REVIEWING">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">Allocation Review</p>
-              <p class="text-xs text-slate-400">Validate fund restrictions and expenditure policies</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-          <div class="step-item flex items-center gap-4" data-step="PENDING_HITL">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">Human Review Gate</p>
-              <p class="text-xs text-slate-400">HITL review for ambiguous or high-value items</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-          <div class="step-item flex items-center gap-4" data-step="EMITTED">
-            <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-slate-700">Journal Entry Emitted</p>
-              <p class="text-xs text-slate-400">Draft sent to Embark Accounting ledger domain</p>
-            </div>
-            <div class="step-status text-xs text-slate-400">Pending</div>
-          </div>
-        </div>
-
-        <!-- HITL prompt -->
-        <div id="hitl-prompt" class="hidden mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
-          <svg class="w-6 h-6 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      <div class="flex items-end">
+        <button id="upload-btn" onclick="uploadInvoice()"
+          class="w-full bg-navy-900 hover:bg-navy-800 text-white font-medium text-sm py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
-          <div class="flex-1">
-            <p class="text-sm font-semibold text-amber-800">Human Review Required</p>
-            <p class="text-xs text-amber-600 mt-0.5">Some line items require manual review before the journal entry can be finalized.</p>
-          </div>
-          <a id="hitl-review-link" href="#" class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
-            Review Now →
-          </a>
-        </div>
-
-        <!-- Result -->
-        <div id="result-card" class="hidden mt-6 bg-green-50 border border-green-200 rounded-xl p-5 fade-in">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-green-800">Journal Entry Created</p>
-              <p id="result-entry-id" class="text-xs text-green-600 font-mono"></p>
-            </div>
-          </div>
-          <div class="grid grid-cols-3 gap-3 mt-3">
-            <div class="bg-white rounded-lg p-3 border border-green-100">
-              <p class="text-xs text-slate-500">Total Debits</p>
-              <p id="result-debits" class="text-base font-semibold text-slate-800 mt-0.5">—</p>
-            </div>
-            <div class="bg-white rounded-lg p-3 border border-green-100">
-              <p class="text-xs text-slate-500">Total Credits</p>
-              <p id="result-credits" class="text-base font-semibold text-slate-800 mt-0.5">—</p>
-            </div>
-            <div class="bg-white rounded-lg p-3 border border-green-100">
-              <p class="text-xs text-slate-500">Status</p>
-              <p id="result-status" class="text-base font-semibold text-slate-800 mt-0.5">—</p>
-            </div>
-          </div>
-          <div class="mt-3 flex gap-2">
-            <a id="view-job-link" href="#" class="text-xs text-navy-700 font-medium hover:underline">View full job details →</a>
-          </div>
-        </div>
+          Process Invoice
+        </button>
       </div>
-
-      <!-- Info cards -->
-      <div class="grid grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-          <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-slate-700">6 AI Agents</p>
-          <p class="text-xs text-slate-400 mt-1">Orchestrator → Researcher → Worker → Reviewer → HITL → Membrane</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-          <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 4 1.79 4 8-1.79 8-4"/>
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-slate-700">Embedding COA Search</p>
-          <p class="text-xs text-slate-400 mt-1">ChromaDB semantic similarity matching per church tenant</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-5">
-          <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-slate-700">Fund Restriction Rules</p>
-          <p class="text-xs text-slate-400 mt-1">GAAP ASC 958 enforcement with per-fund expenditure policies</p>
-        </div>
-      </div>
-
     </div>
-  </main>
+  </div>
+
+  <!-- Pipeline Status (hidden until upload starts) -->
+  <div id="pipeline-panel" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-8 fade-in">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-semibold text-slate-800">Processing Pipeline</h2>
+      <span id="pipeline-status-badge" class="pill bg-blue-100 text-blue-800">Running</span>
+    </div>
+    <div class="space-y-3" id="pipeline-steps"></div>
+  </div>
+
+  <!-- Results (hidden until complete) -->
+  <div id="results-panel" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-8 fade-in">
+    <h2 class="text-lg font-semibold text-slate-800 mb-4">Processing Complete</h2>
+    <div id="results-content"></div>
+  </div>
 </div>
+</template>
 
 <script>
-const API = 'http://localhost:8001';
+const API = 'http://localhost:8000';
+let currentChurch = 'holy_comforter';
 let currentJobId = null;
-let pollInterval = null;
 
-// Redirect to setup wizard if not configured
-(async () => {
-  try {
-    const res = await fetch(`${API}/api/setup/status`);
-    if (res.ok) {
-      const data = await res.json();
-      if (!data.setup_complete) {
-        window.location.href = '/setup-wizard.html';
-      }
-    }
-  } catch (e) {
-    // Backend not available, continue loading normally
+EIMEShell.mount({
+  activeNav: 'invoices',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    loadChurches();
+    setupUploadHandlers();
   }
-})();
+});
 
-// Load churches
 async function loadChurches() {
-  const res = await fetch(`${API}/api/churches`);
-  const churches = await res.json();
-  const sel = document.getElementById('church-selector');
-  sel.innerHTML = churches.map(c =>
-    `<option value="${c.church_id}">${c.church_name}</option>`
-  ).join('');
-  if (churches[0]) {
-    document.getElementById('church-name-label').textContent = churches[0].church_name;
+  try {
+    const res = await fetch(`${API}/api/churches`);
+    const churches = await res.json();
+    const select = document.getElementById('church-selector');
+    select.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name}</option>`).join('');
+    select.addEventListener('change', (e) => currentChurch = e.target.value);
+  } catch (e) {
+    console.error('Failed to load churches:', e);
   }
 }
 
-// Drag and drop
-const dz = document.getElementById('drop-zone');
-const fi = document.getElementById('file-input');
+function setupUploadHandlers() {
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
 
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) {
-    fi.files = e.dataTransfer.files;
-    updateDropLabel(e.dataTransfer.files[0].name);
+  dropZone.addEventListener('dragover', handleDragOver);
+  dropZone.addEventListener('dragleave', handleDragLeave);
+  dropZone.addEventListener('drop', handleDrop);
+  fileInput.addEventListener('change', handleFileSelect);
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    document.getElementById('file-input').files = files;
+    uploadInvoice();
   }
-});
-fi.addEventListener('change', () => {
-  if (fi.files[0]) updateDropLabel(fi.files[0].name);
-});
+}
 
-function updateDropLabel(name) {
-  document.getElementById('drop-label').textContent = `📄 ${name}`;
+function handleFileSelect(e) {
+  if (e.target.files.length > 0) {
+    uploadInvoice();
+  }
 }
 
 async function uploadInvoice() {
-  const file = fi.files[0];
-  if (!file) { alert('Please select a PDF file.'); return; }
-  const churchId = document.getElementById('church-selector').value;
-  if (!churchId) { alert('Please select a church.'); return; }
+  const fileInput = document.getElementById('file-input');
+  const file = fileInput.files[0];
+  if (!file) return;
 
-  const btn = document.getElementById('upload-btn');
-  btn.disabled = true;
-  btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Processing…`;
+  const docType = document.getElementById('doc-type').value;
+  const uploadBtn = document.getElementById('upload-btn');
+  uploadBtn.disabled = true;
 
   const fd = new FormData();
-  fd.append('church_id', churchId);
-  fd.append('document_type', document.getElementById('doc-type').value);
   fd.append('file', file);
+  fd.append('doc_type', docType);
+  fd.append('church_id', currentChurch);
 
   try {
     const res = await fetch(`${API}/api/invoice/upload`, { method: 'POST', body: fd });
-    const data = await res.json();
-    currentJobId = data.job_id;
-    showPipeline();
-    startPolling(currentJobId);
+    const job = await res.json();
+    currentJobId = job.job_id;
+
+    document.getElementById('pipeline-panel').classList.remove('hidden');
+    initPipelineSteps();
+    pollJobStatus();
   } catch (e) {
-    alert('Upload failed: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Process Invoice`;
+    alert(`Upload failed: ${e.message}`);
+    uploadBtn.disabled = false;
   }
 }
 
-function showPipeline() {
-  document.getElementById('pipeline-panel').classList.remove('hidden');
-  document.getElementById('result-card').classList.add('hidden');
-  document.getElementById('hitl-prompt').classList.add('hidden');
+function initPipelineSteps() {
+  const steps = ['EXTRACTING', 'CLASSIFYING', 'MAPPING', 'BUDGETING', 'RISK_ASSESSMENT', 'EMITTING'];
+  const container = document.getElementById('pipeline-steps');
+  container.innerHTML = steps.map(step => `
+    <div class="step-item flex items-center gap-4" data-step="${step}">
+      <div class="step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="text-sm font-medium text-slate-700">${step}</p>
+      </div>
+      <div class="step-status text-xs text-slate-400">Pending</div>
+    </div>
+  `).join('');
 }
 
-const STATUS_ORDER = ['UPLOADED','EXTRACTING','CLASSIFYING','MAPPING','REVIEWING','PENDING_HITL','BUILDING_ENTRY','EMITTED','REJECTED','ERROR'];
-const STEP_MAP = {
-  EXTRACTING: 'EXTRACTING', CLASSIFYING: 'CLASSIFYING', MAPPING: 'MAPPING',
-  REVIEWING: 'REVIEWING', PENDING_HITL: 'PENDING_HITL',
-  BUILDING_ENTRY: 'EMITTED', EMITTED: 'EMITTED'
-};
-
-function updatePipeline(job) {
-  const status = job.status;
-  const steps = document.querySelectorAll('.step-item');
-  steps.forEach(step => {
-    const stepName = step.dataset.step;
-    const icon = step.querySelector('.step-icon');
-    const statusEl = step.querySelector('.step-status');
-    const statusIdx = STATUS_ORDER.indexOf(status);
-    const stepIdx = STATUS_ORDER.indexOf(stepName);
-    if (status === stepName) {
-      icon.className = 'step-icon w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0';
-      icon.querySelector('svg').className = 'w-4 h-4 text-blue-600';
-      statusEl.textContent = 'Running';
-      statusEl.className = 'step-status text-xs text-blue-600 font-medium';
-    } else if (stepIdx < statusIdx || (status === 'EMITTED' && stepName === 'EMITTED')) {
-      icon.className = 'step-icon w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0';
-      icon.querySelector('svg').className = 'w-4 h-4 text-green-600';
-      statusEl.textContent = 'Done';
-      statusEl.className = 'step-status text-xs text-green-600 font-medium';
-    } else {
-      icon.className = 'step-icon w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0';
-      icon.querySelector('svg').className = 'w-4 h-4 text-slate-400';
-      statusEl.textContent = 'Pending';
-      statusEl.className = 'step-status text-xs text-slate-400';
+async function pollJobStatus() {
+  const updateStep = (step, status, color) => {
+    const item = document.querySelector(`[data-step="${step}"]`);
+    if (item) {
+      item.querySelector('.step-status').textContent = status;
+      item.querySelector('.step-status').className = `step-status text-xs ${color}`;
     }
-  });
-
-  const badge = document.getElementById('pipeline-status-badge');
-  const badges = {
-    EMITTED: 'bg-green-100 text-green-800', ERROR: 'bg-red-100 text-red-800',
-    PENDING_HITL: 'bg-amber-100 text-amber-800',
   };
-  badge.className = `pill ${badges[status] || 'bg-blue-100 text-blue-800'}`;
-  badge.textContent = status.replace('_', ' ');
 
-  if (status === 'PENDING_HITL') {
-    document.getElementById('hitl-prompt').classList.remove('hidden');
-    document.getElementById('hitl-review-link').href = `/jobs.html?job=${job.job_id}`;
-  }
-
-  if (status === 'EMITTED' && job.journal_entry) {
-    showResult(job.journal_entry, job.job_id);
-    stopPolling();
-  }
-
-  if (status === 'ERROR') {
-    badge.textContent = 'Error';
-    stopPolling();
-  }
-}
-
-function showResult(je, jobId) {
-  document.getElementById('result-card').classList.remove('hidden');
-  document.getElementById('result-entry-id').textContent = je.entry_id;
-  document.getElementById('result-debits').textContent = `$${Number(je.total_debits).toFixed(2)}`;
-  document.getElementById('result-credits').textContent = `$${Number(je.total_credits).toFixed(2)}`;
-  document.getElementById('result-status').textContent = je.status;
-  document.getElementById('view-job-link').href = `/jobs.html?job=${jobId}`;
-}
-
-function startPolling(jobId) {
-  stopPolling();
-  pollInterval = setInterval(async () => {
+  const checkJob = async () => {
     try {
-      const res = await fetch(`${API}/api/jobs/${jobId}`);
+      const res = await fetch(`${API}/api/jobs/${currentJobId}`);
       const job = await res.json();
-      updatePipeline(job);
-    } catch (e) { console.error(e); }
-  }, 1500);
+
+      updateStep(job.current_step, 'In Progress', 'text-blue-600');
+
+      if (job.status === 'COMPLETED') {
+        updateStep(job.current_step, 'Complete', 'text-green-600');
+        document.getElementById('pipeline-status-badge').textContent = 'Complete';
+        document.getElementById('pipeline-status-badge').className = 'pill bg-green-100 text-green-800';
+        showResults(job);
+        return;
+      }
+
+      if (job.status === 'FAILED') {
+        updateStep(job.current_step, 'Failed', 'text-red-600');
+        document.getElementById('pipeline-status-badge').textContent = 'Failed';
+        document.getElementById('pipeline-status-badge').className = 'pill bg-red-100 text-red-800';
+        return;
+      }
+
+      setTimeout(checkJob, 2000);
+    } catch (e) {
+      console.error('Poll failed:', e);
+    }
+  };
+
+  checkJob();
 }
 
-function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-}
+function showResults(job) {
+  const resultsPanel = document.getElementById('results-panel');
+  const resultsContent = document.getElementById('results-content');
 
-// Check for HITL jobs
-async function checkHITL() {
-  try {
-    const res = await fetch(`${API}/api/jobs`);
-    const jobs = await res.json();
-    const hitl = jobs.filter(j => j.status === 'PENDING_HITL');
-    const badge = document.getElementById('hitl-badge');
-    if (hitl.length > 0) { badge.classList.remove('hidden'); badge.textContent = hitl.length; }
-    else badge.classList.add('hidden');
-  } catch (e) {}
-}
+  resultsContent.innerHTML = `
+    <div class="space-y-4">
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+        <p class="text-sm text-green-800"><strong>Job ID:</strong> ${job.job_id}</p>
+        <p class="text-sm text-green-800 mt-2">Extracted <strong>${job.line_items?.length || 0}</strong> line items</p>
+      </div>
+      <button onclick="location.href='/jobs.html'" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">
+        Review in Processing Queue →
+      </button>
+    </div>
+  `;
 
-loadChurches();
-checkHITL();
-setInterval(checkHITL, 15000);
+  resultsPanel.classList.remove('hidden');
+}
 </script>
-<script src="/eime-responsive.js"></script>
+
 </body>
 </html>

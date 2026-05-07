@@ -9,7 +9,7 @@
  * - Mobile-collapsible; close button dismisses on <1024px screens.
  */
 (function () {
-  let API = 'http://localhost:8001';
+  let API = 'http://localhost:8000';
   let containerId = 'eime-chat-rail';
   let contextRef = { page: null, payload: null };
   let messages = []; // {role:'user'|'assistant'|'system', text:string, meta?:object}
