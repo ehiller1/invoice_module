@@ -119,12 +119,29 @@ class ProcessingStatus(str, Enum):
     EMITTED = "EMITTED"
     REJECTED = "REJECTED"
     ERROR = "ERROR"
+    BLOCKED_FUND_RESTRICTION = "BLOCKED_FUND_RESTRICTION"  # FR-04.3 hard block
+    # FR-05: budget owner & treasurer approval gates
+    PENDING_BUDGET_OWNER = "PENDING_BUDGET_OWNER"
+    PENDING_TREASURER = "PENDING_TREASURER"
+    BUDGET_OWNER_APPROVED = "BUDGET_OWNER_APPROVED"
+    TREASURER_APPROVED = "TREASURER_APPROVED"
 
 
 class JEStatus(str, Enum):
-    DRAFT = "DRAFT"
-    PENDING_APPROVAL = "PENDING_APPROVAL"
-    APPROVED = "APPROVED"
+    DRAFT = "DRAFT"                            # AI-generated, not yet reviewed
+    OPEN = "OPEN"                              # human-reviewed, awaiting budget-owner approval
+    PENDING_TREASURER = "PENDING_TREASURER"    # budget-owner approved, awaiting treasurer
+    APPROVED = "APPROVED"                      # treasurer approved, ready to post
+    POSTED = "POSTED"                          # successfully written to ACS Realm
+    POSTING_FAILED = "POSTING_FAILED"          # ACS Realm posting failed; revert to APPROVED
+    REJECTED = "REJECTED"
+
+    @classmethod
+    def _missing_(cls, value):
+        # Backward-compat: legacy "PENDING_APPROVAL" → OPEN
+        if isinstance(value, str) and value.upper() == "PENDING_APPROVAL":
+            return cls.OPEN
+        return None
 
 
 # ===== Invoice extraction =====
@@ -136,6 +153,7 @@ class LineItem(BaseModel):
     unit_price: Optional[Decimal] = None
     amount: Decimal
     gl_hint: Optional[str] = None
+    source_page: int = 1  # 1-indexed page number this line came from (FR-01.5)
 
 
 class InvoiceDocument(BaseModel):
@@ -344,6 +362,7 @@ class HITLLineDecision(BaseModel):
     approval_timestamp: datetime
     notes: str = ""
     missions_attestation: bool = False
+    override_rationale: Optional[str] = None  # FR-02.3: required when changing GL account
 
 
 class HITLDecision(HITLLineDecision):
@@ -424,6 +443,7 @@ class FraudAssessment(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     job_id: Optional[str] = None
+    church_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -474,3 +494,24 @@ class ProcessingJob(BaseModel):
     error_message: Optional[str] = None
     audit_log: List[Dict[str, Any]] = Field(default_factory=list)
     budget_check: Optional[List[BudgetCheck]] = None
+    # FR-05: approval chain workflow tracking
+    approval_chain_id: Optional[str] = None
+    pending_approval_email: Optional[str] = None
+    pending_approval_started_at: Optional[datetime] = None
+    reminders_sent: List[Dict[str, Any]] = Field(default_factory=list)
+    budget_owner_decision: Optional[Dict[str, Any]] = None
+    treasurer_decision: Optional[Dict[str, Any]] = None
+
+
+# ===== FR-05 Approval Chain =====
+
+class ApprovalChain(BaseModel):
+    chain_id: str
+    gl_pattern: str  # e.g. "6500" or "65*" or "6500-6600"
+    primary_approver_email: str
+    primary_approver_name: str
+    secondary_approver_email: str  # treasurer or supervisor
+    secondary_approver_name: str
+    deadline_hours: int = 48
+    escalation_days: int = 5
+    active: bool = True

@@ -1,8 +1,22 @@
-"""Chat router — routes user questions to relevant agent context and calls Anthropic."""
+"""Chat router — routes user questions to relevant agent context and calls Anthropic.
+
+Phase 2.8 adds an intent classification step. When the user expresses a
+"create manual JE" intent, the router uses Claude to extract the slot values
+(from_account_hint, to_account_hint, amount, fund_hint, memo), resolves the
+account hints via semantic search, and returns a draft JournalEntry payload
+for confirmation in the chat rail.
+
+Phase 2.9 wires per-church KB hits into every chat turn so Claude can cite
+parish-specific guidance alongside denominational canon.
+"""
 from __future__ import annotations
 import json
 import os
-from typing import Any, Dict, List, Optional
+import re
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 from .skill_registry import get_registry
 
@@ -34,7 +48,291 @@ _TOPIC_SKILLS = {
 }
 
 
-def _build_system_prompt(job: Optional[Any]) -> str:
+# ---------------------------------------------------------------------------
+# Intent classification (FR-06.2)
+# ---------------------------------------------------------------------------
+
+# Heuristic keywords that strongly signal a "create JE" intent. These are used
+# both as a fast-path classifier (so we don't have to call Claude in tests) and
+# as a hint to the LLM in the prompt.
+_CREATE_JE_PATTERNS = [
+    r"\bcreate\s+(?:a\s+)?journal\s+entry\b",
+    r"\bcreate\s+(?:a\s+)?j\.?\s*e\.?\b",
+    r"\bmake\s+(?:a\s+)?journal\s+entry\b",
+    r"\bmake\s+(?:a\s+)?j\.?\s*e\.?\b",
+    r"\brecord\s+(?:a\s+)?journal\s+entry\b",
+    r"\bbook\s+(?:a\s+)?journal\s+entry\b",
+    r"\btransfer\s+\$?\d",
+    r"\brecord\s+a\s+transfer\b",
+    r"\bmake\s+an?\s+entry\s+(?:for|to)\b",
+    r"\bjournalize\b",
+]
+
+
+INTENT_CREATE_MANUAL_JE = "CREATE_MANUAL_JE"
+INTENT_QA = "QA"
+
+
+def classify_intent(question: str) -> str:
+    """Return the high-level intent for a chat turn.
+
+    Currently only distinguishes CREATE_MANUAL_JE vs general QA. Uses regex
+    heuristics so no LLM call is required for classification.
+    """
+    if not question:
+        return INTENT_QA
+    q = question.lower()
+    for pat in _CREATE_JE_PATTERNS:
+        if re.search(pat, q):
+            return INTENT_CREATE_MANUAL_JE
+    return INTENT_QA
+
+
+# ---------------------------------------------------------------------------
+# Slot extraction for CREATE_MANUAL_JE
+# ---------------------------------------------------------------------------
+
+_AMOUNT_RE = re.compile(r"\$?\s*([0-9][\d,]*(?:\.\d+)?)")
+
+
+def _extract_amount_heuristic(question: str) -> Optional[Decimal]:
+    m = _AMOUNT_RE.search(question)
+    if not m:
+        return None
+    raw = m.group(1).replace(",", "")
+    try:
+        return Decimal(raw)
+    except Exception:
+        return None
+
+
+def _extract_from_to_heuristic(question: str) -> Tuple[str, str]:
+    """Best-effort slot extraction without an LLM. Returns (from_hint, to_hint)."""
+    q = question
+    # Look for "from X to Y"
+    m = re.search(r"\bfrom\s+(.+?)\s+to\s+(.+?)(?:\.|$|,| for | with )", q, re.I)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    # Look for "transfer ... to Y" (debit Y, credit unknown)
+    m = re.search(r"\bto\s+(.+?)(?:\.|$|,| for | with )", q, re.I)
+    if m:
+        return "", m.group(1).strip()
+    return "", ""
+
+
+def _extract_je_slots_with_claude(question: str, ctx: Optional[Any]) -> Dict[str, Any]:
+    """Use Claude with structured output to extract JE slot values.
+
+    Falls back to regex heuristics if no API key or the call fails.
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    fallback = {
+        "from_account_hint": "",
+        "to_account_hint": "",
+        "amount": None,
+        "fund_hint": None,
+        "memo": question.strip(),
+    }
+    fhint, thint = _extract_from_to_heuristic(question)
+    fallback["from_account_hint"] = fhint
+    fallback["to_account_hint"] = thint
+    amt = _extract_amount_heuristic(question)
+    if amt is not None:
+        fallback["amount"] = float(amt)
+
+    if not api_key:
+        return fallback
+    try:
+        import anthropic  # type: ignore
+    except ImportError:
+        return fallback
+
+    system = (
+        "You are an extractor for accounting journal-entry intents. "
+        "Given a user's natural-language request to create a JE, extract the "
+        "slot values as STRICT JSON with these fields: "
+        "from_account_hint (str), to_account_hint (str), amount (number), "
+        "fund_hint (str|null), memo (str). "
+        "Do NOT include explanation. Output JSON only."
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=400,
+            system=system,
+            messages=[{"role": "user", "content": question}],
+        )
+        text = msg.content[0].text if msg.content else ""
+        # Find first {...} block
+        m = re.search(r"\{.*\}", text, re.S)
+        if not m:
+            return fallback
+        data = json.loads(m.group(0))
+        # Coerce types
+        out = dict(fallback)
+        for k in ("from_account_hint", "to_account_hint", "memo"):
+            v = data.get(k)
+            if v is not None:
+                out[k] = str(v)
+        if data.get("amount") is not None:
+            try:
+                out["amount"] = float(data["amount"])
+            except Exception:
+                pass
+        if data.get("fund_hint") is not None:
+            out["fund_hint"] = str(data["fund_hint"]) or None
+        return out
+    except Exception:
+        return fallback
+
+
+def _resolve_account(church_id: str, hint: str,
+                     fund_filter: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """Use coa_store.semantic_search to resolve a free-text account hint."""
+    if not hint or not church_id:
+        return None
+    from . import coa_store
+    results = coa_store.semantic_search(
+        church_id, query=hint, k=1, fund_filter=fund_filter,
+    )
+    if not results:
+        return None
+    return results[0]
+
+
+def build_manual_je_draft(
+    church_id: str,
+    question: str,
+    ctx: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Extract slots from the question, resolve accounts, return a draft JE.
+
+    Returns a dict suitable as a chat reply payload:
+        {
+            "type": "manual_je_draft",
+            "je_draft": {... JournalEntry .model_dump() ...},
+            "confirmation_required": True,
+            "summary": "Created draft JE: ...",
+            "errors": [...]   # populated when extraction fails
+        }
+    """
+    from ..models.schemas import (
+        JournalEntry, JournalEntryLine, JEStatus, RestrictionClass,
+    )
+
+    errors: List[str] = []
+    slots = _extract_je_slots_with_claude(question, ctx)
+
+    amount = slots.get("amount")
+    if amount is None or float(amount) <= 0:
+        errors.append("Could not determine the amount from your request.")
+    from_hint = slots.get("from_account_hint") or ""
+    to_hint = slots.get("to_account_hint") or ""
+    if not from_hint:
+        errors.append("Could not determine the source (credit) account.")
+    if not to_hint:
+        errors.append("Could not determine the destination (debit) account.")
+
+    # Resolve fund hint to fund_id list (best-effort).
+    fund_filter: Optional[List[str]] = None
+    fund_hint = slots.get("fund_hint")
+    if fund_hint and ctx is not None:
+        try:
+            funds = getattr(ctx, "funds", []) or []
+            for f in funds:
+                fid = getattr(f, "fund_id", "")
+                fname = getattr(f, "fund_name", "")
+                if fund_hint.upper() in (fid.upper(), fname.upper()):
+                    fund_filter = [fid]
+                    break
+        except Exception:
+            fund_filter = None
+
+    debit_acct = _resolve_account(church_id, to_hint, fund_filter=fund_filter)
+    credit_acct = _resolve_account(church_id, from_hint, fund_filter=fund_filter)
+
+    if to_hint and debit_acct is None:
+        errors.append(f"Could not find a GL account matching {to_hint!r}.")
+    if from_hint and credit_acct is None:
+        errors.append(f"Could not find a GL account matching {from_hint!r}.")
+
+    if errors or amount is None or debit_acct is None or credit_acct is None:
+        return {
+            "type": "manual_je_draft",
+            "je_draft": None,
+            "confirmation_required": False,
+            "summary": (
+                "Could not draft a manual journal entry from that request."
+            ),
+            "errors": errors,
+        }
+
+    amount_dec = Decimal(str(amount))
+    today = date.today()
+    fiscal_year = getattr(ctx, "fiscal_year", today.year) if ctx else today.year
+    period = f"{today.year}-{today.month:02d}"
+    memo = (slots.get("memo") or question.strip())[:140]
+
+    debit_line = JournalEntryLine(
+        sequence=1,
+        account_number=str(debit_acct.get("account_number", "")),
+        account_name=str(debit_acct.get("account_name", "")),
+        fund_id=str(debit_acct.get("fund_id", "")),
+        fund_name=str(debit_acct.get("fund_name", "")),
+        debit=amount_dec,
+        credit=Decimal("0"),
+        memo=memo,
+    )
+    credit_line = JournalEntryLine(
+        sequence=2,
+        account_number=str(credit_acct.get("account_number", "")),
+        account_name=str(credit_acct.get("account_name", "")),
+        fund_id=str(credit_acct.get("fund_id", "")),
+        fund_name=str(credit_acct.get("fund_name", "")),
+        debit=Decimal("0"),
+        credit=amount_dec,
+        memo=memo,
+    )
+
+    entry_id = f"JE-MANUAL-{uuid.uuid4().hex[:8].upper()}"
+    je = JournalEntry(
+        entry_id=entry_id,
+        church_id=church_id,
+        fiscal_year=int(fiscal_year),
+        accounting_period=period,
+        entry_date=today,
+        reference=f"MANUAL-{entry_id[-8:]}",
+        vendor_name="Manual Entry",
+        description=memo,
+        status=JEStatus.DRAFT,
+        lines=[debit_line, credit_line],
+        total_debits=amount_dec,
+        total_credits=amount_dec,
+        balanced=True,
+        audit_trail_url="",
+    )
+
+    summary = (
+        f"Created draft JE: Debit {debit_line.account_name} ${amount_dec:,.2f}, "
+        f"Credit {credit_line.account_name} ${amount_dec:,.2f}"
+    )
+
+    return {
+        "type": "manual_je_draft",
+        "je_draft": json.loads(je.model_dump_json()),
+        "confirmation_required": True,
+        "summary": summary,
+        "errors": [],
+    }
+
+
+# ---------------------------------------------------------------------------
+# QA prompt assembly
+# ---------------------------------------------------------------------------
+
+def _build_system_prompt(job: Optional[Any], kb_hits: Optional[List[Any]] = None) -> str:
     registry = get_registry()
     qa_skill = registry.load_body("agent_qa_interface") if registry.get("agent_qa_interface") else ""
 
@@ -49,6 +347,17 @@ def _build_system_prompt(job: Optional[Any]) -> str:
     )
     if qa_skill:
         system += f"## Agent Q&A Interface Protocol\n{qa_skill[:1500]}\n\n"
+
+    if kb_hits:
+        system += "## Relevant church accounting reference (cite when used):\n"
+        for h in kb_hits:
+            cite = getattr(h, "citation", "") or "Reference"
+            text = (getattr(h, "text", "") or "")[:600]
+            system += f"- [{cite}] {text}\n"
+        system += (
+            "\nWhen any of the above passages are used in your answer, cite them "
+            "inline using the bracketed citation labels.\n\n"
+        )
     return system
 
 
@@ -182,16 +491,72 @@ def _build_user_context(question: str, job: Optional[Any]) -> str:
 async def route_question(
     question: str,
     job: Optional[Any] = None,
+    church_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Route a user question, build context, call Anthropic, return answer."""
+    """Route a user question through intent classification, then answer.
+
+    Steps:
+      1. Classify intent — manual JE intents short-circuit to slot extraction.
+      2. Pull KB hits (canon + per-church) for general QA.
+      3. Call Claude with the augmented system prompt.
+    """
+    # Effective church_id: explicit > job's church_id
+    effective_church = church_id
+    if effective_church is None and job is not None:
+        ctx_obj = getattr(job, "accounting_context", None)
+        effective_church = getattr(ctx_obj, "church_id", None) if ctx_obj else None
+
+    intent = classify_intent(question)
+
+    # Manual JE branch — no QA call required.
+    if intent == INTENT_CREATE_MANUAL_JE:
+        ctx = None
+        if job is not None:
+            ctx = getattr(job, "accounting_context", None)
+        if ctx is None and effective_church:
+            try:
+                from . import coa_store
+                ctx = coa_store.load_accounting_context(effective_church)
+            except Exception:
+                ctx = None
+        draft = build_manual_je_draft(
+            church_id=effective_church or "",
+            question=question,
+            ctx=ctx,
+        )
+        return {
+            "answer": draft["summary"],
+            "intent": intent,
+            "type": draft["type"],
+            "je_draft": draft.get("je_draft"),
+            "confirmation_required": draft.get("confirmation_required", False),
+            "errors": draft.get("errors", []),
+            "skills_consulted": ["journal_entry_builder"],
+            "model": None,
+        }
+
+    # General QA branch.
     api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    # KB hits for citations (canon + church). Always attempted; safe to no-op.
+    kb_hits: List[Any] = []
+    try:
+        from . import knowledge_base
+        kb_hits = knowledge_base.kb_search(
+            question, church_id=effective_church, k=3,
+        )
+    except Exception:
+        kb_hits = []
+
     if not api_key:
         return {
             "answer": (
                 "The Agent Q&A interface requires an ANTHROPIC_API_KEY environment variable. "
                 "Set it and restart the server to enable conversational agent interrogation."
             ),
+            "intent": intent,
             "skills_consulted": [],
+            "kb_citations": [getattr(h, "citation", "") for h in kb_hits],
             "model": None,
         }
 
@@ -200,11 +565,12 @@ async def route_question(
     except ImportError:
         return {
             "answer": "The anthropic package is not installed. Run: uv pip install anthropic",
+            "intent": intent,
             "skills_consulted": [],
             "model": None,
         }
 
-    system = _build_system_prompt(job)
+    system = _build_system_prompt(job, kb_hits=kb_hits)
     user_context = _build_user_context(question, job)
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -224,7 +590,9 @@ async def route_question(
 
     return {
         "answer": answer,
+        "intent": intent,
         "skills_consulted": skills_consulted,
+        "kb_citations": [getattr(h, "citation", "") for h in kb_hits],
         "model": "claude-haiku-4-5-20251001",
         "input_tokens": msg.usage.input_tokens,
         "output_tokens": msg.usage.output_tokens,

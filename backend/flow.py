@@ -6,6 +6,7 @@ Pipeline per FRS §3.3 + risk/fraud/denomination extensions:
 """
 from __future__ import annotations
 import asyncio
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,10 @@ from .tools.journal_builder import build_journal_entry
 from .tools.risk_assessor import assess_risk
 from .tools.fraud_detector import assess_fraud
 from .tools.budget_comparator import compare_to_budget
+from .tools.approval_chain_resolver import find_chain_for_gl
+from .tools.approval_audit import append_event as append_approval_event
+from .integrations.email import tokens as email_tokens
+from .integrations.email.smtp_sender import send_email
 
 # In-memory job store (replace with Redis/DB for production)
 _jobs: Dict[str, ProcessingJob] = {}
@@ -218,6 +223,10 @@ async def run_pipeline(job_id: str) -> None:
                 "total_lines_checked": len(budget_results),
             })
 
+        # Step 7c: FR-05.2 budget-owner approval gate.
+        if await _maybe_request_budget_owner_approval(job, reviewed):
+            return
+
         # Step 8: HITL gate
         if reviewed.escalation_items:
             _update_job(job, ProcessingStatus.PENDING_HITL)
@@ -231,6 +240,147 @@ async def run_pipeline(job_id: str) -> None:
         raise
 
 
+async def _maybe_request_budget_owner_approval(
+    job: ProcessingJob,
+    reviewed: ReviewedAllocations,
+) -> bool:
+    """FR-05.2: scan draft allocations, find a configured approval chain.
+
+    If a chain matches, mint approval tokens, email the budget owner, set the
+    job to PENDING_BUDGET_OWNER, and return True. Otherwise return False.
+    """
+    if not job.draft_allocations or not job.invoice_document:
+        return False
+
+    chain = None
+    matched_line = None
+    matched_gl = None
+    for ln in job.draft_allocations.lines:
+        for p in ln.postings:
+            try:
+                c = find_chain_for_gl(job.church_id, p.account_number)
+            except Exception:
+                c = None
+            if c:
+                chain = c
+                matched_line = ln
+                matched_gl = p
+                break
+        if chain:
+            break
+    if not chain or not matched_line or not matched_gl:
+        return False
+
+    base_ctx = {
+        "job_id": job.job_id,
+        "line_id": matched_line.line_id,
+        "approver_email": chain.primary_approver_email,
+        "proposed_gl_code": matched_gl.account_number,
+    }
+    deadline_h = max(1, int(chain.deadline_hours or 48))
+    ttl = deadline_h * 3600
+    approve_token = email_tokens.mint("APPROVE", base_ctx, "budget_owner", ttl)
+    correct_token = email_tokens.mint("CORRECT", base_ctx, "budget_owner", ttl)
+    reject_token = email_tokens.mint("REJECT", base_ctx, "budget_owner", ttl)
+
+    base_url = os.environ.get("EIME_PUBLIC_URL", "http://localhost:8000")
+    approve_url = f"{base_url}/api/approve?token={approve_token}&action=approve"
+    correct_url = f"{base_url}/api/approve?token={correct_token}&action=correct"
+    reject_url = f"{base_url}/api/approve?token={reject_token}&action=reject"
+
+    annual_budget = "0"
+    ytd_actual = "0"
+    if job.budget_check:
+        for bc in job.budget_check:
+            if bc.line_id == matched_line.line_id:
+                annual_budget = str(bc.annual_budget)
+                ytd_actual = str(bc.ytd_actual)
+                break
+
+    invoice = job.invoice_document
+    amount = matched_line.total_debits
+    projected_after = Decimal(str(ytd_actual or "0")) + Decimal(str(amount or "0"))
+    annual_dec = Decimal(str(annual_budget or "0"))
+    pct = float(projected_after / annual_dec * 100) if annual_dec > 0 else 0.0
+
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        tpl_dir = Path(__file__).resolve().parent / "integrations" / "email" / "templates"
+        env = Environment(
+            loader=FileSystemLoader(str(tpl_dir)),
+            autoescape=select_autoescape(["html", "j2"]),
+        )
+        tpl = env.get_template("budget_owner.j2")
+        html_body = tpl.render(
+            vendor_name=invoice.vendor_name,
+            amount=str(amount),
+            approver_name=chain.primary_approver_name,
+            invoice_date=str(invoice.invoice_date),
+            proposed_gl_code=matched_gl.account_number,
+            proposed_gl_name=matched_gl.account_name,
+            annual_budget=annual_budget,
+            ytd_actual=ytd_actual,
+            projected_after=str(projected_after),
+            projected_pct=f"{pct:.1f}",
+            approve_url=approve_url,
+            correct_url=correct_url,
+            reject_url=reject_url,
+        )
+    except Exception as exc:
+        html_body = (
+            f"<p>Approval required for {invoice.vendor_name} — ${amount}.</p>"
+            f"<p><a href='{approve_url}'>Approve</a> | "
+            f"<a href='{correct_url}'>Correct</a> | "
+            f"<a href='{reject_url}'>Reject</a></p>"
+            f"<!-- template render failed: {exc} -->"
+        )
+
+    subject = f"Approval Request: {invoice.vendor_name} — ${amount}"
+    try:
+        send_email(chain.primary_approver_email, subject, html_body)
+    except Exception:
+        pass
+
+    job.approval_chain_id = chain.chain_id
+    job.pending_approval_email = chain.primary_approver_email
+    job.pending_approval_started_at = datetime.utcnow()
+    job.audit_log.append({
+        "ts": datetime.utcnow().isoformat(),
+        "event_type": "BUDGET_OWNER_REQUEST",
+        "status": ProcessingStatus.PENDING_BUDGET_OWNER.value,
+        "chain_id": chain.chain_id,
+        "approver_email": chain.primary_approver_email,
+        "matched_gl": matched_gl.account_number,
+    })
+    try:
+        append_approval_event(job.church_id, {
+            "job_id": job.job_id,
+            "line_id": matched_line.line_id,
+            "actor_email": "system@eime",
+            "actor_role": "pipeline",
+            "action": "REQUESTED_BUDGET_OWNER_APPROVAL",
+            "gl_at_action": matched_gl.account_number,
+            "notes": f"chain={chain.chain_id}",
+        })
+    except Exception:
+        pass
+
+    _update_job(job, ProcessingStatus.PENDING_BUDGET_OWNER)
+    return True
+
+
+async def continue_after_treasurer(job_id: str) -> None:
+    """FR-05.3: resume `_build_and_emit` after treasurer approves."""
+    job = _jobs.get(job_id)
+    if not job:
+        return
+    if job.status != ProcessingStatus.TREASURER_APPROVED:
+        return
+    if job.reviewed_allocations is None:
+        return
+    await _build_and_emit(job, job.reviewed_allocations, job.hitl_decisions)
+
+
 async def submit_hitl_decisions(job_id: str, decisions: HITLDecisions) -> None:
     """Resume the pipeline after HITL review gate."""
     job = _jobs.get(job_id)
@@ -238,6 +388,9 @@ async def submit_hitl_decisions(job_id: str, decisions: HITLDecisions) -> None:
         return
     job.hitl_decisions = decisions
     if job.reviewed_allocations:
+        # FR-05: route through budget-owner gate before emitting.
+        if await _maybe_request_budget_owner_approval(job, job.reviewed_allocations):
+            return
         await _build_and_emit(job, job.reviewed_allocations, decisions)
     else:
         # Was escalated before review (CRITICAL fraud) — build review from scratch
@@ -247,7 +400,31 @@ async def submit_hitl_decisions(job_id: str, decisions: HITLDecisions) -> None:
                 job.draft_allocations, job.classified_items, job.accounting_context
             )
             job.reviewed_allocations = reviewed
+            if await _maybe_request_budget_owner_approval(job, reviewed):
+                return
             await _build_and_emit(job, reviewed, decisions)
+
+
+_FUND_RESTRICTION_MARKERS = (
+    "RestrictionClass",
+    "restricted",
+    "WITH_RESTRICTION_PERMANENT",
+    "WITH_RESTRICTION_PURPOSE",
+    "fund restriction",
+    "Fund restriction",
+)
+
+
+def _has_fund_restriction_violation(reviewed: ReviewedAllocations) -> bool:
+    """FR-04.3: detect any ESCALATE line carrying a fund-restriction reason."""
+    from .models import Verdict
+    for rl in reviewed.lines:
+        if rl.verdict != Verdict.ESCALATE:
+            continue
+        for r in rl.reasons:
+            if any(marker in r for marker in _FUND_RESTRICTION_MARKERS):
+                return True
+    return False
 
 
 async def _build_and_emit(
@@ -255,6 +432,28 @@ async def _build_and_emit(
     reviewed: ReviewedAllocations,
     hitl_decisions: Optional[HITLDecisions],
 ) -> None:
+    # FR-04.3 hard block.
+    if _has_fund_restriction_violation(reviewed):
+        from .models import Verdict
+        violating: List[str] = []
+        for rl in reviewed.lines:
+            if rl.verdict == Verdict.ESCALATE and any(
+                m in r for r in rl.reasons for m in _FUND_RESTRICTION_MARKERS
+            ):
+                violating.append(rl.line_id)
+        _update_job(job, ProcessingStatus.BLOCKED_FUND_RESTRICTION)
+        job.audit_log.append({
+            "ts": datetime.utcnow().isoformat(),
+            "event_type": "FUND_RESTRICTION_BLOCK",
+            "status": ProcessingStatus.BLOCKED_FUND_RESTRICTION.value,
+            "violating_lines": violating,
+            "detail": (
+                f"Journal entry drafting refused: {len(violating)} line(s) "
+                f"have fund-restriction violations."
+            ),
+        })
+        return
+
     _update_job(job, ProcessingStatus.BUILDING_ENTRY)
     await asyncio.sleep(0)
 

@@ -10,6 +10,7 @@ from .schemas import (
     RiskLineDetail, RiskAssessment, FraudSignal, FraudAssessment,
     ChatRequest, ChatResponse,
     BudgetMonth, BudgetPlan, BudgetStatus, BudgetCheck,
+    ApprovalChain,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "RiskLineDetail", "RiskAssessment", "FraudSignal", "FraudAssessment",
     "ChatRequest", "ChatResponse",
     "BudgetMonth", "BudgetPlan", "BudgetStatus", "BudgetCheck",
+    "ApprovalChain",
 ]

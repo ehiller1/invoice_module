@@ -1,0 +1,259 @@
+---
+# EIME Personal Cabinets — Root Configuration
+# OpenClaw substrate for Treasurer, Budget Owner, Finance Staff cabinets
+# Generated: 2026-05-07
+
+version: "1.0"
+workspace: "~/.openclaw/workspace"
+
+# ─── Cabinet Registry ───────────────────────────────────────────────
+
+cabinets:
+  - id: "treasurer"
+    principal_role: "Treasurer, Finance Administrator"
+    description: "Approval queue management and financial decision support"
+    members:
+      - "queue-guardian"
+      - "decision-deputy"
+    coordination_type: "lightweight"  # Uses OpenClaw sessions_send
+    coordination_membrane: "treasurers/membranes/queue-guardian-decision-deputy.yaml"
+
+  - id: "budget-owner"
+    principal_role: "Budget Owner (e.g., Kyle Bynum, Music Ministry)"
+    description: "Budget monitoring and year-forward projection"
+    members:
+      - "budget-steward"
+    coordination_type: "event-driven"  # Redis mesh only
+    mesh_channels:
+      - "embarknow:accounting:impact:proposed:journal_entry_ready"
+      - "embarknow:accounting:impact:proposed:budget_overage_risk"
+
+  - id: "finance-staff"
+    principal_role: "Finance Staff (invoice processor)"
+    description: "Invoice intake and GL account recommendation"
+    members:
+      - "intake-specialist"
+    coordination_type: "webhook"  # EIME upload endpoint
+    webhook_source: "https://eime.local/webhook/invoice-ingested"
+
+# ─── Member Definitions ───────────────────────────────────────────
+
+members:
+  # Treasurer's Cabinet
+  - id: "queue-guardian"
+    cabinet: "treasurer"
+    member_type: "Sentinel"
+    path: "~/.openclaw/workspace/treasurer/queue-guardian"
+    model: "claude-sonnet-4-5-20250929"
+    skills_directory: "skills/"
+    soul_file: "SOUL.md"
+    agents_file: "AGENTS.md"
+    tools_file: "TOOLS.md"
+    status_check_interval_seconds: 60
+    webhook_routes:
+      - event: "approval_deadline_pressure"
+        channel: "embarknow:accounting:impact:proposed:approval_deadline_pressure"
+      - event: "hitl_escalation"
+        channel: "embarknow:accounting:impact:proposed:hitl_escalation"
+      - event: "budget_overage_risk"
+        channel: "embarknow:accounting:impact:proposed:budget_overage_risk"
+
+  - id: "decision-deputy"
+    cabinet: "treasurer"
+    member_type: "Drafter"
+    path: "~/.openclaw/workspace/treasurer/decision-deputy"
+    model: "claude-sonnet-4-5-20250929"
+    skills_directory: "skills/"
+    soul_file: "SOUL.md"
+    agents_file: "AGENTS.md"
+    tools_file: "TOOLS.md"
+    coordination_channel: "sessions_send"  # Wakened by Queue Guardian
+    webhook_routes:
+      - event: "hitl_decision_returned"
+        channel: "embarknow:accounting:impact:proposed:hitl_decision_returned"
+
+  # Budget Owner's Cabinet
+  - id: "budget-steward"
+    cabinet: "budget-owner"
+    member_type: "Monitor"
+    path: "~/.openclaw/workspace/budget-owner/budget-steward"
+    model: "claude-sonnet-4-5-20250929"
+    skills_directory: "skills/"
+    soul_file: "SOUL.md"
+    agents_file: "AGENTS.md"
+    tools_file: "TOOLS.md"
+    status_check_interval_seconds: 300  # Weekly digest cadence
+    webhook_routes:
+      - event: "journal_entry_ready"
+        channel: "embarknow:accounting:impact:proposed:journal_entry_ready"
+      - event: "budget_overage_risk"
+        channel: "embarknow:accounting:impact:proposed:budget_overage_risk"
+    scheduled_jobs:
+      - name: "weekly_budget_digest"
+        cron: "0 16 * * 5"  # Friday 4 PM
+        skill: "weekly_budget_digest_generator"
+
+  # Finance Staff's Cabinet
+  - id: "intake-specialist"
+    cabinet: "finance-staff"
+    member_type: "Screener"
+    path: "~/.openclaw/workspace/finance-staff/intake-specialist"
+    model: "claude-sonnet-4-5-20250929"
+    skills_directory: "skills/"
+    soul_file: "SOUL.md"
+    agents_file: "AGENTS.md"
+    tools_file: "TOOLS.md"
+    webhook_routes:
+      - event: "invoice_ingested"
+        channel: "webhook"  # Direct EIME webhook
+        endpoint: "/api/intake-specialist/process-invoice"
+
+# ─── Scheduled Jobs ───────────────────────────────────────────────
+
+scheduled_jobs:
+  - id: "queue-guardian-daily-digest"
+    member: "queue-guardian"
+    skill: "daily_queue_digest_generator"
+    cron: "0 8 * * 1-5"  # 8 AM weekdays
+    timezone: "America/New_York"
+
+  - id: "queue-guardian-vendor-weekly-report"
+    member: "queue-guardian"
+    skill: "weekly_vendor_risk_reporter"
+    cron: "0 17 * * 5"  # 5 PM Friday
+    timezone: "America/New_York"
+
+  - id: "budget-steward-weekly-digest"
+    member: "budget-steward"
+    skill: "weekly_budget_digest_generator"
+    cron: "0 16 * * 5"  # 4 PM Friday
+    timezone: "America/New_York"
+
+# ─── Notification Channels ───────────────────────────────────────
+
+notification_channels:
+  email:
+    provider: "sendgrid"
+    api_key_env: "SENDGRID_API_KEY"
+    from_address: "cabinet@eime.local"
+    reply_to: "finance@holycomeforter.org"
+    templates_dir: "~/.openclaw/workspace/templates/email"
+
+  slack:
+    enabled: false  # Optional: Enable for real-time Slack notifications
+    webhook_url_env: "SLACK_WEBHOOK_TREASURY"
+    channel: "#cabinet-alerts"
+
+  websocket:
+    enabled: true
+    broadcast_events:
+      - "approval_deadline_pressure"
+      - "budget_threshold_alert"
+      - "vendor_risk_flag"
+    client_endpoint: "https://eime.local/ws/cabinet-notifications"
+
+# ─── Data Persistence ───────────────────────────────────────────
+
+storage:
+  backend: "jsonl"  # Append-only event log
+  base_path: "~/.openclaw/workspace/data"
+  schemas:
+    - path: "approvals_{church_id}.jsonl"
+      type: "approval_audit_log"
+      immutable: true
+    - path: "cabinet_events_{church_id}.jsonl"
+      type: "event_log"
+      immutable: true
+    - path: "skill_invocations_{church_id}.jsonl"
+      type: "invocation_log"
+      immutable: true
+    - path: "budget_snapshots_{church_id}.json"
+      type: "budget_state"
+      immutable: false
+
+# ─── Coordination Patterns ───────────────────────────────────────
+
+coordination:
+  treasurer_queue_guardian_decision_deputy:
+    type: "escalation_aware_handoff"
+    initiator: "queue-guardian"
+    responder: "decision-deputy"
+    handoff_context:
+      - "item_id"
+      - "escalation_reason"
+      - "budget_context"
+      - "vendor_history_snippet"
+      - "recommended_routing_target"
+    timeout_seconds: 3600  # 1 hour for decision draft
+
+  budget_owner_steward:
+    type: "event_subscription"
+    subscriber: "budget-steward"
+    event_sources:
+      - "journal_entry_ready"
+      - "budget_overage_risk"
+    real_time: true
+
+  finance_staff_intake:
+    type: "synchronous_webhook"
+    receiver: "intake-specialist"
+    source: "EIME invoice upload"
+    response_expected: true  # Return screening results before classifying
+
+# ─── Deployment Configuration ───────────────────────────────────
+
+deployment:
+  environment: "production"
+  log_level: "info"
+  audit_log_enabled: true
+  audit_retention_days: 730  # 2 years
+
+  # Graceful shutdown: allow in-flight requests to complete
+  shutdown_timeout_seconds: 30
+
+  # Health check for member services
+  health_check:
+    interval_seconds: 60
+    endpoint_timeout_seconds: 5
+    unhealthy_threshold_count: 3
+
+  # Resource limits per member
+  member_resource_limits:
+    max_concurrent_invocations: 5
+    max_invocation_duration_seconds: 300
+    memory_limit_mb: 2048
+
+---
+
+## Installation Steps
+
+1. Create workspace structure:
+   ```bash
+   mkdir -p ~/.openclaw/workspace/{treasurer,budget-owner,finance-staff}
+   mkdir -p ~/.openclaw/workspace/treasurer/{queue-guardian,decision-deputy,membranes}
+   mkdir -p ~/.openclaw/workspace/treasurer/queue-guardian/skills
+   mkdir -p ~/.openclaw/workspace/treasurer/decision-deputy/skills
+   mkdir -p ~/.openclaw/workspace/budget-owner/budget-steward/skills
+   mkdir -p ~/.openclaw/workspace/finance-staff/intake-specialist/skills
+   mkdir -p ~/.openclaw/workspace/data
+   mkdir -p ~/.openclaw/workspace/templates/email
+   ```
+
+2. Copy this file:
+   ```bash
+   cp cabinet.yaml ~/.openclaw/workspace/cabinet.yaml
+   ```
+
+3. Create member SOUL/AGENTS/TOOLS files (see member manifests below)
+
+4. Install delegated skills (after crewai-skills-architect produces them)
+
+5. Start cabinet daemon:
+   ```bash
+   openclaw daemon ~/.openclaw/workspace/cabinet.yaml
+   ```
+
+6. Verify member registration:
+   ```bash
+   openclaw members list
+   ```
