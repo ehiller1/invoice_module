@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Audit Trail</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 mb-1">Audit Trail</h1>
+      <p class="text-slate-600">Immutable record of all approval decisions with hash-chain verification</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="verifyChain()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        Verify Hash Chain
+      </button>
+      <button onclick="exportPDF()" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">
+        Export PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Chain Verification Status -->
+  <div id="chain-status" class="hidden mb-6 rounded-lg p-4">
+    <p id="chain-status-text" class="font-medium"></p>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border border-slate-200 rounded-lg p-4 mb-6">
+    <div class="grid grid-cols-4 gap-4">
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">From Date</label>
+        <input type="date" id="filter-from" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">To Date</label>
+        <input type="date" id="filter-to" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Action</label>
+        <select id="filter-action" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+          <option value="">All Actions</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+          <option value="OVERRIDE">Override</option>
+          <option value="CORRECTED">Corrected</option>
+          <option value="ESCALATED">Escalated</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Actor</label>
+        <input type="text" id="filter-actor" placeholder="Email or role" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+      </div>
+    </div>
+    <div class="mt-3 flex justify-end">
+      <button onclick="loadAuditTrail()" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm">Apply Filters</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Total Events</p>
+      <p class="text-3xl font-bold text-slate-900" id="stat-total">0</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Approvals</p>
+      <p class="text-3xl font-bold text-green-600" id="stat-approved">0</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Rejections</p>
+      <p class="text-3xl font-bold text-red-600" id="stat-rejected">0</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Overrides</p>
+      <p class="text-3xl font-bold text-orange-600" id="stat-overrides">0</p>
+    </div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Approval Events</h2>
+      <p class="text-xs text-slate-500" id="record-count">0 records</p>
+    </div>
+    <div id="audit-list" class="divide-y divide-slate-200"></div>
+  </div>
+
+  <!-- Event Detail Modal -->
+  <div id="event-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4">Audit Event Details</h2>
+      <div id="event-content" class="space-y-3 mb-6"></div>
+      <button onclick="closeEventModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+let allEvents = [];
+
+EIMEShell.mount({
+  activeNav: 'audit',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    setDefaultDates();
+    loadAuditTrail();
+  }
+});
+
+function setDefaultDates() {
+  const today = new Date();
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+  document.getElementById('filter-from').value = lastMonth.toISOString().split('T')[0];
+  document.getElementById('filter-to').value = today.toISOString().split('T')[0];
+}
+
+async function loadAuditTrail() {
+  try {
+    const params = new URLSearchParams({
+      from: document.getElementById('filter-from').value,
+      to: document.getElementById('filter-to').value,
+      action: document.getElementById('filter-action').value || '',
+      actor: document.getElementById('filter-actor').value || ''
+    });
+    
+    const res = await fetch(`${API}/api/churches/holy_comforter/audit/approvals?${params}`);
+    allEvents = await res.json();
+    if (!Array.isArray(allEvents)) allEvents = allEvents.events || [];
+    
+    updateStats();
+    renderAuditTrail();
+  } catch (e) {
+    console.error('Error loading audit trail:', e);
+    document.getElementById('audit-list').innerHTML = '<div class="px-6 py-12 text-center text-slate-500">No audit events found</div>';
+  }
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = allEvents.length;
+  document.getElementById('stat-approved').textContent = allEvents.filter(e => e.action === 'APPROVED').length;
+  document.getElementById('stat-rejected').textContent = allEvents.filter(e => e.action === 'REJECTED').length;
+  document.getElementById('stat-overrides').textContent = allEvents.filter(e => e.action === 'OVERRIDE').length;
+  document.getElementById('record-count').textContent = `${allEvents.length} record${allEvents.length === 1 ? '' : 's'}`;
+}
+
+function renderAuditTrail() {
+  const list = document.getElementById('audit-list');
+  if (allEvents.length === 0) {
+    list.innerHTML = '<div class="px-6 py-12 text-center text-slate-500">No audit events match the current filters</div>';
+    return;
+  }
+  
+  list.innerHTML = allEvents.map((e, idx) => `
+    <div class="px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="showEvent(${idx})">
+      <div class="flex items-center justify-between">
+        <div class="flex items-start gap-3 flex-1">
+          <div class="${actionColor(e.action)} w-2 h-2 rounded-full mt-2 flex-shrink-0"></div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 ${actionBadge(e.action)} rounded text-xs font-medium">${e.action || 'UNKNOWN'}</span>
+              <p class="font-medium text-slate-900">${e.actor || 'System'}</p>
+              <span class="text-xs text-slate-500">(${e.role || 'unknown'})</span>
+            </div>
+            <p class="text-sm text-slate-600 mt-1">Job: ${e.job_id || 'N/A'} ${e.line_id ? `• Line: ${e.line_id}` : ''}</p>
+            ${e.notes ? `<p class="text-xs text-slate-500 mt-1 italic">"${e.notes}"</p>` : ''}
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-500">${formatDate(e.timestamp)}</p>
+          <p class="text-xs text-slate-400 font-mono">#${(e.event_id || '').slice(0, 8)}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function actionColor(action) {
+  const map = {
+    'APPROVED': 'bg-green-500',
+    'REJECTED': 'bg-red-500',
+    'OVERRIDE': 'bg-orange-500',
+    'CORRECTED': 'bg-blue-500',
+    'ESCALATED': 'bg-purple-500'
+  };
+  return map[action] || 'bg-slate-400';
+}
+
+function actionBadge(action) {
+  const map = {
+    'APPROVED': 'bg-green-100 text-green-800',
+    'REJECTED': 'bg-red-100 text-red-800',
+    'OVERRIDE': 'bg-orange-100 text-orange-800',
+    'CORRECTED': 'bg-blue-100 text-blue-800',
+    'ESCALATED': 'bg-purple-100 text-purple-800'
+  };
+  return map[action] || 'bg-slate-100 text-slate-800';
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  try {
+    return new Date(ts).toLocaleString();
+  } catch { return ts; }
+}
+
+function showEvent(idx) {
+  const e = allEvents[idx];
+  document.getElementById('event-content').innerHTML = `
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Event ID</p>
+        <p class="font-mono text-slate-900">${e.event_id || 'N/A'}</p>
+      </div>
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Timestamp</p>
+        <p class="text-slate-900">${formatDate(e.timestamp)}</p>
+      </div>
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Action</p>
+        <p class="text-slate-900 font-semibold">${e.action || 'N/A'}</p>
+      </div>
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Actor</p>
+        <p class="text-slate-900">${e.actor || 'System'}</p>
+      </div>
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Role</p>
+        <p class="text-slate-900">${e.role || 'unknown'}</p>
+      </div>
+      <div class="bg-slate-50 rounded p-3">
+        <p class="text-xs text-slate-500 font-semibold uppercase">Job ID</p>
+        <p class="font-mono text-slate-900">${e.job_id || 'N/A'}</p>
+      </div>
+    </div>
+    ${e.gl_at_action ? `
+      <div class="bg-blue-50 border border-blue-200 rounded p-3">
+        <p class="text-xs text-blue-700 font-semibold uppercase mb-1">GL At Time of Action</p>
+        <p class="text-sm text-blue-900 font-mono">${e.gl_at_action}</p>
+      </div>
+    ` : ''}
+    ${e.notes ? `
+      <div class="bg-yellow-50 border border-yellow-200 rounded p-3">
+        <p class="text-xs text-yellow-700 font-semibold uppercase mb-1">Notes</p>
+        <p class="text-sm text-yellow-900">${e.notes}</p>
+      </div>
+    ` : ''}
+    ${e.prev_hash ? `
+      <div class="bg-slate-100 rounded p-3 font-mono text-xs">
+        <p class="text-slate-500 font-semibold uppercase mb-1">Hash Chain</p>
+        <p class="text-slate-700 break-all">prev: ${e.prev_hash}</p>
+        <p class="text-slate-700 break-all mt-1">curr: ${e.hash || 'N/A'}</p>
+      </div>
+    ` : ''}
+  `;
+  document.getElementById('event-modal').classList.remove('hidden');
+}
+
+function closeEventModal() {
+  document.getElementById('event-modal').classList.add('hidden');
+}
+
+async function verifyChain() {
+  try {
+    const res = await fetch(`${API}/api/audit-chain/verify`);
+    const result = await res.json();
+    
+    const status = document.getElementById('chain-status');
+    const text = document.getElementById('chain-status-text');
+    status.classList.remove('hidden', 'bg-green-50', 'bg-red-50', 'border-green-200', 'border-red-200');
+    
+    if (result.valid) {
+      status.classList.add('bg-green-50', 'border', 'border-green-200');
+      text.className = 'font-medium text-green-800';
+      text.textContent = `✅ Hash chain verified — ${result.events_checked || 0} events, integrity intact`;
+    } else {
+      status.classList.add('bg-red-50', 'border', 'border-red-200');
+      text.className = 'font-medium text-red-800';
+      text.textContent = `❌ Chain integrity FAILED — Tampering detected at event ${result.broken_at || 'unknown'}`;
+    }
+  } catch (e) {
+    alert('Error verifying chain: ' + e.message);
+  }
+}
+
+async function exportPDF() {
+  try {
+    const params = new URLSearchParams({
+      from: document.getElementById('filter-from').value,
+      to: document.getElementById('filter-to').value,
+      format: 'pdf'
+    });
+    window.open(`${API}/api/churches/holy_comforter/audit/approvals?${params}`, '_blank');
+  } catch (e) {
+    alert('Error exporting PDF: ' + e.message);
+  }
+}
+</script>
+
+</body>
+</html>
