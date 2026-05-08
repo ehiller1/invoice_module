@@ -78,15 +78,31 @@
 <script>
 const API = 'http://localhost:8000';
 let currentJob = null;
+let lastPollTs = null;
 
 EIMEShell.mount({
   activeNav: 'jobs',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
-    loadJobs();
-    setInterval(loadJobs, 5000);
+    loadJobs();              // initial full load
+    setInterval(pollJobs, 2000);  // efficient delta polling every 2s
   }
 });
+
+async function pollJobs() {
+  try {
+    const url = lastPollTs ? `${API}/api/jobs-poll?since=${encodeURIComponent(lastPollTs)}` : `${API}/api/jobs-poll`;
+    const res = await fetch(url);
+    const data = await res.json();
+    lastPollTs = data.as_of;
+    // Only re-render if there are deltas
+    if (data.count > 0) {
+      loadJobs();
+    }
+  } catch (e) {
+    console.warn('Poll error (will retry):', e.message);
+  }
+}
 
 async function loadJobs() {
   try {

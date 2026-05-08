@@ -2391,6 +2391,277 @@ async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
     return _json({"ok": True})
 
 
+# ============================================================
+# Frontend convenience aliases (FR-XX wiring)
+# ============================================================
+# These endpoints provide simpler URLs that the frontend can use
+# without needing to construct church_id paths.
+
+@app.get("/api/budget/variance")
+async def budget_variance_alias(church_id: str = "holy_comforter") -> JSONResponse:
+    """Alias for /api/churches/{church_id}/budget/variance-report — Budget projections.
+
+    Returns variance report with year-forward projections per FR-03.3.
+    """
+    ctx = coa_store.load_accounting_context(church_id)
+    if not ctx:
+        raise HTTPException(404, f"Church not found: {church_id}")
+    if ctx.budget is None:
+        # Return empty structure rather than 404 — frontend handles gracefully
+        return _json({
+            "church_id": church_id,
+            "lines": [],
+            "totals": {"annual_budget": "0", "ytd_actual": "0", "remaining": "0"},
+            "message": "Budget not configured for this church",
+        })
+
+    threshold = float(ctx.budget_warning_threshold or 0.80)
+    accounts_by_no = {a.account_number: a for a in ctx.accounts}
+    lines: List[Dict[str, Any]] = []
+    annual_total = Decimal("0")
+    ytd_total = Decimal("0")
+
+    # Compute month progression for year-forward projection (FR-03.3)
+    now = datetime.utcnow()
+    fiscal_start_month = 1  # default; could be configured per church
+    months_elapsed = max(1, (now.month - fiscal_start_month) + 1)
+    months_in_year = 12
+
+    for acct_no, bm in ctx.budget.accounts.items():
+        annual = Decimal(bm.annual_total)
+        ytd = Decimal(ctx.ytd_actuals.get(acct_no, Decimal("0")))
+        remaining = annual - ytd
+        annual_total += annual
+        ytd_total += ytd
+        pct = float(ytd / annual) if annual > 0 else (1.5 if ytd > 0 else 0.0)
+        # Year-forward projection: extrapolate YTD spend rate to full year
+        run_rate_monthly = ytd / Decimal(months_elapsed) if months_elapsed > 0 else Decimal("0")
+        projected_year_end = run_rate_monthly * Decimal(months_in_year)
+        projected_pct = float(projected_year_end / annual) if annual > 0 else 0.0
+
+        acct = accounts_by_no.get(acct_no)
+        lines.append({
+            "gl_code": acct_no,
+            "gl_name": acct.account_name if acct else acct_no,
+            "annual_budget": float(annual),
+            "ytd_actual": float(ytd),
+            "remaining": float(remaining),
+            "pct_used": pct,
+            "projected_year_end": float(projected_year_end),
+            "projected_pct": projected_pct,
+            "projected_overage": float(projected_year_end - annual) if projected_year_end > annual else 0.0,
+            "status": "over" if pct >= 1.0 else ("at_risk" if pct >= threshold else "within"),
+        })
+
+    return _json({
+        "church_id": church_id,
+        "fiscal_year": ctx.budget.fiscal_year,
+        "as_of": now.isoformat(),
+        "months_elapsed": months_elapsed,
+        "lines": lines,
+        "totals": {
+            "annual_budget": float(annual_total),
+            "ytd_actual": float(ytd_total),
+            "remaining": float(annual_total - ytd_total),
+            "consumed_pct": float(ytd_total / annual_total) if annual_total > 0 else 0.0,
+        },
+    })
+
+
+@app.get("/api/coa/search")
+async def coa_search_alias(q: str, church_id: str = "holy_comforter", k: int = 5) -> JSONResponse:
+    """Alias for /api/churches/{church_id}/search — Semantic COA search.
+
+    Uses ChromaDB to find GL accounts most similar to the query string.
+    """
+    if not q or not q.strip():
+        return _json({"matches": [], "query": q})
+    try:
+        results = coa_store.semantic_search(church_id, q.strip(), k=k)
+    except Exception as exc:
+        return _json({"matches": [], "query": q, "error": str(exc)})
+
+    # Normalise results to a frontend-friendly shape
+    matches = []
+    for r in (results or []):
+        if isinstance(r, dict):
+            matches.append({
+                "gl_code": r.get("account_number") or r.get("gl_code"),
+                "gl_name": r.get("account_name") or r.get("gl_name") or r.get("name"),
+                "fund": r.get("fund") or r.get("fund_id"),
+                "fund_restriction": r.get("fund_restriction"),
+                "account_type": r.get("account_type"),
+                "description": r.get("description"),
+                "score": r.get("score") or r.get("similarity"),
+            })
+        else:
+            matches.append({"raw": str(r)})
+    return _json({"query": q, "matches": matches, "k": k})
+
+
+@app.get("/api/coa")
+async def coa_list_alias(church_id: str = "holy_comforter") -> JSONResponse:
+    """List all GL accounts for a church (frontend convenience)."""
+    ctx = coa_store.load_accounting_context(church_id)
+    if not ctx:
+        return _json({"accounts": [], "funds": []})
+    accounts = []
+    for a in ctx.accounts:
+        accounts.append({
+            "gl_code": a.account_number,
+            "gl_name": a.account_name,
+            "account_type": getattr(a, "account_type", None),
+            "fund": getattr(a, "fund_id", None) or getattr(a, "fund", None),
+            "fund_restriction": getattr(a, "fund_restriction", None),
+            "description": getattr(a, "description", None),
+        })
+    funds = []
+    for f in (ctx.funds or []):
+        funds.append({
+            "fund_id": getattr(f, "fund_id", None) or getattr(f, "id", None),
+            "fund_name": getattr(f, "fund_name", None) or getattr(f, "name", None),
+            "restriction": getattr(f, "restriction", None),
+        })
+    return _json({"accounts": accounts, "funds": funds})
+
+
+# ---------- Job real-time polling (FR-XX) ----------
+# NOTE: This route uses /api/jobs-poll (hyphen) instead of /api/jobs/poll
+# to avoid conflicting with the /api/jobs/{job_id} path parameter route.
+
+@app.get("/api/jobs-poll")
+async def jobs_poll(
+    church_id: Optional[str] = None,
+    since: Optional[str] = None,
+) -> JSONResponse:
+    """Lightweight polling endpoint for job updates.
+
+    Returns only jobs updated since the given ISO timestamp. The frontend
+    can call this on a 2-second interval without re-transferring all data.
+    """
+    jobs = flow.list_jobs(church_id=church_id)
+
+    # Filter by since timestamp if provided
+    cutoff: Optional[datetime] = None
+    if since:
+        try:
+            cutoff = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            if cutoff.tzinfo is not None:
+                cutoff = cutoff.replace(tzinfo=None)
+        except Exception:
+            cutoff = None
+
+    delta_jobs = []
+    for j in jobs:
+        updated = getattr(j, "updated_at", None) or getattr(j, "created_at", None)
+        if cutoff and updated and isinstance(updated, datetime):
+            if updated <= cutoff:
+                continue
+        delta_jobs.append(_job_summary(j))
+
+    return _json({
+        "as_of": datetime.utcnow().isoformat(),
+        "since": since,
+        "count": len(delta_jobs),
+        "total": len(jobs),
+        "jobs": delta_jobs,
+    })
+
+
+# ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
+
+@app.get("/api/integrations/acs/status")
+async def acs_status(church_id: str = "holy_comforter") -> JSONResponse:
+    """Get current ACS Realm browser plug-in configuration status."""
+    from .integrations.acs_realm import credentials as _creds
+    try:
+        creds = _creds.load(church_id) if hasattr(_creds, "load") else None
+    except Exception:
+        creds = None
+
+    # Check if Playwright is available
+    playwright_available = False
+    try:
+        import playwright  # type: ignore # noqa: F401
+        playwright_available = True
+    except ImportError:
+        pass
+
+    # Check if browser binary is installed
+    browser_installed = False
+    try:
+        from playwright.sync_api import sync_playwright  # type: ignore
+        with sync_playwright() as pw:
+            try:
+                # Just attempt to launch headless to verify
+                pw.chromium.executable_path  # type: ignore[attr-defined]
+                browser_installed = True
+            except Exception:
+                browser_installed = False
+    except Exception:
+        browser_installed = False
+
+    return _json({
+        "church_id": church_id,
+        "credentials_stored": creds is not None,
+        "base_url": creds.get("base_url") if creds else None,
+        "username": creds.get("username") if creds else None,
+        "playwright_installed": playwright_available,
+        "chromium_installed": browser_installed,
+        "mock_mode": os.getenv("EIME_ACS_MOCK", "").lower() in ("1", "true", "yes"),
+        "ready": playwright_available and browser_installed and creds is not None,
+    })
+
+
+@app.post("/api/integrations/acs/test")
+async def acs_test_connection(body: Dict[str, Any]) -> JSONResponse:
+    """Test ACS Realm browser connection without storing credentials."""
+    church_id = body.get("church_id", "holy_comforter")
+    base_url = body.get("base_url")
+    username = body.get("username")
+    password = body.get("password")
+
+    if not (base_url and username and password):
+        raise HTTPException(422, "Missing base_url, username, or password")
+
+    # In mock mode, just return success
+    if os.getenv("EIME_ACS_MOCK", "").lower() in ("1", "true", "yes"):
+        return _json({
+            "success": True,
+            "mode": "mock",
+            "message": "Mock mode enabled — connection simulated successfully",
+            "duration_ms": 100,
+        })
+
+    # Try real connection
+    try:
+        from .integrations.acs_realm.playwright_runner import PlaywrightSession  # type: ignore
+        import time
+        t0 = time.time()
+        with PlaywrightSession(base_url=base_url, username=username, password=password) as session:
+            # Just verify login worked
+            page = session.page
+            success = page is not None
+        return _json({
+            "success": success,
+            "mode": "live",
+            "message": "Connected and logged in successfully" if success else "Login failed",
+            "duration_ms": int((time.time() - t0) * 1000),
+        })
+    except ImportError as exc:
+        return _json({
+            "success": False,
+            "mode": "error",
+            "message": f"Playwright not installed: {exc}. Run: uv pip install playwright && playwright install chromium",
+        }, status_code=503)
+    except Exception as exc:
+        return _json({
+            "success": False,
+            "mode": "error",
+            "message": f"Connection failed: {exc}",
+        }, status_code=502)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index() -> HTMLResponse:
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text())

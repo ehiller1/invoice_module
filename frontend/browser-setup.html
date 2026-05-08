@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Browser Plug-in Setup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<style>
+  .step-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+  .step-circle.pending { background: #e5e7eb; color: #6b7280; }
+  .step-circle.active { background: #1e3a6e; color: white; box-shadow: 0 0 0 4px #c7d2fe; }
+  .step-circle.done { background: #10b981; color: white; }
+  .step-line { flex: 1; height: 2px; background: #e5e7eb; margin: 0 8px; }
+  .step-line.done { background: #10b981; }
+  .check-icon { color: #10b981; }
+  .x-icon { color: #ef4444; }
+</style>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-4xl mx-auto p-6">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">Browser Plug-in Configuration</h1>
+    <p class="text-slate-600">Configure the ACS Realm browser automation that posts approved journal entries to your accounting system.</p>
+  </div>
+
+  <!-- Progress -->
+  <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-sm text-slate-700">Step <span id="current-step">1</span> of 5: <span id="step-title" class="font-semibold">Prerequisites Check</span></p>
+      <p class="text-sm text-slate-500" id="step-pct">20%</p>
+    </div>
+    <div class="w-full bg-slate-200 rounded-full h-2 mb-6">
+      <div id="progress-bar" class="bg-navy-700 h-2 rounded-full transition-all" style="width: 20%"></div>
+    </div>
+    <div id="step-circles" class="flex items-center"></div>
+  </div>
+
+  <!-- Step Content -->
+  <div id="step-card" class="bg-white border border-slate-200 rounded-lg p-8 min-h-[400px]"></div>
+
+  <!-- Navigation -->
+  <div class="flex justify-between mt-6">
+    <button id="prev-btn" onclick="prevStep()" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50" disabled>← Back</button>
+    <button id="next-btn" onclick="nextStep()" class="px-6 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">Next →</button>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const STEPS = [
+  { id: 1, title: 'Prerequisites Check' },
+  { id: 2, title: 'ACS Realm Credentials' },
+  { id: 3, title: 'Test Connection' },
+  { id: 4, title: 'Configure Selectors' },
+  { id: 5, title: 'Review & Activate' }
+];
+
+let currentStep = 1;
+let wizardState = {
+  baseUrl: '',
+  username: '',
+  password: '',
+  testResult: null,
+  credentialsStored: false,
+  status: null
+};
+
+EIMEShell.mount({
+  activeNav: 'settings',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    renderStepCircles();
+    renderCurrentStep();
+    loadStatus();
+  }
+});
+
+async function loadStatus() {
+  try {
+    const res = await fetch(`${API}/api/integrations/acs/status?church_id=holy_comforter`);
+    wizardState.status = await res.json();
+    if (currentStep === 1) renderCurrentStep();
+  } catch (e) {
+    console.error('Status load failed:', e);
+  }
+}
+
+function renderStepCircles() {
+  const container = document.getElementById('step-circles');
+  container.innerHTML = STEPS.map((s, i) => {
+    const cls = s.id < currentStep ? 'done' : s.id === currentStep ? 'active' : 'pending';
+    const label = s.id < currentStep ? '✓' : s.id;
+    const lineCls = s.id < currentStep ? 'step-line done' : 'step-line';
+    return `
+      ${i > 0 ? `<div class="${lineCls}"></div>` : ''}
+      <div class="step-circle ${cls}" title="${s.title}">${label}</div>
+    `;
+  }).join('');
+}
+
+function renderCurrentStep() {
+  const card = document.getElementById('step-card');
+  document.getElementById('current-step').textContent = currentStep;
+  document.getElementById('step-title').textContent = STEPS[currentStep - 1].title;
+  document.getElementById('step-pct').textContent = `${(currentStep / 5 * 100).toFixed(0)}%`;
+  document.getElementById('progress-bar').style.width = `${(currentStep / 5 * 100)}%`;
+  document.getElementById('prev-btn').disabled = currentStep === 1;
+  
+  if (currentStep === 1) renderStep1(card);
+  else if (currentStep === 2) renderStep2(card);
+  else if (currentStep === 3) renderStep3(card);
+  else if (currentStep === 4) renderStep4(card);
+  else if (currentStep === 5) renderStep5(card);
+  
+  renderStepCircles();
+}
+
+function renderStep1(card) {
+  const s = wizardState.status || {};
+  card.innerHTML = `
+    <h2 class="text-xl font-bold text-slate-900 mb-2">System Prerequisites</h2>
+    <p class="text-slate-600 mb-6">Verify your environment can run the browser automation. ACS Realm posting requires Playwright and a Chromium browser.</p>
+    
+    <div class="space-y-3">
+      <div class="flex items-center justify-between p-4 border ${s.playwright_installed ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'} rounded-lg">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">${s.playwright_installed ? '✅' : '⚠️'}</div>
+          <div>
+            <p class="font-semibold text-slate-900">Playwright Library</p>
+            <p class="text-sm text-slate-600">Python browser automation framework</p>
+          </div>
+        </div>
+        <span class="text-sm font-medium ${s.playwright_installed ? 'text-green-700' : 'text-orange-700'}">
+          ${s.playwright_installed ? 'Installed' : 'Not Installed'}
+        </span>
+      </div>
+      
+      <div class="flex items-center justify-between p-4 border ${s.chromium_installed ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'} rounded-lg">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">${s.chromium_installed ? '✅' : '⚠️'}</div>
+          <div>
+            <p class="font-semibold text-slate-900">Chromium Browser</p>
+            <p class="text-sm text-slate-600">Browser binary used for automation</p>
+          </div>
+        </div>
+        <span class="text-sm font-medium ${s.chromium_installed ? 'text-green-700' : 'text-orange-700'}">
+          ${s.chromium_installed ? 'Installed' : 'Not Installed'}
+        </span>
+      </div>
+      
+      <div class="flex items-center justify-between p-4 border border-blue-200 bg-blue-50 rounded-lg">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">${s.mock_mode ? '🧪' : '🌐'}</div>
+          <div>
+            <p class="font-semibold text-slate-900">Operating Mode</p>
+            <p class="text-sm text-slate-600">${s.mock_mode ? 'Mock mode (simulated, no real browser)' : 'Live mode (real browser automation)'}</p>
+          </div>
+        </div>
+        <span class="text-sm font-medium text-blue-700">${s.mock_mode ? 'Mock' : 'Live'}</span>
+      </div>
+    </div>
+    
+    ${(!s.playwright_installed || !s.chromium_installed) && !s.mock_mode ? `
+      <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <p class="font-semibold text-yellow-900 mb-2">⚠ Installation Required</p>
+        <p class="text-sm text-yellow-800 mb-3">Run these commands in your terminal:</p>
+        <pre class="bg-slate-900 text-slate-100 text-xs p-3 rounded overflow-x-auto"><code>uv pip install playwright
+playwright install chromium</code></pre>
+        <p class="text-sm text-yellow-800 mt-3">Or set <code class="bg-yellow-100 px-1 rounded">EIME_ACS_MOCK=true</code> in <code>.env</code> to use mock mode.</p>
+      </div>
+    ` : ''}
+    
+    ${s.ready ? `
+      <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+        <p class="font-semibold text-green-900">✅ All prerequisites met — ready to proceed</p>
+      </div>
+    ` : ''}
+  `;
+  
+  // Allow next if mock mode OR all prereqs met
+  document.getElementById('next-btn').disabled = !(s.mock_mode || (s.playwright_installed && s.chromium_installed));
+}
+
+function renderStep2(card) {
+  card.innerHTML = `
+    <h2 class="text-xl font-bold text-slate-900 mb-2">ACS Realm Login Credentials</h2>
+    <p class="text-slate-600 mb-6">Enter the credentials EIME will use to log into your ACS Realm instance. These will be encrypted with Fernet (AES-128) before storage.</p>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">ACS Realm Base URL *</label>
+        <input type="url" id="ws-base-url" value="${wizardState.baseUrl}" placeholder="https://your-parish.acsrealm.com"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none" />
+        <p class="text-xs text-slate-500 mt-1">The full URL of your ACS Realm instance</p>
+      </div>
+      
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Username *</label>
+        <input type="text" id="ws-username" value="${wizardState.username}" placeholder="acs_user"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none" />
+        <p class="text-xs text-slate-500 mt-1">Recommended: dedicated service account, not a personal login</p>
+      </div>
+      
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Password *</label>
+        <input type="password" id="ws-password" value="${wizardState.password}" placeholder="••••••••"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none" />
+        <p class="text-xs text-slate-500 mt-1">Encrypted at rest; never logged or transmitted to AI agents</p>
+      </div>
+    </div>
+    
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <p class="text-sm text-blue-900"><strong>🔒 Security:</strong> Credentials are encrypted using Fernet AES-128 with a key stored at <code class="bg-blue-100 px-1 rounded">backend/data/.vault_key</code>. The key never leaves your server.</p>
+    </div>
+  `;
+  
+  // Save form values on input
+  ['ws-base-url', 'ws-username', 'ws-password'].forEach(id => {
+    document.getElementById(id).addEventListener('input', validateStep2);
+  });
+  validateStep2();
+}
+
+function validateStep2() {
+  const b = document.getElementById('ws-base-url').value;
+  const u = document.getElementById('ws-username').value;
+  const p = document.getElementById('ws-password').value;
+  document.getElementById('next-btn').disabled = !(b && u && p);
+  wizardState.baseUrl = b;
+  wizardState.username = u;
+  wizardState.password = p;
+}
+
+function renderStep3(card) {
+  card.innerHTML = `
+    <h2 class="text-xl font-bold text-slate-900 mb-2">Test Browser Connection</h2>
+    <p class="text-slate-600 mb-6">Verify that the browser plug-in can log into your ACS Realm with the credentials provided.</p>
+    
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
+      <div class="grid grid-cols-3 gap-3 text-sm">
+        <div>
+          <p class="text-xs text-slate-500 font-semibold">URL</p>
+          <p class="text-slate-900 truncate">${wizardState.baseUrl || '(none)'}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-semibold">Username</p>
+          <p class="text-slate-900">${wizardState.username || '(none)'}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 font-semibold">Password</p>
+          <p class="text-slate-900">${wizardState.password ? '•'.repeat(wizardState.password.length) : '(none)'}</p>
+        </div>
+      </div>
+    </div>
+    
+    <button id="test-btn" onclick="runTest()" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+      🚀 Test Connection
+    </button>
+    
+    <div id="test-result" class="mt-6"></div>
+  `;
+  
+  document.getElementById('next-btn').disabled = !wizardState.testResult || !wizardState.testResult.success;
+}
+
+async function runTest() {
+  const btn = document.getElementById('test-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Testing... (this may take 10-30 seconds)';
+  
+  const result = document.getElementById('test-result');
+  result.innerHTML = '<div class="bg-slate-50 border border-slate-200 rounded-lg p-4"><p class="text-slate-700">Launching browser session...</p></div>';
+  
+  try {
+    const res = await fetch(`${API}/api/integrations/acs/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        church_id: 'holy_comforter',
+        base_url: wizardState.baseUrl,
+        username: wizardState.username,
+        password: wizardState.password
+      })
+    });
+    const data = await res.json();
+    wizardState.testResult = data;
+    
+    if (data.success) {
+      result.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p class="font-semibold text-green-900 mb-2">✅ Connection Successful</p>
+          <div class="text-sm text-green-800 space-y-1">
+            <p><strong>Mode:</strong> ${data.mode}</p>
+            <p><strong>Duration:</strong> ${data.duration_ms}ms</p>
+            <p><strong>Message:</strong> ${data.message}</p>
+          </div>
+        </div>
+      `;
+    } else {
+      result.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p class="font-semibold text-red-900 mb-2">❌ Connection Failed</p>
+          <p class="text-sm text-red-800">${data.message || 'Unknown error'}</p>
+        </div>
+      `;
+    }
+  } catch (e) {
+    result.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="font-semibold text-red-900">❌ Test Failed</p>
+        <p class="text-sm text-red-800">${e.message}</p>
+      </div>
+    `;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄 Test Again';
+    document.getElementById('next-btn').disabled = !wizardState.testResult?.success;
+  }
+}
+
+function renderStep4(card) {
+  card.innerHTML = `
+    <h2 class="text-xl font-bold text-slate-900 mb-2">DOM Selectors Configuration</h2>
+    <p class="text-slate-600 mb-6">The plug-in uses these CSS selectors to navigate ACS Realm. Defaults work for most parishes; customize only if your instance uses non-standard UI.</p>
+    
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <p class="text-sm text-yellow-900">💡 <strong>Tip:</strong> Defaults are loaded from <code class="bg-yellow-100 px-1 rounded">backend/integrations/acs_realm/selectors.yaml</code>. You can edit this file to override.</p>
+    </div>
+    
+    <div class="space-y-3">
+      <div class="border border-slate-200 rounded-lg p-3">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Login Username Field</p>
+        <code class="text-sm text-slate-900 font-mono">input[name="username"], #username</code>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-3">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Login Password Field</p>
+        <code class="text-sm text-slate-900 font-mono">input[name="password"], #password</code>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-3">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Login Submit Button</p>
+        <code class="text-sm text-slate-900 font-mono">button[type="submit"], .login-btn</code>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-3">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-1">Journal Entry Form</p>
+        <code class="text-sm text-slate-900 font-mono">form#je-form, [data-form="journal-entry"]</code>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-3">
+        <p class="text-xs font-semibold text-slate-500 uppercase mb-1">JE Save Button</p>
+        <code class="text-sm text-slate-900 font-mono">button.save-je, button[name="save"]</code>
+      </div>
+    </div>
+    
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <p class="text-sm text-blue-900">🤖 <strong>Fallback:</strong> If selectors fail, the plug-in automatically falls back to Claude <code class="bg-blue-100 px-1 rounded">computer-use</code> for resilient navigation.</p>
+    </div>
+  `;
+  
+  document.getElementById('next-btn').disabled = false;
+}
+
+function renderStep5(card) {
+  card.innerHTML = `
+    <h2 class="text-xl font-bold text-slate-900 mb-2">Review & Activate</h2>
+    <p class="text-slate-600 mb-6">Review your configuration. Click <strong>Activate</strong> to encrypt and store credentials.</p>
+    
+    <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden">
+      <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
+        <p class="font-semibold text-slate-900">Configuration Summary</p>
+      </div>
+      <div class="divide-y divide-slate-200">
+        <div class="px-4 py-3 flex justify-between">
+          <span class="text-slate-600">ACS Realm URL</span>
+          <span class="font-mono text-slate-900">${wizardState.baseUrl}</span>
+        </div>
+        <div class="px-4 py-3 flex justify-between">
+          <span class="text-slate-600">Username</span>
+          <span class="text-slate-900">${wizardState.username}</span>
+        </div>
+        <div class="px-4 py-3 flex justify-between">
+          <span class="text-slate-600">Password</span>
+          <span class="text-slate-900">${'•'.repeat(wizardState.password.length)}</span>
+        </div>
+        <div class="px-4 py-3 flex justify-between">
+          <span class="text-slate-600">Test Result</span>
+          <span class="text-green-700 font-medium">✓ Verified (${wizardState.testResult?.duration_ms || 0}ms)</span>
+        </div>
+        <div class="px-4 py-3 flex justify-between">
+          <span class="text-slate-600">Mode</span>
+          <span class="text-slate-900">${wizardState.testResult?.mode || 'unknown'}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="activation-status" class="mt-6"></div>
+    
+    <div class="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+      <p class="text-sm text-orange-900"><strong>⚠ Confirmation Required:</strong> Once activated, EIME will use these credentials to post approved journal entries to ACS Realm. You can revoke access anytime from this page.</p>
+    </div>
+  `;
+  
+  document.getElementById('next-btn').textContent = wizardState.credentialsStored ? '✓ Done' : '🔒 Activate & Encrypt';
+}
+
+async function activateCredentials() {
+  const status = document.getElementById('activation-status');
+  status.innerHTML = '<div class="bg-slate-50 border border-slate-200 rounded-lg p-4"><p class="text-slate-700">⏳ Encrypting and storing credentials...</p></div>';
+  
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/acs-credentials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: wizardState.username,
+        password: wizardState.password,
+        base_url: wizardState.baseUrl
+      })
+    });
+    
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    wizardState.credentialsStored = true;
+    status.innerHTML = `
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+        <p class="font-semibold text-green-900 mb-2">✅ Browser Plug-in Activated</p>
+        <p class="text-sm text-green-800">Credentials encrypted and stored. EIME can now post approved journal entries to ACS Realm.</p>
+        <div class="mt-4 flex gap-2">
+          <a href="/jes.html" class="inline-block px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 text-sm">View Journal Entries →</a>
+          <a href="/treasurer-queue.html" class="inline-block px-4 py-2 border border-navy-900 text-navy-900 rounded-lg hover:bg-slate-50 text-sm">Treasurer Queue →</a>
+        </div>
+      </div>
+    `;
+    document.getElementById('next-btn').textContent = '✓ Done';
+    document.getElementById('next-btn').disabled = true;
+  } catch (e) {
+    status.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-900">❌ Error: ${e.message}</p></div>`;
+  }
+}
+
+function nextStep() {
+  if (currentStep === 5) {
+    activateCredentials();
+    return;
+  }
+  if (currentStep < 5) {
+    currentStep++;
+    renderCurrentStep();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    currentStep--;
+    renderCurrentStep();
+  }
+}
+</script>
+
+</body>
+</html>
