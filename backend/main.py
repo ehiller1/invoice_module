@@ -2770,6 +2770,182 @@ async def list_recommendations(church_id: str) -> JSONResponse:
     })
 
 
+# ---------- Question Canvas & Intent Router (FRD §16.4, §10.1) ----------
+
+@app.post("/api/intents/route")
+async def route_intent(body: Dict[str, Any]) -> JSONResponse:
+    """Classify user query into one of 15 default intents (FRD §10.1).
+
+    Intent classification for Question Canvas:
+    - all_in_program_cost: "What is our all-in program cost per unit of impact?"
+    - pledge_fulfillment_cash_projection: "What's our cash position assuming 95% pledge fulfillment?"
+    - multi_year_scenario_projection: "Show a 5-year projection under conservative/base/growth scenarios"
+    - gift_trace_to_use: "Trace this $100K gift from donor intent to actual use"
+    - mission_drift_analysis: "Which restricted funds have drifted from original intent?"
+    - covenant_gap_analysis: "Are we tracking toward covenant violations?"
+    - peer_benchmark_comparison: "How do we compare to peer organizations on X metric?"
+    - expense_category_deep_dive: "Why did facilities spending spike 40%?"
+    - restricted_fund_reallocation: "Which underperforming funds could be reallocated?"
+    - seasonality_forecast: "What's our typical Q4 cash crunch look like?"
+    - cfo_dashboard_refresh: "Show me the key metrics I need for next board meeting"
+    - donor_risk_profile: "Which donors are at risk of lapsing?"
+    - budget_variance_attribution: "Why are we 12% over on program expenses?"
+    - headcount_projection: "Can we afford the proposed salary increases?"
+    - quasi_endowment_stress_test: "What if pledge revenue drops 20%?"
+
+    Phase 4: Simple keyword-based routing. Phase 5+: LLM classification via Claude API.
+    """
+    query = body.get("query", "").lower()
+    church_id = body.get("church_id", "holy_comforter")
+
+    # Simple keyword matching (Phase 4); Phase 5 will use LLM
+    intents_map = {
+        "all_in_program_cost": ["all-in", "program cost", "cost per unit", "cost per impact"],
+        "pledge_fulfillment_cash_projection": ["cash position", "pledge fulfillment", "cash projection", "q4 cash"],
+        "multi_year_scenario_projection": ["5-year", "scenario", "conservative", "base case", "growth"],
+        "gift_trace_to_use": ["trace gift", "trace donation", "donor intent", "gift usage"],
+        "mission_drift_analysis": ["mission drift", "drift", "original intent", "restrict"],
+        "covenant_gap_analysis": ["covenant", "violation", "gap"],
+        "peer_benchmark_comparison": ["peer", "benchmark", "compare", "similar organizations"],
+        "expense_category_deep_dive": ["spending spike", "expense spike", "why", "expenses"],
+        "restricted_fund_reallocation": ["reallocation", "underperforming fund", "reallocate"],
+        "seasonality_forecast": ["seasonality", "q4", "crunch", "seasonal"],
+        "cfo_dashboard_refresh": ["dashboard", "key metrics", "board meeting"],
+        "donor_risk_profile": ["donor risk", "lapsing", "at risk"],
+        "budget_variance_attribution": ["variance", "over budget", "over/under"],
+        "headcount_projection": ["headcount", "salary", "staff"],
+        "quasi_endowment_stress_test": ["stress test", "endowment", "drop", "downturn"]
+    }
+
+    # Route to best matching intent
+    matched_intent = None
+    max_matches = 0
+
+    for intent, keywords in intents_map.items():
+        matches = sum(1 for kw in keywords if kw in query)
+        if matches > max_matches:
+            max_matches = matches
+            matched_intent = intent
+
+    if not matched_intent:
+        matched_intent = "all_in_program_cost"  # default fallback
+
+    return _json({
+        "church_id": church_id,
+        "query": body.get("query"),
+        "intent": matched_intent,
+        "confidence": 0.75 if max_matches > 0 else 0.5,
+        "suggested_follow_ons": generate_follow_on_suggestions(matched_intent)
+    })
+
+
+def generate_follow_on_suggestions(intent: str) -> List[str]:
+    """Generate follow-on question suggestions based on intent."""
+    suggestions_map = {
+        "all_in_program_cost": [
+            "Show breakdown by program area",
+            "Compare to peer organizations",
+            "Historical trend (3-year)"
+        ],
+        "pledge_fulfillment_cash_projection": [
+            "Scenario at 85% fulfillment",
+            "Compare to prior year Q4",
+            "Flag major pledge gaps"
+        ],
+        "multi_year_scenario_projection": [
+            "Show covenant impact under each scenario",
+            "Which scenario is most likely?",
+            "Break down by revenue vs expense drivers"
+        ],
+        "gift_trace_to_use": [
+            "Show donor communications sent",
+            "Flag any use violations",
+            "Generate donor impact letter"
+        ],
+        "mission_drift_analysis": [
+            "Show donor communication templates",
+            "List potential reallocations",
+            "Flag legal restrictions"
+        ],
+        "covenant_gap_analysis": [
+            "Show which covenants at risk",
+            "What corrective actions are needed?",
+            "Timeline to compliance"
+        ],
+        "peer_benchmark_comparison": [
+            "Show peer data sources",
+            "Which metrics are we strongest in?",
+            "Recommended improvements"
+        ],
+        "expense_category_deep_dive": [
+            "Itemize the top 5 drivers",
+            "Is this a one-time spike or trend?",
+            "Compare to prior year"
+        ],
+        "restricted_fund_reallocation": [
+            "Show donor communication templates",
+            "Estimate reallocation impact",
+            "What approvals are needed?"
+        ],
+        "seasonality_forecast": [
+            "Show historical Q4 patterns",
+            "Mitigation strategies",
+            "Optimal cash reserve targets"
+        ],
+        "cfo_dashboard_refresh": [
+            "Show full executive summary",
+            "Include covenant tracking",
+            "Flag key risks"
+        ],
+        "donor_risk_profile": [
+            "Show lapse probability by donor",
+            "Recommended retention strategies",
+            "Stewardship letter templates"
+        ],
+        "budget_variance_attribution": [
+            "Show variance by line",
+            "Root cause for top 3 variances",
+            "Forecast full-year impact"
+        ],
+        "headcount_projection": [
+            "Show FTE vs budget impact",
+            "Break down by department",
+            "Alternative scenarios"
+        ],
+        "quasi_endowment_stress_test": [
+            "Show impact on annual draw",
+            "Multi-year recovery timeline",
+            "Policy options"
+        ]
+    }
+    return suggestions_map.get(intent, ["Ask another question", "Refine your query"])
+
+
+@app.post("/api/intents/answer")
+async def answer_question(body: Dict[str, Any]) -> JSONResponse:
+    """Generate answer to classified question (Phase 4+).
+
+    Phase 4: Return structured answer template with data placeholders.
+    Phase 5: Integrate with Claude API for natural language generation.
+    """
+    intent = body.get("intent")
+    query = body.get("query", "")
+    church_id = body.get("church_id", "holy_comforter")
+
+    # Phase 4: Template-based answers
+    # Phase 5: Would call Claude API with intent-specific prompt
+
+    return _json({
+        "church_id": church_id,
+        "query": query,
+        "intent": intent,
+        "answer": f"Phase 4 placeholder: Answer to '{intent}' intent coming in Phase 5",
+        "provenance": [],
+        "follow_ons": generate_follow_on_suggestions(intent),
+        "message": "Answer generation ready for Phase 5 (Claude API integration)"
+    })
+
+
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")
