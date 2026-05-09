@@ -3082,6 +3082,159 @@ async def cabinet_disavow_override(principal: str, body: Dict[str, Any]) -> JSON
     })
 
 
+# ---------- Phase 6: Adversarial Membrane & Auditor Surface (FRD MEM-26, §16) ----------
+
+@app.get("/api/audit/adversarial-findings")
+async def get_adversarial_findings(church_id: str = "holy_comforter") -> JSONResponse:
+    """Get Adversarial Membrane outputs: anomalies, drift, patterns, outliers.
+
+    MEM-26 counter-agent identifies:
+    - Vendor pricing drift (unexpected changes in unit prices)
+    - JE anomaly profiles (unusual account combinations, round amounts, timing patterns)
+    - Override patterns (who overrides what, frequency, rationale consistency)
+    - Related-party transactions (flagged by counterparty analysis)
+    """
+    # Phase 6: Mock data ready for integration with actual anomaly detection
+    findings = [
+        {
+            "finding_id": "adv_001",
+            "membrane": "pricing_drift",
+            "severity": "high",
+            "category": "vendor_pricing_anomaly",
+            "summary": "ABC Cleaning Services: unit price increased 18% without contract update",
+            "vendor": "ABC Cleaning Services",
+            "prior_unit_price": "$45.00",
+            "current_unit_price": "$53.10",
+            "last_review_date": "2026-03-15",
+            "impact": "Estimated $2.1K overage YTD",
+            "recommendation": "Review amended contract or audit recent invoices",
+            "timestamp": datetime.now().isoformat()
+        },
+        {
+            "finding_id": "adv_002",
+            "membrane": "je_anomaly",
+            "severity": "medium",
+            "category": "round_amount_pattern",
+            "summary": "Recurring $5,000 JEs: Altar Fund to Outreach Fund (no supporting doc)",
+            "account_from": "Altar Fund",
+            "account_to": "Outreach Fund",
+            "frequency": "Monthly for 6 months",
+            "total_amount": "$30,000",
+            "supporting_docs": 0,
+            "recommendation": "Request missing approval for standing transfer or codify as recurring decision",
+            "timestamp": datetime.now().isoformat()
+        },
+        {
+            "finding_id": "adv_003",
+            "membrane": "override_pattern",
+            "severity": "medium",
+            "category": "override_frequency",
+            "summary": "CFO override rate: 23% of policy decisions (vs. T2 avg 8%)",
+            "actor": "CFO",
+            "authority_tier": 2,
+            "override_count": 23,
+            "total_decisions": 100,
+            "override_rate_percentile": "95th",
+            "rationale_consistency": "72%",
+            "recommendation": "Review CFO override rationale for consistency; consider coaching on delegation",
+            "timestamp": datetime.now().isoformat()
+        },
+        {
+            "finding_id": "adv_004",
+            "membrane": "related_party",
+            "severity": "low",
+            "category": "counterparty_flag",
+            "summary": "Vestry member spouse is vendor (Facility Maintenance LLC): $47K YTD",
+            "related_party": "Vestry member (Dr. Jane Smith)",
+            "vendor_name": "Facility Maintenance LLC",
+            "relationship": "Spouse",
+            "ytd_amount": "$47,000",
+            "disclosure_on_file": True,
+            "competitively_bid": False,
+            "recommendation": "Confirm competitive bid or justify sole-source; ensure conflict-of-interest disclosure current",
+            "timestamp": datetime.now().isoformat()
+        }
+    ]
+
+    return _json({
+        "church_id": church_id,
+        "findings": findings,
+        "total_high": sum(1 for f in findings if f["severity"] == "high"),
+        "total_medium": sum(1 for f in findings if f["severity"] == "medium"),
+        "total_low": sum(1 for f in findings if f["severity"] == "low"),
+        "last_scan": datetime.now().isoformat(),
+        "next_scan": (datetime.now() + timedelta(days=7)).isoformat()
+    })
+
+
+@app.get("/api/audit/materiality-budget")
+async def get_materiality_budget(church_id: str = "holy_comforter") -> JSONResponse:
+    """Get materiality budget for external auditor.
+
+    Tracks audit findings materiality threshold and evidence pack requirements.
+    """
+    return _json({
+        "church_id": church_id,
+        "materiality_threshold": 50000,  # $50K = materiality level
+        "performance_threshold": 25000,  # $25K = performance materiality
+        "factual_misstatements_budget": 0,  # Used up
+        "judgmental_misstatements_budget": 2,  # 2 items remaining
+        "total_identified_misstatements": 0,
+        "evidence_items_required": 15,
+        "evidence_items_collected": 8,
+        "message": "Auditor: 8 of 15 evidence items collected. Materiality budget at capacity."
+    })
+
+
+@app.get("/api/audit/evidence-pack")
+async def get_evidence_pack(church_id: str = "holy_comforter") -> JSONResponse:
+    """Get audit evidence pack for external auditor.
+
+    Returns structured evidence for:
+    - Material account balances (top 20% by balance)
+    - High-risk transactions (overrides, one-offs, round amounts)
+    - Compliance items (covenant calculations, restricted fund use)
+    - Related-party disclosures
+    """
+    return _json({
+        "church_id": church_id,
+        "evidence_items": [
+            {
+                "evidence_id": "ev_001",
+                "type": "account_balance",
+                "account": "Operating Checking",
+                "balance": "$287,450",
+                "materiality_pct": 18.5,
+                "supporting_docs": ["bank_statement_2026_04.pdf", "reconciliation_2026_04.xlsx"],
+                "audit_procedure": "Agree bank statement to GL; inspect reconciling items"
+            },
+            {
+                "evidence_id": "ev_002",
+                "type": "high_risk_transaction",
+                "description": "$100K gift from anonymous donor (unclear intent)",
+                "amount": "$100,000",
+                "risk_factors": ["no_donor_history", "vague_intent", "governance_approval_pending"],
+                "supporting_docs": ["gift_letter.pdf", "board_minutes_2026_04.pdf"],
+                "audit_procedure": "Obtain intent clarification; trace to permitted use"
+            },
+            {
+                "evidence_id": "ev_003",
+                "type": "compliance_item",
+                "description": "Covenant: Maintain 4-month cash reserves",
+                "current_reserves_months": 2.3,
+                "threshold_months": 4.0,
+                "variance": "-1.7 months",
+                "supporting_docs": ["covenant_agreement.pdf", "cash_reserve_calc.xlsx"],
+                "audit_procedure": "Recalculate covenant position; evaluate covenant waiver if needed"
+            }
+        ],
+        "pack_ready": False,
+        "completion_pct": 53,
+        "next_item_due": "2026-05-12",
+        "auditor_notes": "Awaiting intent clarification on $100K anonymous gift before evidence pack can be finalized"
+    })
+
+
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")

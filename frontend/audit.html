@@ -78,6 +78,14 @@
     </div>
   </div>
 
+  <!-- Adversarial Membrane Findings (Phase 6) -->
+  <div class="mb-8">
+    <h2 class="text-xl font-bold text-slate-900 mb-4">🤖 Adversarial Membrane Findings</h2>
+    <div id="adversarial-findings" class="grid grid-cols-1 gap-4">
+      <p class="text-slate-500 text-center py-8">Loading adversarial findings...</p>
+    </div>
+  </div>
+
   <!-- Stats -->
   <div class="grid grid-cols-4 gap-4 mb-6">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
@@ -132,6 +140,7 @@ EIMEShell.mount({
     });
     setDefaultDates();
     loadAuditTrail();
+    loadAdversarialFindings();
   }
 });
 
@@ -321,6 +330,81 @@ async function exportPDF() {
   } catch (e) {
     alert('Error exporting PDF: ' + e.message);
   }
+}
+
+async function loadAdversarialFindings() {
+  try {
+    const res = await fetch(`${API}/api/audit/adversarial-findings?church_id=holy_comforter`);
+    const data = await res.json();
+    renderAdversarialFindings(data);
+  } catch (e) {
+    console.error('Error loading adversarial findings:', e);
+    document.getElementById('adversarial-findings').innerHTML = '<p class="text-slate-500">No adversarial findings available</p>';
+  }
+}
+
+function renderAdversarialFindings(data) {
+  const findings = data.findings || [];
+  const container = document.getElementById('adversarial-findings');
+
+  if (findings.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No anomalies detected</p>';
+    return;
+  }
+
+  container.innerHTML = findings.map(f => {
+    const severityColor = {
+      high: 'red',
+      medium: 'amber',
+      low: 'blue'
+    }[f.severity] || 'slate';
+
+    const severityBg = {
+      red: 'bg-red-50 border-red-200',
+      amber: 'bg-amber-50 border-amber-200',
+      blue: 'bg-blue-50 border-blue-200',
+      slate: 'bg-slate-50 border-slate-200'
+    }[severityColor];
+
+    const severityBadge = {
+      red: 'bg-red-100 text-red-900',
+      amber: 'bg-amber-100 text-amber-900',
+      blue: 'bg-blue-100 text-blue-900',
+      slate: 'bg-slate-100 text-slate-900'
+    }[severityColor];
+
+    return `
+      <div class="border ${severityBg} rounded-lg p-4">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex-1">
+            <p class="font-semibold text-slate-900">${f.summary}</p>
+            <p class="text-xs text-slate-600 mt-1">
+              <span class="font-medium">${f.category.replace(/_/g, ' ').toUpperCase()}</span>
+              ${f.membrane ? `• Membrane: <span class="font-medium">${f.membrane}</span>` : ''}
+            </p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded ${severityBadge}">
+            ${f.severity.toUpperCase()}
+          </span>
+        </div>
+
+        <div class="space-y-2 mb-3 text-sm text-slate-700">
+          ${f.prior_unit_price ? `<p>• Unit price change: <strong>${f.prior_unit_price} → ${f.current_unit_price}</strong> (${Math.round(((parseFloat(f.current_unit_price.replace('$', '')) - parseFloat(f.prior_unit_price.replace('$', ''))) / parseFloat(f.prior_unit_price.replace('$', '')) * 100))}%)</p>` : ''}
+          ${f.impact ? `<p>• Impact: <strong>${f.impact}</strong></p>` : ''}
+          ${f.frequency ? `<p>• Frequency: <strong>${f.frequency}</strong></p>` : ''}
+          ${f.total_amount ? `<p>• Total amount: <strong>${f.total_amount}</strong></p>` : ''}
+          ${f.override_count ? `<p>• Overrides: <strong>${f.override_count} of ${f.total_decisions}</strong> (${Math.round((f.override_count / f.total_decisions) * 100)}% vs 8% avg)</p>` : ''}
+          ${f.ytd_amount ? `<p>• YTD amount: <strong>${f.ytd_amount}</strong></p>` : ''}
+        </div>
+
+        <div class="bg-white rounded px-3 py-2 mb-3">
+          <p class="text-sm text-slate-700"><strong>Recommendation:</strong> ${f.recommendation}</p>
+        </div>
+
+        <p class="text-xs text-slate-500">Identified: ${new Date(f.timestamp).toLocaleDateString()}</p>
+      </div>
+    `;
+  }).join('');
 }
 </script>
 

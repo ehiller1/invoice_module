@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — External Auditor Portal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 mb-1">🔍 External Auditor Portal</h1>
+      <p class="text-slate-600">Materiality-budget-tracked evidence pack assembly for year-end audit</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="downloadEvidencePack()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        ⬇️ Download Evidence Pack
+      </button>
+      <button onclick="exportMaterislityReport()" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">
+        📋 Export Materiality Report
+      </button>
+    </div>
+  </div>
+
+  <!-- Materiality Budget Status -->
+  <div class="grid grid-cols-3 gap-6 mb-8">
+    <!-- Materiality Threshold -->
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-6">
+      <p class="text-sm font-semibold text-blue-900 mb-2">Materiality Threshold</p>
+      <p class="text-3xl font-bold text-blue-600 mb-1">$50,000</p>
+      <p class="text-xs text-blue-800">Misstatements ≥ $50K require disclosure</p>
+    </div>
+
+    <!-- Performance Materiality (75% of threshold) -->
+    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg border border-emerald-200 p-6">
+      <p class="text-sm font-semibold text-emerald-900 mb-2">Performance Materiality</p>
+      <p class="text-3xl font-bold text-emerald-600 mb-1">$25,000</p>
+      <p class="text-xs text-emerald-800">Target for testing procedures</p>
+    </div>
+
+    <!-- Budget Status -->
+    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200 p-6">
+      <p class="text-sm font-semibold text-orange-900 mb-2">Budget Status</p>
+      <p class="text-lg font-bold text-orange-600 mb-1">At Capacity ⚠️</p>
+      <p class="text-xs text-orange-800">
+        <span class="font-semibold">0 factual</span> |
+        <span class="font-semibold">2 judgmental</span> remaining
+      </p>
+    </div>
+  </div>
+
+  <!-- Tabs: Evidence Pack vs Findings vs Covenant Analysis -->
+  <div class="mb-6 border-b border-slate-200 flex gap-4">
+    <button id="tab-evidence" onclick="switchTab('evidence')" class="px-4 py-3 font-medium text-slate-900 border-b-2 border-blue-600 text-blue-600">
+      📦 Evidence Pack (8/15)
+    </button>
+    <button id="tab-findings" onclick="switchTab('findings')" class="px-4 py-3 font-medium text-slate-600 hover:text-slate-900">
+      🚩 Audit Findings
+    </button>
+    <button id="tab-covenant" onclick="switchTab('covenant')" class="px-4 py-3 font-medium text-slate-600 hover:text-slate-900">
+      📊 Covenant Analysis
+    </button>
+  </div>
+
+  <!-- Evidence Pack Tab -->
+  <div id="panel-evidence" class="space-y-4">
+    <p class="text-sm text-slate-600 mb-4">
+      15 evidence items required for year-end audit. <strong>8 collected (53%)</strong>
+    </p>
+    <div id="evidence-list" class="space-y-3"></div>
+  </div>
+
+  <!-- Audit Findings Tab (hidden by default) -->
+  <div id="panel-findings" class="hidden space-y-4">
+    <p class="text-sm text-slate-600 mb-4">
+      Materiality assessments: findings meeting or exceeding performance materiality ($25K)
+    </p>
+    <div id="findings-list" class="space-y-3"></div>
+  </div>
+
+  <!-- Covenant Analysis Tab (hidden by default) -->
+  <div id="panel-covenant" class="hidden space-y-4">
+    <p class="text-sm text-slate-600 mb-4">
+      Covenant compliance tracking for bond indentures and donor restrictions
+    </p>
+    <div id="covenant-list" class="space-y-3">
+      <div class="border border-orange-300 rounded-lg p-4 bg-orange-50">
+        <div class="flex items-start justify-between mb-2">
+          <p class="font-semibold text-slate-900">4-Month Cash Reserve Covenant</p>
+          <span class="text-xs font-bold text-orange-600 px-2 py-1 bg-orange-200 rounded">AT RISK</span>
+        </div>
+        <p class="text-sm text-slate-700 mb-3">Bond requirement: Maintain liquidity ≥ 4 months of operating expenses</p>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <p class="text-xs text-slate-600">Requirement</p>
+            <p class="text-lg font-bold text-slate-900">4.0 months</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600">Current</p>
+            <p class="text-lg font-bold text-orange-600">2.3 months</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600">Gap</p>
+            <p class="text-lg font-bold text-red-600">-1.7 months</p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-700">
+          <strong>Impact:</strong> Required to maintain waiver from bond issuer or address deficiency by year-end
+        </p>
+      </div>
+
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <div class="flex items-start justify-between mb-2">
+          <p class="font-semibold text-slate-900">Restricted Fund Intent Compliance</p>
+          <span class="text-xs font-bold text-green-600 px-2 py-1 bg-green-100 rounded">COMPLIANT</span>
+        </div>
+        <p class="text-sm text-slate-700 mb-3">All restricted funds used in accordance with donor intent and legal restrictions</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <p class="text-xs text-slate-600">Temporary Restrictions</p>
+            <p class="text-lg font-bold text-slate-900">$340K (10 funds)</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600">Permanent Restrictions</p>
+            <p class="text-lg font-bold text-slate-900">$1.2M (8 funds)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let materialityData = null;
+let evidenceData = null;
+
+EIMEShell.mount({
+  activeNav: null,  // Auditor portal is not in main nav
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'auditor',
+      payload: { church_id: CHURCH_ID, role: 'external_auditor' }
+    });
+    loadAuditorData();
+  }
+});
+
+async function loadAuditorData() {
+  try {
+    // Load materiality budget
+    const matRes = await fetch(`${API}/api/audit/materiality-budget?church_id=${CHURCH_ID}`);
+    materialityData = await matRes.json();
+
+    // Load evidence pack
+    const evRes = await fetch(`${API}/api/audit/evidence-pack?church_id=${CHURCH_ID}`);
+    evidenceData = await evRes.json();
+
+    renderEvidencePack();
+  } catch (e) {
+    console.error('Error loading auditor data:', e);
+  }
+}
+
+function renderEvidencePack() {
+  const container = document.getElementById('evidence-list');
+  const items = (evidenceData && evidenceData.evidence_items) || [];
+
+  container.innerHTML = items.map(item => {
+    const statusColor = item.type === 'account_balance' ? 'blue' : item.type === 'high_risk_transaction' ? 'red' : 'amber';
+    const statusIcon = item.type === 'account_balance' ? '📊' : item.type === 'high_risk_transaction' ? '⚠️' : '✅';
+
+    return `
+      <div class="border border-slate-300 rounded-lg p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <p class="font-semibold text-slate-900">${statusIcon} ${item.description || item.account || ''}</p>
+            <p class="text-xs text-slate-600 mt-1">
+              Type: <span class="font-medium">${item.type.replace(/_/g, ' ').toUpperCase()}</span>
+            </p>
+          </div>
+          <span class="text-sm font-semibold px-3 py-1 rounded-full" style="background-color: var(--color-${statusColor}-100); color: var(--color-${statusColor}-700);">
+            ${item.amount || item.balance || 'N/A'}
+          </span>
+        </div>
+        <div class="mb-3 text-sm text-slate-700">
+          <p><strong>Audit Procedure:</strong> ${item.audit_procedure}</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          ${(item.supporting_docs || []).map(doc => `
+            <a href="#" class="text-xs text-blue-600 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50">
+              📎 ${doc}
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function switchTab(tabName) {
+  // Hide all panels
+  document.getElementById('panel-evidence').classList.add('hidden');
+  document.getElementById('panel-findings').classList.add('hidden');
+  document.getElementById('panel-covenant').classList.add('hidden');
+
+  // Clear active tab button styling
+  document.getElementById('tab-evidence').classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+  document.getElementById('tab-evidence').classList.add('text-slate-600');
+  document.getElementById('tab-findings').classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+  document.getElementById('tab-findings').classList.add('text-slate-600');
+  document.getElementById('tab-covenant').classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+  document.getElementById('tab-covenant').classList.add('text-slate-600');
+
+  // Show selected panel and highlight tab
+  if (tabName === 'evidence') {
+    document.getElementById('panel-evidence').classList.remove('hidden');
+    document.getElementById('tab-evidence').classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+    document.getElementById('tab-evidence').classList.remove('text-slate-600');
+  } else if (tabName === 'findings') {
+    document.getElementById('panel-findings').classList.remove('hidden');
+    document.getElementById('tab-findings').classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+    document.getElementById('tab-findings').classList.remove('text-slate-600');
+  } else if (tabName === 'covenant') {
+    document.getElementById('panel-covenant').classList.remove('hidden');
+    document.getElementById('tab-covenant').classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+    document.getElementById('tab-covenant').classList.remove('text-slate-600');
+  }
+}
+
+function downloadEvidencePack() {
+  const data = {
+    church_id: CHURCH_ID,
+    pack_date: new Date().toISOString(),
+    materiality_threshold: materialityData?.materiality_threshold || 50000,
+    evidence_items: evidenceData?.evidence_items || [],
+    completion: `${evidenceData?.completion_pct || 0}%`
+  };
+
+  const dataStr = JSON.stringify(data, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `evidence-pack-${CHURCH_ID}-${new Date().toISOString().split('T')[0]}.json`;
+  link.click();
+}
+
+function exportMaterislityReport() {
+  const report = `
+MATERIALITY & EVIDENCE PACK REPORT
+Generated: ${new Date().toLocaleString()}
+Church: ${CHURCH_ID}
+
+MATERIALITY SUMMARY
+-------------------
+Materiality Threshold: $${(materialityData?.materiality_threshold || 0).toLocaleString()}
+Performance Materiality: $${(materialityData?.performance_materiality || 0).toLocaleString()}
+
+BUDGET STATUS
+Factual Misstatements Budget: ${materialityData?.factual_misstatements_budget || 0} remaining
+Judgmental Misstatements Budget: ${materialityData?.judgmental_misstatements_budget || 0} remaining
+
+EVIDENCE PACK COMPLETION
+${evidenceData?.completion_pct || 0}% Complete (${evidenceData?.evidence_items?.length || 0} items)
+
+Next Item Due: ${evidenceData?.next_item_due || 'TBD'}
+Status: ${evidenceData?.pack_ready ? 'READY' : 'IN PROGRESS'}
+
+AUDITOR NOTES
+${evidenceData?.auditor_notes || 'None'}
+  `;
+
+  const dataBlob = new Blob([report], { type: 'text/plain' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `materiality-report-${CHURCH_ID}-${new Date().toISOString().split('T')[0]}.txt`;
+  link.click();
+}
+</script>
+
+</body>
+</html>
