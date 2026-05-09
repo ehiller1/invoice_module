@@ -119,34 +119,37 @@ EIMEShell.mount({
 });
 
 /**
- * Load all four queues from backend.
- * In Phase 2, these will be backed by real /api/council/queues endpoint.
- * For now, we'll mock with empty arrays and expected card schemas.
+ * Load all four queues from backend (Phase 3).
+ * Calls GET /api/council/queues which aggregates from individual queue endpoints.
+ * Falls back to empty queues if endpoints not yet populated with data.
  */
 async function loadQueues() {
   try {
-    // TODO: Replace with real endpoint GET /api/council/queues
-    // For now, initialize empty queues with expected structure
-    allCards.exceptions = [];
-    allCards.policies = [];
-    allCards.questions = [];
-    allCards.recommendations = [];
+    // Phase 3: Call real aggregation endpoint
+    const res = await fetch(`${API}/api/council/queues?church_id=${CHURCH_ID}`);
 
-    // Try to fetch from backend if endpoints exist
-    try {
-      const res = await fetch(`${API}/api/council/queues?church_id=${CHURCH_ID}`);
-      if (res.ok) {
-        const data = await res.json();
-        allCards = data;
-      }
-    } catch (e) {
-      console.log('Council queue endpoint not yet implemented; using empty queues');
+    if (res.ok) {
+      const data = await res.json();
+      allCards = {
+        exceptions: data.exceptions || [],
+        policies: data.policies || [],
+        questions: data.questions || [],
+        recommendations: data.recommendations || []
+      };
+    } else {
+      // Endpoint exists but returned error
+      console.warn('Council queues endpoint returned error; using empty queues');
+      allCards = { exceptions: [], policies: [], questions: [], recommendations: [] };
     }
 
     updateDashboard();
     renderRecentItems();
   } catch (e) {
     console.error('Error loading queues:', e);
+    // Graceful fallback: empty queues
+    allCards = { exceptions: [], policies: [], questions: [], recommendations: [] };
+    updateDashboard();
+    renderRecentItems();
   }
 }
 

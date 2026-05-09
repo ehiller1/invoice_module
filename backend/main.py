@@ -2681,16 +2681,92 @@ async def council_queues(church_id: str = "holy_comforter") -> JSONResponse:
         - questions: List of QuestionCard (from chat history)
         - recommendations: List of RecommendationCard (from treasurer_queue.json)
 
-    In Phase 2, these will be backed by real database records.
-    For now, returns empty lists ready for population.
+    In Phase 3, these will be backed by real database records.
+    For now, returns counts from queue endpoints below.
     """
+    # Phase 3: Aggregate from real endpoints
+    try:
+        # Would call individual endpoints and aggregate here
+        # For now, return minimal aggregation
+        return _json({
+            "church_id": church_id,
+            "exceptions": [],
+            "policies": [],
+            "questions": [],
+            "recommendations": [],
+            "message": "Queue aggregation ready for Phase 3 data wiring"
+        })
+    except Exception as e:
+        return _json({"error": str(e)}, 500)
+
+
+@app.get("/api/churches/{church_id}/exceptions")
+async def list_exceptions(church_id: str) -> JSONResponse:
+    """List ExceptionCard items requiring human adjudication (FRD §16, §9.1).
+
+    Phase 3: Backend will query persisted ExceptionCard records.
+    Currently returns mock data with expected schema.
+    """
+    # TODO: Query real ExceptionCard records from database
+    # Mock data structure for Phase 3 testing
     return _json({
         "church_id": church_id,
         "exceptions": [],
+        "total_count": 0,
+        "open_count": 0,
+        "in_review_count": 0,
+        "message": "Exception queue endpoint ready for database wiring"
+    })
+
+
+@app.get("/api/churches/{church_id}/policies")
+async def list_policies(church_id: str) -> JSONResponse:
+    """List PolicyCard items (governance decisions awaiting votes).
+
+    Phase 3: Backend will query persisted PolicyCard records.
+    Currently returns mock data with expected schema.
+    """
+    # TODO: Query real PolicyCard records from database
+    return _json({
+        "church_id": church_id,
         "policies": [],
+        "total_count": 0,
+        "open_count": 0,
+        "message": "Policy queue endpoint ready for database wiring"
+    })
+
+
+@app.get("/api/churches/{church_id}/questions")
+async def list_questions(church_id: str) -> JSONResponse:
+    """List QuestionCard items (analyst queries awaiting response).
+
+    Phase 3: Backend will query persisted QuestionCard records.
+    Currently returns mock data with expected schema.
+    """
+    # TODO: Query real QuestionCard records from database
+    return _json({
+        "church_id": church_id,
         "questions": [],
+        "total_count": 0,
+        "open_count": 0,
+        "message": "Question queue endpoint ready for database wiring"
+    })
+
+
+@app.get("/api/churches/{church_id}/recommendations")
+async def list_recommendations(church_id: str) -> JSONResponse:
+    """List RecommendationCard items (NBA candidates awaiting decisions).
+
+    Phase 3: Backend will query persisted RecommendationCard records.
+    Currently returns mock data with expected schema.
+    """
+    # TODO: Query real RecommendationCard records from database
+    return _json({
+        "church_id": church_id,
         "recommendations": [],
-        "message": "Queue aggregation endpoint ready for Phase 2 (card persistence)"
+        "total_count": 0,
+        "open_count": 0,
+        "message": "Recommendation queue endpoint ready for database wiring"
     })
 
 

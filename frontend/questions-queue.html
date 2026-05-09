@@ -60,48 +60,59 @@ EIMEShell.mount({
 
 async function loadQuestions() {
   try {
-    allQuestions = [
-      {
-        question_id: 'q_001',
-        state: 'OPEN',
-        query: 'What is our projected cash position for Q4 assuming 95% pledge fulfillment?',
-        intent: 'pledge_fulfillment_cash_projection',
-        answer: null,
-        provenance: [],
-        follow_on_suggestions: [
-          'Show scenario at 85% fulfillment',
-          'Compare to prior year Q4',
-          'Flag major pledge gaps'
-        ],
-        asker_id: 'finance_analyst@example.com',
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 4 * 3600000).toISOString()
-      },
-      {
-        question_id: 'q_002',
-        state: 'OPEN',
-        query: 'Which restricted funds have experienced mission drift?',
-        intent: 'mission_drift_analysis',
-        answer: null,
-        provenance: [],
-        follow_on_suggestions: [
-          'Show donor communication templates',
-          'List potential reallocations',
-          'Flag legal restrictions'
-        ],
-        asker_id: 'cfo@example.com',
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 24 * 3600000).toISOString()
-      }
-    ];
+    // Phase 3: Call real endpoint
+    const res = await fetch(`${API}/api/churches/${CHURCH_ID}/questions`);
+    const data = await res.json();
+
+    if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+      allQuestions = data.questions;
+    } else {
+      // Fallback to mock data
+      allQuestions = [
+        {
+          question_id: 'q_001',
+          state: 'OPEN',
+          query: 'What is our projected cash position for Q4 assuming 95% pledge fulfillment?',
+          intent: 'pledge_fulfillment_cash_projection',
+          answer: null,
+          provenance: [],
+          follow_on_suggestions: [
+            'Show scenario at 85% fulfillment',
+            'Compare to prior year Q4',
+            'Flag major pledge gaps'
+          ],
+          asker_id: 'finance_analyst@example.com',
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 4 * 3600000).toISOString()
+        },
+        {
+          question_id: 'q_002',
+          state: 'OPEN',
+          query: 'Which restricted funds have experienced mission drift?',
+          intent: 'mission_drift_analysis',
+          answer: null,
+          provenance: [],
+          follow_on_suggestions: [
+            'Show donor communication templates',
+            'List potential reallocations',
+            'Flag legal restrictions'
+          ],
+          asker_id: 'cfo@example.com',
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 24 * 3600000).toISOString()
+        }
+      ];
+    }
 
     renderQuestions();
   } catch (e) {
     console.error('Error loading questions:', e);
+    allQuestions = [];
+    renderQuestions();
   }
 }
 

@@ -125,54 +125,66 @@ EIMEShell.mount({
 });
 
 /**
- * Load exceptions from backend.
- * In Phase 2, will call GET /api/churches/{id}/exceptions or similar.
- * For now, uses mocked data structure.
+ * Load exceptions from backend (Phase 3).
+ * Calls GET /api/churches/{church_id}/exceptions
+ * Falls back to mock data if endpoint not yet implemented.
  */
 async function loadExceptions() {
   try {
-    // TODO: Replace with real endpoint GET /api/churches/{church_id}/exceptions
-    allExceptions = [
-      {
-        exception_id: 'exc_001',
-        exception_type: 'ambiguous_gift',
-        state: 'OPEN',
-        summary: '$50K anonymous gift with unclear intent',
-        details: {
-          reason: 'Donor letter references both endowment and operations; need clarification.',
-          gift_amount: 50000,
-          donor_name: 'Anonymous'
+    // Phase 3: Call real endpoint
+    const res = await fetch(`${API}/api/churches/${CHURCH_ID}/exceptions`);
+    const data = await res.json();
+
+    // If endpoint returns exceptions array, use it; otherwise use mock
+    if (data.exceptions && Array.isArray(data.exceptions) && data.exceptions.length > 0) {
+      allExceptions = data.exceptions;
+    } else {
+      // Fallback to mock data for Phase 3 testing
+      allExceptions = [
+        {
+          exception_id: 'exc_001',
+          exception_type: 'ambiguous_gift',
+          state: 'OPEN',
+          summary: '$50K anonymous gift with unclear intent',
+          details: {
+            reason: 'Donor letter references both endowment and operations; need clarification.',
+            gift_amount: 50000,
+            donor_name: 'Anonymous'
+          },
+          assigned_to: null,
+          priority: 'HIGH',
+          privacy_class: 'P1',
+          version: 1,
+          created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 2 * 3600000).toISOString()
         },
-        assigned_to: null,
-        priority: 'HIGH',
-        privacy_class: 'P1',
-        version: 1,
-        created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 2 * 3600000).toISOString()
-      },
-      {
-        exception_id: 'exc_002',
-        exception_type: 'capitalization_gap',
-        state: 'IN_REVIEW',
-        summary: 'Capitalization threshold variance on $250K equipment purchase',
-        details: {
-          reason: 'Asset cost in expense account; needs reclassification per policy.',
-          amount: 250000
-        },
-        assigned_to: 'treasurer@example.com',
-        priority: 'NORMAL',
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 12 * 3600000).toISOString()
-      }
-    ];
+        {
+          exception_id: 'exc_002',
+          exception_type: 'capitalization_gap',
+          state: 'IN_REVIEW',
+          summary: 'Capitalization threshold variance on $250K equipment purchase',
+          details: {
+            reason: 'Asset cost in expense account; needs reclassification per policy.',
+            amount: 250000
+          },
+          assigned_to: 'treasurer@example.com',
+          priority: 'NORMAL',
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 12 * 3600000).toISOString()
+        }
+      ];
+    }
 
     filteredExceptions = [...allExceptions];
     applyFilters();
     renderExceptions();
   } catch (e) {
     console.error('Error loading exceptions:', e);
+    // Still render with empty state on error
+    filteredExceptions = [];
+    renderExceptions();
   }
 }
 

@@ -97,51 +97,62 @@ EIMEShell.mount({
 
 async function loadPolicies() {
   try {
-    allPolicies = [
-      {
-        policy_id: 'pol_001',
-        policy_type: 'discretionary_fund_size',
-        state: 'OPEN',
-        title: 'Discretionary Fund Size Adjustment',
-        description: 'Increase discretionary fund from $50K to $75K annually',
-        proposed_action: 'Approve increase to $75K',
-        effective_date: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
-        voted_by: [
-          { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
-          { actor_id: 'finance_chair', tier: 'T2', vote: 'yes' }
-        ],
-        decision: null,
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 12 * 3600000).toISOString()
-      },
-      {
-        policy_id: 'pol_002',
-        policy_type: 'quasi_endowment_draw',
-        state: 'CLOSED',
-        title: 'Quasi-Endowment Annual Draw Policy',
-        description: 'Establish 4.5% annual draw from quasi-endowment for operations',
-        proposed_action: 'Approve 4.5% draw policy',
-        effective_date: new Date(Date.now() + 60 * 24 * 3600000).toISOString(),
-        voted_by: [
-          { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
-          { actor_id: 'finance_chair', tier: 'T2', vote: 'abstain' },
-          { actor_id: 'vestry_senior', tier: 'T3', vote: 'yes' }
-        ],
-        decision: 'approved',
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 24 * 3600000).toISOString()
-      }
-    ];
+    // Phase 3: Call real endpoint
+    const res = await fetch(`${API}/api/churches/${CHURCH_ID}/policies`);
+    const data = await res.json();
+
+    if (data.policies && Array.isArray(data.policies) && data.policies.length > 0) {
+      allPolicies = data.policies;
+    } else {
+      // Fallback to mock data
+      allPolicies = [
+        {
+          policy_id: 'pol_001',
+          policy_type: 'discretionary_fund_size',
+          state: 'OPEN',
+          title: 'Discretionary Fund Size Adjustment',
+          description: 'Increase discretionary fund from $50K to $75K annually',
+          proposed_action: 'Approve increase to $75K',
+          effective_date: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
+          voted_by: [
+            { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
+            { actor_id: 'finance_chair', tier: 'T2', vote: 'yes' }
+          ],
+          decision: null,
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 12 * 3600000).toISOString()
+        },
+        {
+          policy_id: 'pol_002',
+          policy_type: 'quasi_endowment_draw',
+          state: 'CLOSED',
+          title: 'Quasi-Endowment Annual Draw Policy',
+          description: 'Establish 4.5% annual draw from quasi-endowment for operations',
+          proposed_action: 'Approve 4.5% draw policy',
+          effective_date: new Date(Date.now() + 60 * 24 * 3600000).toISOString(),
+          voted_by: [
+            { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
+            { actor_id: 'finance_chair', tier: 'T2', vote: 'abstain' },
+            { actor_id: 'vestry_senior', tier: 'T3', vote: 'yes' }
+          ],
+          decision: 'approved',
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 24 * 3600000).toISOString()
+        }
+      ];
+    }
 
     filteredPolicies = [...allPolicies];
     applyFilters();
     renderPolicies();
   } catch (e) {
     console.error('Error loading policies:', e);
+    filteredPolicies = [];
+    renderPolicies();
   }
 }
 

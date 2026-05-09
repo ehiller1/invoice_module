@@ -60,61 +60,72 @@ EIMEShell.mount({
 
 async function loadRecommendations() {
   try {
-    allRecommendations = [
-      {
-        recommendation_id: 'rec_001',
-        state: 'OPEN',
-        title: 'Establish Monthly Cash Reserve Target',
-        description: 'Build cash reserves to cover 6 months of operating expenses',
-        candidates: [
-          { id: 'c1', description: 'Immediate: Allocate 15% of monthly surplus', impact_projection: '+$25K/month' },
-          { id: 'c2', description: 'Gradual: Build over 3 years via 10% allocation', impact_projection: '+$17K/month' },
-          { id: 'c3', description: 'Deferred: Allocate only after achieving $500K baseline', impact_projection: '+$0K/month (now)' }
-        ],
-        selected_candidate: null,
-        rationale: 'Current reserves at 2.1 months; industry standard is 4-6 months',
-        impact_projection: {
-          cash_impact: '$25K monthly increase in reserves',
-          covenant_impact: 'Improves liquidity covenants',
-          mission_impact: 'Enables counter-cyclical grant-making during downturns'
+    // Phase 3: Call real endpoint
+    const res = await fetch(`${API}/api/churches/${CHURCH_ID}/recommendations`);
+    const data = await res.json();
+
+    if (data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+      allRecommendations = data.recommendations;
+    } else {
+      // Fallback to mock data
+      allRecommendations = [
+        {
+          recommendation_id: 'rec_001',
+          state: 'OPEN',
+          title: 'Establish Monthly Cash Reserve Target',
+          description: 'Build cash reserves to cover 6 months of operating expenses',
+          candidates: [
+            { id: 'c1', description: 'Immediate: Allocate 15% of monthly surplus', impact_projection: '+$25K/month' },
+            { id: 'c2', description: 'Gradual: Build over 3 years via 10% allocation', impact_projection: '+$17K/month' },
+            { id: 'c3', description: 'Deferred: Allocate only after achieving $500K baseline', impact_projection: '+$0K/month (now)' }
+          ],
+          selected_candidate: null,
+          rationale: 'Current reserves at 2.1 months; industry standard is 4-6 months',
+          impact_projection: {
+            cash_impact: '$25K monthly increase in reserves',
+            covenant_impact: 'Improves liquidity covenants',
+            mission_impact: 'Enables counter-cyclical grant-making during downturns'
+          },
+          decision_deadline: new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+          decided_by: null,
+          decision: null,
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 48 * 3600000).toISOString()
         },
-        decision_deadline: new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
-        decided_by: null,
-        decision: null,
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 48 * 3600000).toISOString()
-      },
-      {
-        recommendation_id: 'rec_002',
-        state: 'OPEN',
-        title: 'Reallocate Underperforming Fund',
-        description: 'Move $75K from Legacy Scholarship (0 grants) to Active Mission Fund',
-        candidates: [
-          { id: 'c1', description: 'Full reallocation: $75K to Active Mission', impact_projection: '+$12 grants/year' },
-          { id: 'c2', description: 'Partial: $50K reallocation, keep $25K reserves', impact_projection: '+$8 grants/year' }
-        ],
-        selected_candidate: null,
-        rationale: 'Legacy Scholarship has no qualified applications; Active Mission has 40+ pending requests',
-        impact_projection: {
-          cash_impact: '$75K annual redistribution',
-          mission_impact: 'Increase active grants from 8 to 20 per year',
-          covenant_impact: 'Maintains restricted fund intent via Active Mission alignment'
-        },
-        decision_deadline: new Date(Date.now() + 7 * 24 * 3600000).toISOString(),
-        decided_by: null,
-        decision: null,
-        privacy_class: 'P2',
-        version: 1,
-        created_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString()
-      }
-    ];
+        {
+          recommendation_id: 'rec_002',
+          state: 'OPEN',
+          title: 'Reallocate Underperforming Fund',
+          description: 'Move $75K from Legacy Scholarship (0 grants) to Active Mission Fund',
+          candidates: [
+            { id: 'c1', description: 'Full reallocation: $75K to Active Mission', impact_projection: '+$12 grants/year' },
+            { id: 'c2', description: 'Partial: $50K reallocation, keep $25K reserves', impact_projection: '+$8 grants/year' }
+          ],
+          selected_candidate: null,
+          rationale: 'Legacy Scholarship has no qualified applications; Active Mission has 40+ pending requests',
+          impact_projection: {
+            cash_impact: '$75K annual redistribution',
+            mission_impact: 'Increase active grants from 8 to 20 per year',
+            covenant_impact: 'Maintains restricted fund intent via Active Mission alignment'
+          },
+          decision_deadline: new Date(Date.now() + 7 * 24 * 3600000).toISOString(),
+          decided_by: null,
+          decision: null,
+          privacy_class: 'P2',
+          version: 1,
+          created_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString()
+        }
+      ];
+    }
 
     renderRecommendations();
   } catch (e) {
     console.error('Error loading recommendations:', e);
+    allRecommendations = [];
+    renderRecommendations();
   }
 }
 
