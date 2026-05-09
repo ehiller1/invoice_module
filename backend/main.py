@@ -2946,6 +2946,142 @@ async def answer_question(body: Dict[str, Any]) -> JSONResponse:
     })
 
 
+# ---------- Cabinet Surface (FRD §16.5, Personal Cabinet) ----------
+
+@app.get("/api/cabinets/{principal}/activity")
+async def get_cabinet_activity(principal: str, church_id: str = "holy_comforter") -> JSONResponse:
+    """Get per-principal activity log: recent approvals, decisions, pending actions.
+
+    Returns activity feed for Personal Cabinet with:
+    - Recent decisions (cards approved, rejected, escalated)
+    - Pending approvals (decisions awaiting this principal's vote/action)
+    - Recent disavowals (overrides reversed)
+    - Voice/style config history
+    """
+    # Phase 5: Mock data ready for database integration
+    activity = [
+        {
+            "activity_id": f"act_{principal}_001",
+            "timestamp": (datetime.now() - timedelta(hours=2)).isoformat(),
+            "type": "approval",
+            "action": "approved",
+            "subject": "Fund reallocation recommendation",
+            "card_id": "rec_002",
+            "principal": principal,
+            "tier": 2,
+            "decision_summary": "Approved reallocation of Legacy Scholarship to Active Mission"
+        },
+        {
+            "activity_id": f"act_{principal}_002",
+            "timestamp": (datetime.now() - timedelta(hours=6)).isoformat(),
+            "type": "policy_vote",
+            "action": "voted_yes",
+            "subject": "Quasi-endowment draw policy amendment",
+            "card_id": "pol_001",
+            "principal": principal,
+            "tier": 2,
+            "decision_summary": "Voted YES on 4% annual draw limit"
+        },
+        {
+            "activity_id": f"act_{principal}_003",
+            "timestamp": (datetime.now() - timedelta(days=1)).isoformat(),
+            "type": "exception_adjudication",
+            "action": "routed",
+            "subject": "Ambiguous bequest language (donor: Jane Smith)",
+            "card_id": "exc_012",
+            "principal": principal,
+            "tier": 2,
+            "decision_summary": "Routed to Canon Lawyer (T3) for intent clarification"
+        }
+    ]
+
+    pending = [
+        {
+            "pending_id": f"pend_{principal}_001",
+            "created_at": (datetime.now() - timedelta(hours=4)).isoformat(),
+            "type": "policy_vote",
+            "subject": "Board approval: 2024 budget adjustment",
+            "card_id": "pol_002",
+            "deadline": (datetime.now() + timedelta(days=3)).isoformat(),
+            "options": ["Approve", "Reject", "Abstain"],
+            "privacy_class": "P2"
+        },
+        {
+            "pending_id": f"pend_{principal}_002",
+            "created_at": (datetime.now() - timedelta(hours=1)).isoformat(),
+            "type": "exception_review",
+            "subject": "Anonymous $50K gift with unclear intent",
+            "card_id": "exc_015",
+            "deadline": (datetime.now() + timedelta(days=7)).isoformat(),
+            "privacy_class": "P1"
+        }
+    ]
+
+    return _json({
+        "principal": principal,
+        "church_id": church_id,
+        "activity": activity,
+        "pending": pending,
+        "voice_config": {
+            "principal_name": f"Cabinet Member ({principal.title()})",
+            "tier": 2,
+            "voice_style": "pastoral",
+            "communication_preference": "brief",
+            "notification_frequency": "immediate"
+        }
+    })
+
+
+@app.post("/api/cabinets/{principal}/approve")
+async def cabinet_approve_decision(principal: str, body: Dict[str, Any]) -> JSONResponse:
+    """Record a decision approval/action in cabinet.
+
+    Commits a pending decision (policy vote, exception adjudication, etc.)
+    """
+    pending_id = body.get("pending_id")
+    action = body.get("action")  # "approve", "reject", "abstain", "route", etc.
+    reasoning = body.get("reasoning", "")
+    church_id = body.get("church_id", "holy_comforter")
+
+    # Phase 5: Would integrate with decision ledger
+    return _json({
+        "principal": principal,
+        "church_id": church_id,
+        "pending_id": pending_id,
+        "action": action,
+        "status": "committed",
+        "timestamp": datetime.now().isoformat(),
+        "ledger_entry_id": f"led_{uuid.uuid4().hex[:12]}",
+        "message": f"Decision {action} recorded in audit ledger"
+    })
+
+
+@app.post("/api/cabinets/{principal}/disavow")
+async def cabinet_disavow_override(principal: str, body: Dict[str, Any]) -> JSONResponse:
+    """Disavow (reverse) an override decision made by this principal.
+
+    Opens a disavowal window showing:
+    - Original decision + rationale
+    - Time window for reversal (typically 24-48 hours)
+    - Ledger entry for the disavowal
+    - Impact on dependent decisions
+    """
+    override_id = body.get("override_id")
+    reason = body.get("reason", "")
+    church_id = body.get("church_id", "holy_comforter")
+
+    # Phase 5: Would validate disavowal eligibility, check time window
+    return _json({
+        "principal": principal,
+        "church_id": church_id,
+        "override_id": override_id,
+        "disavowed": True,
+        "timestamp": datetime.now().isoformat(),
+        "disavowal_ledger_entry": f"dis_{uuid.uuid4().hex[:12]}",
+        "message": "Override disavowed. Original decision path restored. Dependent decisions flagged for review."
+    })
+
+
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")

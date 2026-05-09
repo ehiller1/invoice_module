@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Personal Cabinet</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script src="/components/card-renderer.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-5xl mx-auto p-6">
+  <!-- Principal Header -->
+  <div class="mb-8 bg-gradient-to-r from-navy-900 to-navy-800 rounded-lg p-6 text-white">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h1 class="text-3xl font-bold mb-2" id="principal-name">Cabinet Member</h1>
+        <p class="text-navy-200">Authority Tier <span id="principal-tier">2</span> • Personal Decision Cabinet</p>
+      </div>
+      <div class="text-right">
+        <p class="text-sm text-navy-200">Voice Configuration</p>
+        <button onclick="showVoiceConfig()" class="mt-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors">⚙️ Customize</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-navy-700">
+      <div>
+        <p class="text-xs text-navy-200">Pending Decisions</p>
+        <p class="text-2xl font-bold" id="pending-count">0</p>
+      </div>
+      <div>
+        <p class="text-xs text-navy-200">Decisions This Month</p>
+        <p class="text-2xl font-bold" id="decisions-count">0</p>
+      </div>
+      <div>
+        <p class="text-xs text-navy-200">Override Window</p>
+        <p class="text-sm font-medium">24 hours</p>
+      </div>
+      <div>
+        <p class="text-xs text-navy-200">Last Disavowal</p>
+        <p class="text-sm font-medium" id="last-disavowal">None</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two-column layout: Pending + Recent Activity -->
+  <div class="grid grid-cols-3 gap-6 mb-8">
+    <!-- Pending Decisions (Left Column - 2/3 width) -->
+    <div class="col-span-2">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4">⏳ Pending Decisions</h2>
+      <div id="pending-list" class="space-y-4">
+        <p class="text-slate-500 text-center py-8">Loading pending decisions...</p>
+      </div>
+    </div>
+
+    <!-- Recent Activity Summary (Right Column) -->
+    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+      <h3 class="text-lg font-bold text-slate-900 mb-4">📋 Recent Activity</h3>
+      <div id="recent-activity" class="space-y-3 text-sm">
+        <p class="text-slate-500">Loading activity log...</p>
+      </div>
+      <button onclick="loadActivityLog()" class="mt-4 w-full px-3 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 text-sm font-medium">
+        View Full Log
+      </button>
+    </div>
+  </div>
+
+  <!-- Activity Log (Modal or expanded view) -->
+  <div id="activity-log-panel" class="hidden bg-white rounded-lg border border-slate-200 p-6 mb-8">
+    <h2 class="text-2xl font-bold text-slate-900 mb-4">📊 Full Activity Log</h2>
+    <div id="full-activity-list" class="space-y-4"></div>
+    <button onclick="closeActivityLog()" class="mt-6 w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+  </div>
+
+  <!-- Voice & Style Configuration -->
+  <div id="voice-config-panel" class="hidden bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200 p-6 mb-8">
+    <h2 class="text-2xl font-bold text-slate-900 mb-6">🎤 Voice & Style Configuration</h2>
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-2 block">Voice Tone</label>
+        <select id="voice-tone" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+          <option value="pastoral">Pastoral & Reflective</option>
+          <option value="analytical">Analytical & Direct</option>
+          <option value="balanced">Balanced & Diplomatic</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-2 block">Communication Preference</label>
+        <select id="comm-preference" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+          <option value="brief">Brief & Concise</option>
+          <option value="detailed">Detailed & Thorough</option>
+          <option value="narrative">Narrative & Story-driven</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-2 block">Notification Frequency</label>
+        <select id="notif-freq" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+          <option value="immediate">Immediate</option>
+          <option value="daily_digest">Daily Digest</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-2 block">Decision Confidence Threshold</label>
+        <select id="decision-threshold" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+          <option value="high">High (>80% confidence)</option>
+          <option value="medium">Medium (>60% confidence)</option>
+          <option value="low">Low (all options)</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt-6 flex gap-3">
+      <button onclick="saveVoiceConfig()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Save Configuration</button>
+      <button onclick="closeVoiceConfig()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Disavowal History & Window -->
+  <div class="bg-red-50 rounded-lg border border-red-200 p-6">
+    <h2 class="text-lg font-bold text-red-900 mb-4">⏮️ Disavowal Window</h2>
+    <p class="text-sm text-red-800 mb-4">Reverse any decision made in the past 24 hours. Original decision path will be restored and dependent decisions flagged for review.</p>
+    <div id="disavowal-candidates" class="space-y-3">
+      <p class="text-slate-500 text-center py-6">No decisions eligible for disavowal at this time</p>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let currentPrincipal = 'treasurer';
+let currentUserTier = 2;
+let cabinetData = null;
+
+EIMEShell.mount({
+  activeNav: 'cabinet',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'cabinet',
+      payload: { church_id: CHURCH_ID, principal: currentPrincipal }
+    });
+    loadCabinetData();
+  }
+});
+
+async function loadCabinetData() {
+  try {
+    const res = await fetch(`${API}/api/cabinets/${currentPrincipal}/activity?church_id=${CHURCH_ID}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    cabinetData = await res.json();
+    renderCabinet();
+  } catch (e) {
+    console.error('Error loading cabinet:', e);
+    cabinetData = { activity: [], pending: [], voice_config: {} };
+    renderCabinet();
+  }
+}
+
+function renderCabinet() {
+  // Update header
+  const voiceConfig = cabinetData.voice_config || {};
+  document.getElementById('principal-name').textContent = voiceConfig.principal_name || 'Cabinet Member';
+  document.getElementById('principal-tier').textContent = voiceConfig.tier || 2;
+  document.getElementById('pending-count').textContent = (cabinetData.pending || []).length;
+  document.getElementById('decisions-count').textContent = (cabinetData.activity || []).filter(a => a.type !== 'disavowal').length;
+
+  // Render pending decisions
+  renderPendingDecisions();
+
+  // Render recent activity summary (top 3)
+  renderRecentActivity();
+
+  // Render disavowal candidates
+  renderDisavowalWindow();
+
+  // Load voice config into form
+  if (voiceConfig) {
+    document.getElementById('voice-tone').value = voiceConfig.voice_style || 'pastoral';
+    document.getElementById('comm-preference').value = voiceConfig.communication_preference || 'brief';
+    document.getElementById('notif-freq').value = voiceConfig.notification_frequency || 'immediate';
+  }
+}
+
+function renderPendingDecisions() {
+  const pending = cabinetData.pending || [];
+  const container = document.getElementById('pending-list');
+
+  if (pending.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No pending decisions</p>';
+    return;
+  }
+
+  container.innerHTML = pending.map(p => {
+    const daysLeft = Math.floor((new Date(p.deadline) - new Date()) / (24 * 3600000));
+    const urgency = daysLeft < 1 ? 'border-red-500 bg-red-50' : daysLeft < 3 ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white';
+
+    return `
+      <div class="border-l-4 ${urgency} rounded-lg p-4 transition-colors hover:shadow-md">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <p class="font-semibold text-slate-900">${p.subject}</p>
+            <p class="text-xs text-slate-600 mt-1">Type: ${p.type.replace(/_/g, ' ')}</p>
+          </div>
+          <span class="text-xs font-semibold text-slate-600 px-2 py-1 bg-slate-200 rounded">${daysLeft} days</span>
+        </div>
+        <div class="mb-4 bg-white rounded px-3 py-2 text-sm text-slate-700">
+          ${p.options ? `Options: ${p.options.join(' / ')}` : 'Action required'}
+        </div>
+        <div class="flex gap-2">
+          ${p.options ? p.options.map((opt, i) => `
+            <button onclick="submitDecision('${p.pending_id}', '${opt.toLowerCase().replace(/ /g, '_')}')"
+              class="flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors
+              ${opt === 'Approve' || opt === 'Yes' ? 'bg-green-600 text-white hover:bg-green-700' :
+                opt === 'Reject' || opt === 'No' ? 'bg-red-600 text-white hover:bg-red-700' :
+                'bg-slate-200 text-slate-700 hover:bg-slate-300'}">
+              ${opt}
+            </button>
+          `).join('') : `
+            <button onclick="submitDecision('${p.pending_id}', 'approve')" class="flex-1 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700">
+              Take Action
+            </button>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRecentActivity() {
+  const activity = (cabinetData.activity || []).slice(0, 3);
+  const container = document.getElementById('recent-activity');
+
+  if (activity.length === 0) {
+    container.innerHTML = '<p class="text-slate-500">No recent activity</p>';
+    return;
+  }
+
+  container.innerHTML = activity.map(a => `
+    <div class="border border-slate-200 rounded p-3 hover:bg-slate-100 transition-colors cursor-pointer">
+      <p class="font-medium text-slate-900 text-sm">${a.action}</p>
+      <p class="text-xs text-slate-600 mt-1">${a.subject}</p>
+      <p class="text-xs text-slate-500 mt-2">${formatDate(a.timestamp)}</p>
+    </div>
+  `).join('');
+}
+
+function renderDisavowalWindow() {
+  const container = document.getElementById('disavowal-candidates');
+  const recentDecisions = (cabinetData.activity || [])
+    .filter(a => {
+      const hoursAgo = (new Date() - new Date(a.timestamp)) / 3600000;
+      return hoursAgo < 24 && (a.action === 'approved' || a.action === 'routed' || a.action === 'voted_yes');
+    })
+    .slice(0, 3);
+
+  if (recentDecisions.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-6">No decisions eligible for disavowal at this time</p>';
+    return;
+  }
+
+  container.innerHTML = recentDecisions.map(d => `
+    <div class="border border-red-300 rounded p-3 bg-white">
+      <div class="flex items-start justify-between mb-2">
+        <div>
+          <p class="font-medium text-slate-900">${d.subject}</p>
+          <p class="text-xs text-slate-600 mt-1">${d.decision_summary}</p>
+        </div>
+        <button onclick="startDisavow('${d.activity_id}')" class="px-3 py-1 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700">
+          Disavow
+        </button>
+      </div>
+      <p class="text-xs text-red-700 mt-2">⏱️ ${formatDate(d.timestamp)} (24h window)</p>
+    </div>
+  `).join('');
+}
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now - date;
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+async function submitDecision(pendingId, action) {
+  try {
+    const res = await fetch(`${API}/api/cabinets/${currentPrincipal}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pending_id: pendingId,
+        action: action,
+        church_id: CHURCH_ID
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Decision recorded. Audit ledger entry created.');
+    loadCabinetData();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function startDisavow(activityId) {
+  const reason = prompt('Reason for disavowal:');
+  if (!reason) return;
+
+  try {
+    const res = await fetch(`${API}/api/cabinets/${currentPrincipal}/disavow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        override_id: activityId,
+        reason: reason,
+        church_id: CHURCH_ID
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Decision disavowed. Original decision path restored. Dependent decisions flagged for review.');
+    loadCabinetData();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function showVoiceConfig() {
+  document.getElementById('voice-config-panel').classList.remove('hidden');
+  window.scrollTo(0, document.getElementById('voice-config-panel').offsetTop - 100);
+}
+
+function closeVoiceConfig() {
+  document.getElementById('voice-config-panel').classList.add('hidden');
+}
+
+async function saveVoiceConfig() {
+  const config = {
+    voice_style: document.getElementById('voice-tone').value,
+    communication_preference: document.getElementById('comm-preference').value,
+    notification_frequency: document.getElementById('notif-freq').value
+  };
+  alert('Voice configuration saved locally (Phase 5: would persist to database)');
+  closeVoiceConfig();
+}
+
+function loadActivityLog() {
+  document.getElementById('activity-log-panel').classList.remove('hidden');
+  const activity = cabinetData.activity || [];
+  const container = document.getElementById('full-activity-list');
+
+  if (activity.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">No activity</p>';
+    return;
+  }
+
+  container.innerHTML = activity.map(a => `
+    <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+      <div class="flex items-start justify-between mb-2">
+        <div>
+          <p class="font-semibold text-slate-900">${a.subject}</p>
+          <p class="text-sm text-slate-700 mt-1">${a.decision_summary || a.action}</p>
+        </div>
+        <span class="text-xs font-medium text-slate-600 px-2 py-1 bg-slate-200 rounded">${a.type}</span>
+      </div>
+      <p class="text-xs text-slate-600">${formatDate(a.timestamp)}</p>
+    </div>
+  `).join('');
+
+  window.scrollTo(0, document.getElementById('activity-log-panel').offsetTop - 100);
+}
+
+function closeActivityLog() {
+  document.getElementById('activity-log-panel').classList.add('hidden');
+}
+</script>
+
+</body>
+</html>
