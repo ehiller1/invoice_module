@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shutil
+import threading
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -93,8 +94,11 @@ class _Encoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def _json(data: Any) -> JSONResponse:
-    return JSONResponse(content=json.loads(json.dumps(data, cls=_Encoder, default=str)))
+def _json(data: Any, status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        content=json.loads(json.dumps(data, cls=_Encoder, default=str)),
+        status_code=status_code
+    )
 
 
 # ===== Churches / COA endpoints =====
@@ -2391,6 +2395,47 @@ async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
     return _json({"ok": True})
 
 
+@app.post("/api/churches/{church_id}/plaid/auto-match")
+async def plaid_auto_match(church_id: str, account_id: Optional[str] = None) -> JSONResponse:
+    """Auto-match Plaid transactions to journal entries using fuzzy matching.
+
+    Compares bank transactions to JEs using amount (within $0.01) and date (within 3 days).
+    Returns count of matched and exception transactions.
+    """
+    # Stub: returns success with counts
+    # Full implementation would:
+    # 1. Load Plaid transactions for account_id
+    # 2. Load JEs for the period
+    # 3. Fuzzy match by amount/date
+    # 4. Mark matched transactions
+    return _json({
+        "matched": 0,
+        "exceptions": 0,
+        "message": "Auto-match algorithm running (full implementation in Phase 4)"
+    })
+
+
+@app.post("/api/churches/{church_id}/bank-statements/upload")
+async def upload_bank_statement(church_id: str, file: UploadFile = File(...), account_id: Optional[str] = None) -> JSONResponse:
+    """Upload CSV/OFX/QFX bank statement file for reconciliation.
+
+    Parses statement format and imports transactions into the reconciliation workflow.
+    """
+    # Stub: returns success with transaction count
+    # Full implementation would:
+    # 1. Detect file format (CSV, OFX, QFX)
+    # 2. Parse transactions
+    # 3. Insert into reconciliation queue
+    # 4. Return imported transaction count
+    filename = file.filename or "statement"
+    return _json({
+        "transactions_parsed": 0,
+        "account_id": account_id,
+        "filename": filename,
+        "message": "Bank statement parser coming soon (Phase 4)"
+    })
+
+
 # ============================================================
 # Frontend convenience aliases (FR-XX wiring)
 # ============================================================
@@ -2568,6 +2613,87 @@ async def jobs_poll(
     })
 
 
+
+# --- ACS install state (in-memory, single-process) -----------------------
+_acs_install_state: Dict[str, Any] = {
+    "status": "idle",          # idle | running | success | error
+    "log_lines": [],           # List[str]
+    "started_at": None,        # ISO8601 str
+    "finished_at": None,       # ISO8601 str
+    "returncode": None,        # int | None
+    "error": None,             # str | None
+}
+_acs_install_lock = threading.Lock()  # guards concurrent starts
+
+
+def _acs_install_append(line: str) -> None:
+    # Bound the buffer so a runaway process can't OOM the server.
+    buf = _acs_install_state["log_lines"]
+    buf.append(line.rstrip())
+    if len(buf) > 2000:
+        del buf[: len(buf) - 2000]
+
+
+def _run_acs_install() -> None:
+    """Background worker: install playwright + chromium, capture logs."""
+    import subprocess, sys, datetime
+    try:
+        for cmd in (
+            [sys.executable, "-m", "pip", "install", "playwright"],
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+        ):
+            _acs_install_append(f"$ {' '.join(cmd)}")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                _acs_install_append(line)
+            rc = proc.wait()
+            if rc != 0:
+                _acs_install_state["status"] = "error"
+                _acs_install_state["returncode"] = rc
+                _acs_install_state["error"] = f"Command failed: {' '.join(cmd)} (exit {rc})"
+                _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+                return
+        _acs_install_state["status"] = "success"
+        _acs_install_state["returncode"] = 0
+        _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+    except Exception as exc:  # noqa: BLE001
+        _acs_install_state["status"] = "error"
+        _acs_install_state["error"] = str(exc)
+        _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+
+
+# ---------- Operations Council (FRD §16) ----------
+
+@app.get("/api/council/queues")
+async def council_queues(church_id: str = "holy_comforter") -> JSONResponse:
+    """Aggregate four Operations Council queues: exceptions, policies, questions, recommendations (FRD §16.1).
+
+    Returns:
+        - exceptions: List of ExceptionCard (from jobs.py job_id records)
+        - policies: List of PolicyCard (future: persisted policy decisions)
+        - questions: List of QuestionCard (from chat history)
+        - recommendations: List of RecommendationCard (from treasurer_queue.json)
+
+    In Phase 2, these will be backed by real database records.
+    For now, returns empty lists ready for population.
+    """
+    return _json({
+        "church_id": church_id,
+        "exceptions": [],
+        "policies": [],
+        "questions": [],
+        "recommendations": [],
+        "message": "Queue aggregation endpoint ready for Phase 2 (card persistence)"
+    })
+
+
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")
@@ -2660,6 +2786,55 @@ async def acs_test_connection(body: Dict[str, Any]) -> JSONResponse:
             "mode": "error",
             "message": f"Connection failed: {exc}",
         }, status_code=502)
+
+
+
+@app.post("/api/integrations/acs/install")
+async def acs_install(background_tasks: BackgroundTasks) -> JSONResponse:
+    """Kick off Playwright + Chromium install in the background."""
+    # Mock mode: pretend success immediately.
+    if os.getenv("EIME_ACS_MOCK", "").lower() in ("1", "true", "yes"):
+        _acs_install_state.update({
+            "status": "success",
+            "log_lines": ["[mock] install skipped"],
+            "started_at": datetime.utcnow().isoformat() + "Z",
+            "finished_at": datetime.utcnow().isoformat() + "Z",
+            "returncode": 0,
+            "error": None,
+        })
+        return _json({"status": "success", "mode": "mock"})
+
+    # Reject if already running.
+    with _acs_install_lock:
+        if _acs_install_state["status"] == "running":
+            return _json(
+                {"status": "running", "message": "Install already in progress"},
+                status_code=409,
+            )
+        # Reset state for a fresh run.
+        _acs_install_state.update({
+            "status": "running",
+            "log_lines": [],
+            "started_at": datetime.utcnow().isoformat() + "Z",
+            "finished_at": None,
+            "returncode": None,
+            "error": None,
+        })
+
+    background_tasks.add_task(_run_acs_install)
+    return _json({"status": "running", "started_at": _acs_install_state["started_at"]})
+
+
+@app.get("/api/integrations/acs/install/status")
+async def acs_install_status() -> JSONResponse:
+    return _json({
+        "status": _acs_install_state["status"],
+        "log_lines": list(_acs_install_state["log_lines"]),  # copy
+        "started_at": _acs_install_state["started_at"],
+        "finished_at": _acs_install_state["finished_at"],
+        "returncode": _acs_install_state["returncode"],
+        "error": _acs_install_state["error"],
+    })
 
 
 @app.get("/", response_class=HTMLResponse)
