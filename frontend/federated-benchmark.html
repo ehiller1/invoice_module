@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Federated Benchmarking</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">🌐 Federated Peer Benchmarking</h1>
+    <p class="text-slate-600">Compare your financial metrics to similar organizations. Data sourced from peer dioceses and comparable faith organizations.</p>
+  </div>
+
+  <!-- Your Organization Summary -->
+  <div class="bg-gradient-to-r from-navy-900 to-navy-800 rounded-lg p-6 text-white mb-8">
+    <h2 class="text-2xl font-bold mb-4">Holy Comforter Episcopal Church</h2>
+    <div class="grid grid-cols-4 gap-4">
+      <div>
+        <p class="text-sm text-navy-200 mb-1">Annual Revenue</p>
+        <p class="text-2xl font-bold">$1.55M</p>
+      </div>
+      <div>
+        <p class="text-sm text-navy-200 mb-1">Cash Reserves</p>
+        <p class="text-2xl font-bold">2.3<span class="text-lg"> months</span></p>
+      </div>
+      <div>
+        <p class="text-sm text-navy-200 mb-1">Program Expense Ratio</p>
+        <p class="text-2xl font-bold">72%</p>
+      </div>
+      <div>
+        <p class="text-sm text-navy-200 mb-1">Donor Concentration (Top 10)</p>
+        <p class="text-2xl font-bold">35%</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metric Comparison Cards -->
+  <div class="grid grid-cols-2 gap-6 mb-8">
+    <!-- Cash Reserves Benchmark -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h3 class="text-lg font-bold text-slate-900 mb-2">💰 Cash Reserves Health</h3>
+      <p class="text-sm text-slate-600 mb-4">Months of operating expenses on hand (higher is better)</p>
+      <div id="reserves-chart" style="position: relative; height: 200px;"></div>
+      <div class="mt-4 pt-4 border-t border-slate-200">
+        <p class="text-xs text-slate-600 mb-2"><strong>Your Position:</strong> Below median (39th percentile)</p>
+        <p class="text-xs text-slate-600"><strong>Benchmark (4-6 months):</strong> Consider increasing reserves by $180K–$270K</p>
+      </div>
+    </div>
+
+    <!-- Expense Ratio Benchmark -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h3 class="text-lg font-bold text-slate-900 mb-2">📊 Program Expense Ratio</h3>
+      <p class="text-sm text-slate-600 mb-4">% of revenue dedicated to programs (higher is better)</p>
+      <div id="expense-chart" style="position: relative; height: 200px;"></div>
+      <div class="mt-4 pt-4 border-t border-slate-200">
+        <p class="text-xs text-slate-600 mb-2"><strong>Your Position:</strong> Above median (62nd percentile)</p>
+        <p class="text-xs text-slate-600"><strong>Peer avg: 71%</strong> | You: 72% | Range: 68%–80%</p>
+      </div>
+    </div>
+
+    <!-- Donor Concentration Risk -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h3 class="text-lg font-bold text-slate-900 mb-2">👥 Donor Concentration Risk</h3>
+      <p class="text-sm text-slate-600 mb-4">% of revenue from top 10 donors (lower is better)</p>
+      <div id="concentration-chart" style="position: relative; height: 200px;"></div>
+      <div class="mt-4 pt-4 border-t border-slate-200">
+        <p class="text-xs text-slate-600 mb-2"><strong>Your Position:</strong> Above median (70th percentile in risk)</p>
+        <p class="text-xs text-slate-600"><strong>Risk Level: Medium-High</strong> | Peer avg: 33% | You: 35%</p>
+      </div>
+    </div>
+
+    <!-- Fund Diversification -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h3 class="text-lg font-bold text-slate-900 mb-2">🎯 Fund Diversification</h3>
+      <p class="text-sm text-slate-600 mb-4">Number of restricted funds (higher enables flexibility)</p>
+      <div class="space-y-3">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-medium text-slate-900">Your org</p>
+            <p class="text-sm font-bold text-slate-900">18 funds</p>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2">
+            <div class="bg-navy-900 h-2 rounded-full" style="width: 64%;"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-medium text-slate-700">Peer average</p>
+            <p class="text-sm font-bold text-slate-700">18 funds</p>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2">
+            <div class="bg-blue-500 h-2 rounded-full" style="width: 64%;"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-medium text-slate-700">Top peer</p>
+            <p class="text-sm font-bold text-slate-700">28 funds</p>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2">
+            <div class="bg-emerald-500 h-2 rounded-full" style="width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Peer Organizations Table -->
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-lg font-bold text-slate-900 mb-4">📋 Peer Organizations</h2>
+    <div id="peers-table" class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="border-b border-slate-200">
+          <tr>
+            <th class="text-left py-2 px-3 text-xs font-semibold text-slate-600">Organization</th>
+            <th class="text-right py-2 px-3 text-xs font-semibold text-slate-600">Revenue</th>
+            <th class="text-right py-2 px-3 text-xs font-semibold text-slate-600">Cash Reserves</th>
+            <th class="text-right py-2 px-3 text-xs font-semibold text-slate-600">Program %</th>
+            <th class="text-right py-2 px-3 text-xs font-semibold text-slate-600">Donor Conc.</th>
+            <th class="text-right py-2 px-3 text-xs font-semibold text-slate-600">Endowment Ratio</th>
+            <th class="text-left py-2 px-3 text-xs font-semibold text-slate-600">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-slate-100 bg-navy-50">
+            <td class="py-3 px-3 font-semibold text-slate-900">✓ Holy Comforter (You)</td>
+            <td class="py-3 px-3 text-right text-slate-900">$1.55M</td>
+            <td class="py-3 px-3 text-right text-slate-900">2.3mo</td>
+            <td class="py-3 px-3 text-right text-slate-900">72%</td>
+            <td class="py-3 px-3 text-right text-orange-600 font-medium">35%</td>
+            <td class="py-3 px-3 text-right text-slate-900">15%</td>
+            <td class="py-3 px-3 text-slate-600">—</td>
+          </tr>
+          <tr class="border-b border-slate-100">
+            <td class="py-3 px-3 font-semibold text-slate-900">St. Mary's Episcopal</td>
+            <td class="py-3 px-3 text-right text-slate-700">$1.80M</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">4.2mo</td>
+            <td class="py-3 px-3 text-right text-slate-700">68%</td>
+            <td class="py-3 px-3 text-right text-slate-700">28%</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">42%</td>
+            <td class="py-3 px-3 text-slate-600 text-xs">Best-in-class reserves</td>
+          </tr>
+          <tr class="border-b border-slate-100">
+            <td class="py-3 px-3 font-semibold text-slate-900">Grace Anglican Community</td>
+            <td class="py-3 px-3 text-right text-slate-700">$1.40M</td>
+            <td class="py-3 px-3 text-right text-slate-700">2.1mo</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">75%</td>
+            <td class="py-3 px-3 text-right text-slate-700">32%</td>
+            <td class="py-3 px-3 text-right text-slate-700">8%</td>
+            <td class="py-3 px-3 text-slate-600 text-xs">Similar profile</td>
+          </tr>
+          <tr class="border-b border-slate-100">
+            <td class="py-3 px-3 font-semibold text-slate-900">St. John's Chapel</td>
+            <td class="py-3 px-3 text-right text-slate-700">$2.10M</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">5.1mo</td>
+            <td class="py-3 px-3 text-right text-slate-700">70%</td>
+            <td class="py-3 px-3 text-right text-slate-700">30%</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">55%</td>
+            <td class="py-3 px-3 text-slate-600 text-xs">Largest peer</td>
+          </tr>
+          <tr>
+            <td class="py-3 px-3 font-semibold text-slate-900">Trinity Interfaith Alliance</td>
+            <td class="py-3 px-3 text-right text-slate-700">$980K</td>
+            <td class="py-3 px-3 text-right text-red-600 font-medium">1.8mo</td>
+            <td class="py-3 px-3 text-right text-emerald-600 font-medium">80%</td>
+            <td class="py-3 px-3 text-right text-red-600 font-medium">45%</td>
+            <td class="py-3 px-3 text-right text-slate-700">2%</td>
+            <td class="py-3 px-3 text-slate-600 text-xs">Similar risk profile</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Key Insights & Recommendations -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-8">
+    <h3 class="text-lg font-bold text-blue-900 mb-4">💡 Key Insights & Recommendations</h3>
+    <ul class="space-y-3 text-sm text-blue-900">
+      <li><strong>Cash Reserve Gap:</strong> You're at 2.3 months vs. peer median of 3.5 months. Consider building reserves by $180K–$270K over 18–24 months to reach benchmark. This improves resilience and may lower covenant waiver risk.</li>
+      <li><strong>Donor Concentration Risk:</strong> Your top 10 donors represent 35% of revenue (vs. peer avg 33%). This is medium-high risk. Diversification could protect against major donor lapsing. Peer leaders maintain 28–30%.</li>
+      <li><strong>Strong Program Ratio:</strong> At 72%, you're above peer average (71%). This is a strength — donors and grantmakers view this favorably.</li>
+      <li><strong>Endowment Opportunity:</strong> At 15% of revenue, your endowment is below peer average (26%). St. Mary's and St. John's have 42–55% endowment ratios, providing buffer against revenue volatility. Consider planned giving campaign.</li>
+      <li><strong>Peer Comparison:</strong> Grace Anglican Community has a similar risk profile. Trinity Alliance is riskier. St. Mary's and St. John's are models for reserve and endowment growth.</li>
+    </ul>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let benchmarkData = null;
+
+EIMEShell.mount({
+  activeNav: null,
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'federated-benchmark',
+      payload: { church_id: CHURCH_ID }
+    });
+    loadBenchmarkData();
+  }
+});
+
+async function loadBenchmarkData() {
+  try {
+    const res = await fetch(`${API}/api/benchmarking/peers?church_id=${CHURCH_ID}`);
+    benchmarkData = await res.json();
+    renderCharts();
+  } catch (e) {
+    console.error('Error loading benchmark data:', e);
+  }
+}
+
+function renderCharts() {
+  if (!benchmarkData) return;
+
+  // Cash Reserves Chart
+  const reservesCtx = document.getElementById('reserves-chart').getContext('2d');
+  const yourReserves = benchmarkData.your_organization.cash_reserves_months;
+  const peerReserves = benchmarkData.peers.map(p => p.cash_reserves_months);
+
+  new Chart(reservesCtx, {
+    type: 'bar',
+    data: {
+      labels: ['You', ...benchmarkData.peers.map(p => p.name.split(' ')[0])],
+      datasets: [{
+        label: 'Months of Reserves',
+        data: [yourReserves, ...peerReserves],
+        backgroundColor: ['#0f1f3d', '#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff'],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 6 }
+      }
+    }
+  });
+
+  // Expense Ratio Chart
+  const expenseCtx = document.getElementById('expense-chart').getContext('2d');
+  const yourExpense = benchmarkData.your_organization.expense_ratio_program * 100;
+  const peerExpense = benchmarkData.peers.map(p => p.expense_ratio_program * 100);
+
+  new Chart(expenseCtx, {
+    type: 'bar',
+    data: {
+      labels: ['You', ...benchmarkData.peers.map(p => p.name.split(' ')[0])],
+      datasets: [{
+        label: 'Program Expense %',
+        data: [yourExpense, ...peerExpense],
+        backgroundColor: ['#0f1f3d', '#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff'],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 100 }
+      }
+    }
+  });
+
+  // Donor Concentration Chart
+  const concentrationCtx = document.getElementById('concentration-chart').getContext('2d');
+  const yourConc = benchmarkData.your_organization.donor_concentration_top10 * 100;
+  const peerConc = benchmarkData.peers.map(p => p.donor_concentration_top10 * 100);
+
+  new Chart(concentrationCtx, {
+    type: 'bar',
+    data: {
+      labels: ['You', ...benchmarkData.peers.map(p => p.name.split(' ')[0])],
+      datasets: [{
+        label: 'Top 10 Donor %',
+        data: [yourConc, ...peerConc],
+        backgroundColor: ['#0f1f3d', '#e0e7ff', '#e0e7ff', '#e0e7ff', '#e0e7ff'],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 50 }
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>

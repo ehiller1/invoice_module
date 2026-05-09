@@ -3235,6 +3235,115 @@ async def get_evidence_pack(church_id: str = "holy_comforter") -> JSONResponse:
     })
 
 
+# ---------- Federated Peer Benchmarking (Phase 6, FRD MEM-28) ----------
+
+@app.get("/api/benchmarking/peers")
+async def get_peer_benchmarks(church_id: str = "holy_comforter", metric: str = None) -> JSONResponse:
+    """Get peer organization benchmarking data for financial health comparison.
+
+    Federated Membrane (MEM-28) queries similar organizations:
+    - Expense ratio analysis (program vs admin vs fundraising)
+    - Cash reserve health (months of operations)
+    - Donor concentration (top 10 donor pct of revenue)
+    - Fund diversification (number of restricted funds, endowment ratio)
+    - Growth trends (YoY revenue change, expense growth)
+    """
+    # Phase 6: Mock peer data from similar-sized Episcopal churches
+    peer_data = {
+        "your_organization": {
+            "name": "Holy Comforter Episcopal Church",
+            "revenue_annual": 1_550_000,
+            "expense_ratio_program": 0.72,
+            "expense_ratio_admin": 0.18,
+            "expense_ratio_fundraising": 0.10,
+            "cash_reserves_months": 2.3,
+            "donor_concentration_top10": 0.35,
+            "restricted_funds_count": 18,
+            "endowment_ratio": 0.15,
+            "yoy_revenue_growth": 0.03,
+            "percentile": None  # Will be calculated
+        },
+        "peers": [
+            {
+                "org_id": "peer_001",
+                "name": "St. Mary's Episcopal Church",
+                "denomination": "Episcopal",
+                "region": "Northeast",
+                "revenue_annual": 1_800_000,
+                "expense_ratio_program": 0.68,
+                "expense_ratio_admin": 0.22,
+                "expense_ratio_fundraising": 0.10,
+                "cash_reserves_months": 4.2,
+                "donor_concentration_top10": 0.28,
+                "restricted_funds_count": 22,
+                "endowment_ratio": 0.42,
+                "yoy_revenue_growth": 0.05,
+                "notes": "Strong endowment management; considered best-in-class cash reserves"
+            },
+            {
+                "org_id": "peer_002",
+                "name": "Grace Anglican Community",
+                "denomination": "Anglican",
+                "region": "Mid-Atlantic",
+                "revenue_annual": 1_400_000,
+                "expense_ratio_program": 0.75,
+                "expense_ratio_admin": 0.17,
+                "expense_ratio_fundraising": 0.08,
+                "cash_reserves_months": 2.1,
+                "donor_concentration_top10": 0.32,
+                "restricted_funds_count": 15,
+                "endowment_ratio": 0.08,
+                "yoy_revenue_growth": 0.02,
+                "notes": "Similar profile; lean admin costs"
+            },
+            {
+                "org_id": "peer_003",
+                "name": "St. John's Chapel",
+                "denomination": "Episcopal",
+                "region": "Northeast",
+                "revenue_annual": 2_100_000,
+                "expense_ratio_program": 0.70,
+                "expense_ratio_admin": 0.20,
+                "expense_ratio_fundraising": 0.10,
+                "cash_reserves_months": 5.1,
+                "donor_concentration_top10": 0.30,
+                "restricted_funds_count": 28,
+                "endowment_ratio": 0.55,
+                "yoy_revenue_growth": 0.06,
+                "notes": "Largest peer; significant endowment; exceptional cash position"
+            },
+            {
+                "org_id": "peer_004",
+                "name": "Trinity Interfaith Alliance",
+                "denomination": "Interfaith",
+                "region": "Southeast",
+                "revenue_annual": 980_000,
+                "expense_ratio_program": 0.80,
+                "expense_ratio_admin": 0.15,
+                "expense_ratio_fundraising": 0.05,
+                "cash_reserves_months": 1.8,
+                "donor_concentration_top10": 0.45,
+                "restricted_funds_count": 8,
+                "endowment_ratio": 0.02,
+                "yoy_revenue_growth": 0.01,
+                "notes": "Smaller peer; donor-dependent; lower reserves (similar risk to you)"
+            }
+        ]
+    }
+
+    # Calculate percentiles
+    all_orgs = [peer_data["your_organization"]] + peer_data["peers"]
+    for metric_key in ["cash_reserves_months", "expense_ratio_program", "donor_concentration_top10"]:
+        values = [org[metric_key] for org in all_orgs if metric_key in org]
+        if values:
+            your_value = peer_data["your_organization"][metric_key]
+            rank = sum(1 for v in values if v <= your_value)
+            percentile = int((rank / len(values)) * 100)
+            peer_data["your_organization"][f"{metric_key}_percentile"] = percentile
+
+    return _json(peer_data)
+
+
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")
