@@ -275,14 +275,67 @@
   function detectLocalIntent(text) {
     const t = text.toLowerCase();
     let m;
+
+    // Entity-specific intents (invoice/job detail views)
     m = t.match(/open\s+invoice\s+([a-z0-9\-]+)/i);
     if (m) return { action: 'OPEN_INVOICE', payload: { invoice_id: m[1] } };
     m = t.match(/open\s+job\s+([a-z0-9\-]+)/i);
     if (m) return { action: 'OPEN_INVOICE', payload: { job_id: m[1] } };
     if (/reconcil/.test(t)) return { action: 'OPEN_RECON', payload: {} };
     if (/budget/.test(t) && /show|view|open/.test(t)) return { action: 'OPEN_BUDGET', payload: {} };
+
+    // Page navigation intents
+    const pageMap = {
+      invoices: '/index.html',
+      invoice: '/index.html',
+      jobs: '/jobs.html',
+      'je|journal': '/jes.html',
+      'entry|entries': '/jes.html',
+      'treasurer': '/treasurer-queue.html',
+      'queue': '/treasurer-queue.html',
+      'reconcil|recon': '/reconciliation.html',
+      'payment|payments': '/payments.html',
+      'budget': '/budget.html',
+      'vendor|suppliers': '/vendors.html',
+      'coa|chart|account': '/settings/coa.html',
+      'audit|audit.trail|history': '/audit.html',
+      'approval|chain': '/settings/approval-chains.html',
+      'authorit|permission': '/settings/authorities.html',
+      'knowledge|doc|reference': '/knowledge-base.html',
+      'plaid|bank|link': '/settings/plaid-linking.html',
+    };
+
+    for (const [keywords, url] of Object.entries(pageMap)) {
+      const keywordList = keywords.split('|');
+      for (const keyword of keywordList) {
+        if (t.includes(keyword)) {
+          // Confirm this is a navigation intent (not just mentioning the word)
+          if (/show|view|open|go.to|navigate|take.me|display/.test(t) || t.startsWith(keyword)) {
+            return { action: 'NAVIGATE', payload: { url } };
+          }
+        }
+      }
+    }
+
     return null;
   }
 
-  window.EIMEChatRail = { init, sendMessage, appendMessage };
+  /**
+   * Append a system narration message (for agent processing steps).
+   * Renders as italic, centered, with a step icon.
+   */
+  function appendSystemNarration(text) {
+    const list = document.getElementById('eime-chat-messages');
+    if (!list) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'flex justify-center';
+    wrap.innerHTML = `<div class="text-[11px] text-slate-500 italic flex items-center gap-2 py-1">
+      <svg class="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+      ${escapeHtml(text)}
+    </div>`;
+    list.appendChild(wrap);
+    list.scrollTop = list.scrollHeight;
+  }
+
+  window.EIMEChatRail = { init, sendMessage, appendMessage, appendSystemNarration };
 })();

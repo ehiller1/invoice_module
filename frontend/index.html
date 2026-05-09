@@ -123,6 +123,10 @@ EIMEShell.mount({
   activeNav: 'invoices',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'invoices',
+      payload: { church_id: currentChurch, job_id: null }
+    });
     loadChurches();
     setupUploadHandlers();
   }
@@ -134,7 +138,13 @@ async function loadChurches() {
     const churches = await res.json();
     const select = document.getElementById('church-selector');
     select.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name}</option>`).join('');
-    select.addEventListener('change', (e) => currentChurch = e.target.value);
+    select.addEventListener('change', (e) => {
+      currentChurch = e.target.value;
+      window.eime.setContext({
+        page: 'invoices',
+        payload: { church_id: currentChurch, job_id: currentJobId }
+      });
+    });
   } catch (e) {
     console.error('Failed to load churches:', e);
   }
@@ -195,6 +205,11 @@ async function uploadInvoice() {
     const job = await res.json();
     currentJobId = job.job_id;
 
+    window.eime.setContext({
+      page: 'invoices',
+      payload: { church_id: currentChurch, job_id: currentJobId }
+    });
+
     document.getElementById('pipeline-panel').classList.remove('hidden');
     initPipelineSteps();
     pollJobStatus();
@@ -223,6 +238,17 @@ function initPipelineSteps() {
 }
 
 async function pollJobStatus() {
+  let lastStep = null;
+
+  const stepNarration = {
+    EXTRACTING: '📄 Extracting invoice data from PDF...',
+    CLASSIFYING: '🏷️ Classifying line items...',
+    MAPPING: '📊 Mapping to general ledger accounts...',
+    BUDGETING: '💰 Checking budget impact and fund restrictions...',
+    RISK_ASSESSMENT: '⚠️ Assessing risk signals...',
+    EMITTING: '📝 Generating journal entry draft...',
+  };
+
   const updateStep = (step, status, color) => {
     const item = document.querySelector(`[data-step="${step}"]`);
     if (item) {
@@ -236,12 +262,29 @@ async function pollJobStatus() {
       const res = await fetch(`${API}/api/jobs/${currentJobId}`);
       const job = await res.json();
 
+      // On step transition, emit narration to chat rail (FR-01.3)
+      if (job.current_step && job.current_step !== lastStep) {
+        lastStep = job.current_step;
+        if (stepNarration[job.current_step] && window.EIMEChatRail) {
+          window.EIMEChatRail.appendSystemNarration(stepNarration[job.current_step]);
+        }
+      }
+
+      // Update context with current step so chat knows progress
+      window.eime.setContext({
+        page: 'invoices',
+        payload: { church_id: currentChurch, job_id: currentJobId, step: job.current_step }
+      });
+
       updateStep(job.current_step, 'In Progress', 'text-blue-600');
 
       if (job.status === 'COMPLETED') {
         updateStep(job.current_step, 'Complete', 'text-green-600');
         document.getElementById('pipeline-status-badge').textContent = 'Complete';
         document.getElementById('pipeline-status-badge').className = 'pill bg-green-100 text-green-800';
+        if (window.EIMEChatRail) {
+          window.EIMEChatRail.appendSystemNarration('✅ Invoice processing complete. Ready for review.');
+        }
         showResults(job);
         return;
       }
@@ -250,6 +293,9 @@ async function pollJobStatus() {
         updateStep(job.current_step, 'Failed', 'text-red-600');
         document.getElementById('pipeline-status-badge').textContent = 'Failed';
         document.getElementById('pipeline-status-badge').className = 'pill bg-red-100 text-red-800';
+        if (window.EIMEChatRail) {
+          window.EIMEChatRail.appendSystemNarration('❌ Processing failed. Please check the error logs.');
+        }
         return;
       }
 

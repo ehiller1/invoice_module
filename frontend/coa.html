@@ -29,18 +29,22 @@
   <h1 class="text-3xl font-bold text-slate-900 mb-2">Chart of Accounts</h1>
   <p class="text-slate-600 mb-6">Episcopal church GL structure with fund restrictions and semantic search</p>
 
-  <div class="grid grid-cols-3 gap-4 mb-8">
+  <div class="grid grid-cols-4 gap-4 mb-8">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
       <p class="text-xs text-slate-500 font-semibold uppercase">Total Accounts</p>
       <p class="text-3xl font-bold text-slate-900" id="total-accounts">73</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Funds</p>
-      <p class="text-3xl font-bold text-slate-900" id="total-funds">6</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">Unrestricted</p>
+      <p class="text-3xl font-bold text-emerald-600" id="unrestricted-count">61</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Restricted</p>
-      <p class="text-3xl font-bold text-orange-600" id="restricted-count">12</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">Temp. Restricted</p>
+      <p class="text-3xl font-bold text-amber-600" id="temp-restricted-count">8</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Perm. Restricted</p>
+      <p class="text-3xl font-bold text-rose-600" id="perm-restricted-count">4</p>
     </div>
   </div>
 
@@ -55,8 +59,13 @@
   </div>
 
   <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-200">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
       <h2 class="text-lg font-semibold text-slate-900">GL Accounts</h2>
+      <div class="flex gap-2">
+        <button onclick="setViewMode('grouped')" id="btn-grouped" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-navy-900 text-white">Grouped by Fund</button>
+        <button onclick="setViewMode('flat')" id="btn-flat" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">Flat List</button>
+        <button onclick="showAddAccountModal()" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">+ Add Account</button>
+      </div>
     </div>
     <div id="coa-list" class="divide-y divide-slate-200"></div>
   </div>
@@ -66,7 +75,56 @@
     <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
       <h2 class="text-2xl font-bold text-slate-900 mb-4" id="modal-account-code">GL Account</h2>
       <div id="modal-account-content" class="space-y-4 mb-6"></div>
-      <button onclick="closeAccountModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+      <div class="flex gap-2">
+        <button onclick="closeAccountModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+        <button onclick="editCurrentAccount()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Edit</button>
+        <button onclick="deleteCurrentAccount()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Account Modal -->
+  <div id="account-edit-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4" id="edit-modal-title">New Account</h2>
+      <div class="space-y-4 mb-6">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Account Number</label>
+          <input type="text" id="edit-account-number" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="e.g., 1000" />
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Account Name</label>
+          <input type="text" id="edit-account-name" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="e.g., Checking Account" />
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Type</label>
+          <select id="edit-account-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+            <option value="">Select Type</option>
+            <option value="Asset">Asset</option>
+            <option value="Liability">Liability</option>
+            <option value="Equity">Equity</option>
+            <option value="Revenue">Revenue</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Fund</label>
+          <select id="edit-account-fund" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+            <option value="">General Fund</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Status</label>
+          <select id="edit-account-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeEditModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+        <button onclick="saveAccount()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -75,25 +133,147 @@
 <script>
 const API = 'http://localhost:8000';
 let allAccounts = [];
+let allFunds = [];
+let currentViewMode = 'grouped';
 
 EIMEShell.mount({
   activeNav: 'settings',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'settings-coa',
+      payload: { church_id: 'holy_comforter' }
+    });
     loadCOA();
   }
 });
+
+function getAccountTypePill(type) {
+  const pills = {
+    'Asset': 'bg-blue-100 text-blue-800',
+    'Liability': 'bg-red-100 text-red-800',
+    'Equity': 'bg-purple-100 text-purple-800',
+    'Revenue': 'bg-emerald-100 text-emerald-800',
+    'Expense': 'bg-amber-100 text-amber-800',
+  };
+  const classes = pills[type] || 'bg-slate-100 text-slate-800';
+  return `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${classes}">${type || 'Other'}</span>`;
+}
+
+function computeRestrictionCounts(accounts) {
+  let unrestricted = 0, tempRestricted = 0, permRestricted = 0;
+  (accounts || []).forEach(a => {
+    if (!a.fund_restriction) unrestricted++;
+    else if (a.fund_restriction.toLowerCase().includes('permanent')) permRestricted++;
+    else tempRestricted++;
+  });
+  return { unrestricted, tempRestricted, permRestricted };
+}
+
+let currentEditingAccount = null;
+
+function showAddAccountModal() {
+  currentEditingAccount = null;
+  document.getElementById('edit-modal-title').textContent = 'New Account';
+  document.getElementById('edit-account-number').value = '';
+  document.getElementById('edit-account-name').value = '';
+  document.getElementById('edit-account-type').value = '';
+  document.getElementById('edit-account-status').value = 'active';
+  populateFundSelect();
+  document.getElementById('account-edit-modal').classList.remove('hidden');
+}
+
+function populateFundSelect() {
+  const select = document.getElementById('edit-account-fund');
+  select.innerHTML = allFunds.map(f => `<option value="${f.fund_id}">${f.name}</option>`).join('');
+  if (allFunds.length === 0) select.innerHTML = '<option value="">General Fund</option>';
+}
+
+function editCurrentAccount() {
+  if (!currentEditingAccount) return;
+  document.getElementById('edit-modal-title').textContent = 'Edit Account';
+  document.getElementById('edit-account-number').value = currentEditingAccount.account_number || '';
+  document.getElementById('edit-account-name').value = currentEditingAccount.name || '';
+  document.getElementById('edit-account-type').value = currentEditingAccount.account_type || '';
+  document.getElementById('edit-account-status').value = currentEditingAccount.status || 'active';
+  populateFundSelect();
+  document.getElementById('edit-account-fund').value = currentEditingAccount.fund_id || '';
+  closeAccountModal();
+  document.getElementById('account-edit-modal').classList.remove('hidden');
+}
+
+async function saveAccount() {
+  const churchId = 'holy_comforter';
+  const accountNum = document.getElementById('edit-account-number').value.trim();
+  const name = document.getElementById('edit-account-name').value.trim();
+  const type = document.getElementById('edit-account-type').value;
+  const fundId = document.getElementById('edit-account-fund').value || null;
+  const status = document.getElementById('edit-account-status').value;
+
+  if (!accountNum || !name || !type) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  const payload = {
+    account_number: accountNum,
+    name,
+    account_type: type,
+    fund_id: fundId,
+    status
+  };
+
+  try {
+    const res = await fetch(`${API}/api/churches/${churchId}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Account saved successfully');
+    closeEditModal();
+    loadCOA();
+  } catch (e) {
+    alert('Error saving account: ' + e.message);
+  }
+}
+
+async function deleteCurrentAccount() {
+  if (!currentEditingAccount) return;
+  if (!confirm(`Delete account ${currentEditingAccount.account_number}? This cannot be undone.`)) return;
+
+  const churchId = 'holy_comforter';
+  try {
+    const res = await fetch(`${API}/api/churches/${churchId}/accounts/${currentEditingAccount.account_number}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Account deleted successfully');
+    closeAccountModal();
+    loadCOA();
+  } catch (e) {
+    alert('Error deleting account: ' + e.message);
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('account-edit-modal').classList.add('hidden');
+  currentEditingAccount = null;
+}
 
 async function loadCOA() {
   try {
     const res = await fetch(`${API}/api/coa?church_id=holy_comforter`);
     const data = await res.json();
     allAccounts = data.accounts || [];
-    
+    allFunds = data.funds || [];
+
+    const counts = computeRestrictionCounts(allAccounts);
     document.getElementById('total-accounts').textContent = allAccounts.length;
-    document.getElementById('total-funds').textContent = data.funds?.length || 6;
-    document.getElementById('restricted-count').textContent = allAccounts.filter(a => a.fund_restriction).length;
-    
+    document.getElementById('unrestricted-count').textContent = counts.unrestricted;
+    document.getElementById('temp-restricted-count').textContent = counts.tempRestricted;
+    document.getElementById('perm-restricted-count').textContent = counts.permRestricted;
+
     renderAccounts(allAccounts);
   } catch (e) {
     console.error('Error loading COA:', e);
@@ -106,7 +286,7 @@ async function searchCOA() {
     renderAccounts(allAccounts);
     return;
   }
-  
+
   try {
     const res = await fetch(`${API}/api/coa/search?q=${encodeURIComponent(query)}&church_id=holy_comforter`);
     const results = await res.json();
@@ -116,17 +296,37 @@ async function searchCOA() {
   }
 }
 
+function setViewMode(mode) {
+  currentViewMode = mode;
+  document.getElementById('btn-grouped').classList.toggle('bg-navy-900 text-white', mode === 'grouped');
+  document.getElementById('btn-grouped').classList.toggle('border border-slate-200 text-slate-700 bg-white hover:bg-slate-50', mode !== 'grouped');
+  document.getElementById('btn-flat').classList.toggle('bg-navy-900 text-white', mode === 'flat');
+  document.getElementById('btn-flat').classList.toggle('border border-slate-200 text-slate-700 bg-white hover:bg-slate-50', mode !== 'flat');
+  renderAccounts(allAccounts);
+}
+
 function renderAccounts(accounts) {
+  if (currentViewMode === 'grouped') {
+    renderGroupedAccounts(accounts);
+  } else {
+    renderFlatAccounts(accounts);
+  }
+}
+
+function renderFlatAccounts(accounts) {
   const list = document.getElementById('coa-list');
   list.innerHTML = (accounts || []).map(acc => `
     <div class="px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAccount('${acc.gl_code}')">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="font-medium text-slate-900">${acc.gl_code}</p>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1">
+            <p class="font-medium text-slate-900">${acc.gl_code}</p>
+            ${getAccountTypePill(acc.account_type)}
+          </div>
           <p class="text-sm text-slate-600">${acc.gl_name || 'Unknown'}</p>
-          ${acc.fund_restriction ? `<p class="text-xs text-orange-600 mt-1">🔒 Restricted: ${acc.fund_restriction}</p>` : ''}
+          ${acc.fund_restriction ? `<p class="text-xs text-orange-600 mt-1">🔒 ${acc.fund_restriction}</p>` : ''}
         </div>
-        <div class="text-right">
+        <div class="text-right flex-shrink-0">
           <span class="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800">${acc.fund || 'General'}</span>
         </div>
       </div>
@@ -134,10 +334,85 @@ function renderAccounts(accounts) {
   `).join('');
 }
 
+function renderGroupedAccounts(accounts) {
+  // Group accounts by fund
+  const byFund = new Map();
+  (accounts || []).forEach(acc => {
+    const fundId = acc.fund || 'GENERAL';
+    if (!byFund.has(fundId)) byFund.set(fundId, []);
+    byFund.get(fundId).push(acc);
+  });
+
+  const list = document.getElementById('coa-list');
+  let html = '';
+
+  // Find fund details from allFunds if available
+  const fundDetails = {};
+  (allFunds || []).forEach(f => { fundDetails[f.fund_id] = f; });
+
+  // Render each fund as a collapsible section
+  Array.from(byFund.entries()).forEach(([fundId, fundAccounts]) => {
+    const fund = fundDetails[fundId] || {};
+    const fundName = fund.fund_name || fundId;
+    const fundType = fund.restriction_type || 'Unrestricted';
+    const fundTypeColor = fundType.includes('Permanent') ? 'bg-rose-100 text-rose-800' : fundType.includes('Temporary') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+
+    html += `
+      <div class="border-b border-slate-200 last:border-0">
+        <div class="px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="toggleFundSection('${fundId}')">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3 flex-1">
+              <svg class="w-5 h-5 text-slate-400 fund-toggle-icon" id="toggle-${fundId}" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="transform: rotate(-90deg);">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+              </svg>
+              <div>
+                <p class="font-semibold text-slate-900">${fundName}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${fundAccounts.length} accounts</p>
+              </div>
+            </div>
+            <span class="px-2 py-1 rounded text-xs font-medium ${fundTypeColor}">${fundType}</span>
+          </div>
+        </div>
+        <div class="fund-accounts-${fundId} hidden bg-slate-50">
+          ${fundAccounts.map(acc => `
+            <div class="px-6 py-3 border-t border-slate-200 hover:bg-slate-100 cursor-pointer transition-colors" onclick="showAccount('${acc.gl_code}')">
+              <div class="flex items-center justify-between gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <p class="font-medium text-slate-800 text-sm">${acc.gl_code}</p>
+                    ${getAccountTypePill(acc.account_type)}
+                  </div>
+                  <p class="text-xs text-slate-600">${acc.gl_name || 'Unknown'}</p>
+                </div>
+                ${acc.fund_restriction ? `<span class="text-xs text-orange-600 flex-shrink-0">🔒</span>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  list.innerHTML = html;
+}
+
+function toggleFundSection(fundId) {
+  const section = document.querySelector(`.fund-accounts-${fundId}`);
+  const icon = document.querySelector(`#toggle-${fundId}`);
+  if (section) {
+    section.classList.toggle('hidden');
+    if (icon) {
+      icon.style.transform = section.classList.contains('hidden') ? 'rotate(-90deg)' : 'rotate(0deg)';
+    }
+  }
+}
+
 async function showAccount(glCode) {
   const acc = allAccounts.find(a => a.gl_code === glCode);
   if (!acc) return;
-  
+
+  currentEditingAccount = acc;
+
   document.getElementById('modal-account-code').textContent = `${glCode} — ${acc.gl_name}`;
   document.getElementById('modal-account-content').innerHTML = `
     <div class="space-y-3">
@@ -163,7 +438,7 @@ async function showAccount(glCode) {
       ` : ''}
     </div>
   `;
-  
+
   document.getElementById('account-modal').classList.remove('hidden');
 }
 

@@ -61,6 +61,11 @@
   let activeTab = 'PENDING_APPROVAL';
   let allPayments = [];
 
+  window.eime.setContext({
+    page: 'payments',
+    payload: { church_id: 'holy_comforter' }
+  });
+
   async function loadPayments() {
     const churchId = (window.EIMEBus && EIMEBus.getChurch && EIMEBus.getChurch()) || 'default';
     try {

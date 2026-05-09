@@ -49,9 +49,13 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-shell.js"></script>
+  <script src="/eime-chat-rail.js"></script>
 </head>
 <body class="h-full bg-slate-50 font-sans">
 
+<template id="page-center-content">
 <div class="min-h-screen flex items-center justify-center py-8 px-4">
   <div class="w-full max-w-3xl">
 
@@ -102,6 +106,7 @@
 
   </div>
 </div>
+</template>
 
 <script>
 const API = window.location.origin.includes('8001') ? '' : 'http://localhost:8000';
@@ -985,19 +990,25 @@ window.handleNext_9 = async () => {
 };
 
 // ----- Init -----
-(async () => {
-  // If already complete, jump straight to dashboard
+function initWizard() {
+  // Check setup status but allow wizard to run regardless
   try {
-    const res = await fetch(API + '/api/setup/status');
-    if (res.ok) {
-      const d = await res.json();
-      if (d.setup_complete) {
-        // user manually visited wizard, but setup done — let them re-run anyway
-      }
-    }
+    fetch(API + '/api/setup/status').catch(() => {});
   } catch {}
   render();
-})();
+}
+
+EIMEShell.mount({
+  activeNav: 'settings',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'setup-wizard',
+      payload: {}
+    });
+    initWizard();
+  }
+});
 </script>
 </body>
 </html>

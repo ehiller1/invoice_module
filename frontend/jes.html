@@ -31,6 +31,53 @@
 
   <div id="je-list" class="space-y-3"></div>
   <div id="csv-result" class="mt-4"></div>
+
+  <!-- Create Recurring Schedule Button (shown only on RECURRING tab) -->
+  <div id="recurring-header" class="hidden mt-4 flex justify-end">
+    <button onclick="showCreateRecurringModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">+ Create Recurring Schedule</button>
+  </div>
+</div>
+
+<!-- Create Recurring Schedule Modal -->
+<div id="create-recurring-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-4">Create Recurring Schedule</h2>
+    <div class="space-y-4 mb-6">
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Description/Memo</label>
+        <input type="text" id="rec-memo" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="e.g., Monthly rent payment" />
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Debit Account</label>
+          <input type="text" id="rec-debit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="GL code" />
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Credit Account</label>
+          <input type="text" id="rec-credit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="GL code" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Amount</label>
+          <input type="number" id="rec-amount" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="0.00" step="0.01" />
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Fund (optional)</label>
+          <input type="text" id="rec-fund" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="fund_id" />
+        </div>
+      </div>
+      <div>
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Cron Schedule</label>
+        <input type="text" id="rec-cron" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="e.g., 0 2 1 * * (2 AM on 1st of month)" value="0 2 1 * *" />
+        <p class="text-xs text-slate-500 mt-1">5-field cron: minute hour day month dayofweek</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="closeCreateRecurringModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+      <button onclick="saveRecurringSchedule()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create</button>
+    </div>
+  </div>
 </div>
 
 <!-- FR-NF: ACS confirmation gate modal -->
@@ -67,6 +114,10 @@ EIMEShell.mount({
   activeNav: 'jobs',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'jes',
+      payload: { church_id: currentChurch, state: 'DRAFT' }
+    });
     setupTabs();
   }
 });
@@ -78,6 +129,10 @@ function setupTabs() {
       document.querySelectorAll('.je-tab').forEach(t => t.classList.remove('border-blue-500', 'text-blue-600'));
       tab.classList.add('border-blue-500', 'text-blue-600');
       const state = tab.dataset.state;
+      window.eime.setContext({
+        page: 'jes',
+        payload: { church_id: currentChurch, state: state }
+      });
       if (state === 'RECURRING') {
         loadRecurring();
       } else {
@@ -129,6 +184,8 @@ function setupCsvImport() {
 
 async function loadRecurring() {
   const list = document.getElementById('je-list');
+  const header = document.getElementById('recurring-header');
+  header.classList.remove('hidden');
   list.innerHTML = '<div class="text-gray-500">Loading recurring schedules...</div>';
   try {
     const url = `/api/jes/recurring?church_id=${encodeURIComponent(currentChurch)}`;
@@ -235,7 +292,10 @@ function renderJeCard(je, state) {
     actions.push({ label: 'Approve to Post', toState: 'APPROVED', role: currentRole });
     actions.push({ label: 'Reject', toState: 'REJECTED', role: currentRole });
   }
-  if (state === 'APPROVED') actions.push({ label: 'Post to ACS Realm', toState: 'POSTED', role: currentRole, isPost: true });
+  if (state === 'APPROVED') {
+    actions.push({ label: 'Create Payment', toState: null, role: currentRole, isPayment: true });
+    actions.push({ label: 'Post to ACS Realm', toState: 'POSTED', role: currentRole, isPost: true });
+  }
 
   const memoText = je.description || je.memo || 'Journal Entry';
 
@@ -261,7 +321,7 @@ function renderJeCard(je, state) {
         ${lines.length > 3 ? `<div class="text-gray-400">+${lines.length - 3} more lines</div>` : ''}
       </div>
       <div class="mt-3 flex gap-2">
-        ${actions.map(a => `<button class="je-action px-3 py-1 text-sm rounded ${a.isPost ? 'bg-green-600 text-white' : 'bg-blue-100 text-blue-700'}" data-je="${je.entry_id}" data-state="${a.toState}" data-ispost="${a.isPost || false}">${a.label}</button>`).join('')}
+        ${actions.map(a => `<button class="je-action px-3 py-1 text-sm rounded ${a.isPost ? 'bg-green-600 text-white' : a.isPayment ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}" data-je="${je.entry_id}" data-state="${a.toState}" data-ispost="${a.isPost || false}" data-ispayment="${a.isPayment || false}">${a.label}</button>`).join('')}
       </div>
     </div>
   `;
@@ -313,6 +373,29 @@ document.addEventListener('click', async (e) => {
   const jeId = e.target.dataset.je;
   const toState = e.target.dataset.state;
   const isPost = e.target.dataset.ispost === 'true';
+  const isPayment = e.target.dataset.ispayment === 'true';
+
+  if (isPayment) {
+    e.target.disabled = true;
+    e.target.textContent = 'Creating...';
+    try {
+      const res = await fetch(`/api/jes/${encodeURIComponent(jeId)}/payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ je_id: jeId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Payment creation failed');
+      alert(`Payment created: ${data.payment_id}`);
+      document.querySelector('.je-tab.border-blue-500').click();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      e.target.disabled = false;
+      e.target.textContent = 'Create Payment';
+    }
+    return;
+  }
 
   if (isPost) {
     // FR-NF: ACS confirmation gate — explicit modal with checkbox attestation.
@@ -353,6 +436,61 @@ document.addEventListener('click', async (e) => {
     }
   }
 });
+
+function showCreateRecurringModal() {
+  document.getElementById('rec-memo').value = '';
+  document.getElementById('rec-debit').value = '';
+  document.getElementById('rec-credit').value = '';
+  document.getElementById('rec-amount').value = '';
+  document.getElementById('rec-fund').value = '';
+  document.getElementById('rec-cron').value = '0 2 1 * *';
+  document.getElementById('create-recurring-modal').classList.remove('hidden');
+}
+
+function closeCreateRecurringModal() {
+  document.getElementById('create-recurring-modal').classList.add('hidden');
+}
+
+async function saveRecurringSchedule() {
+  const memo = document.getElementById('rec-memo').value.trim();
+  const debit = document.getElementById('rec-debit').value.trim();
+  const credit = document.getElementById('rec-credit').value.trim();
+  const amount = parseFloat(document.getElementById('rec-amount').value);
+  const fund = document.getElementById('rec-fund').value.trim() || null;
+  const cron = document.getElementById('rec-cron').value.trim();
+
+  if (!memo || !debit || !credit || !amount || !cron) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  const payload = {
+    description: memo,
+    memo,
+    schedule_cron: cron,
+    template_je: {
+      description: memo,
+      debit_account: debit,
+      credit_account: credit,
+      amount,
+      fund_id: fund
+    }
+  };
+
+  try {
+    const res = await fetch(`/api/jes/recurring?church_id=${encodeURIComponent(currentChurch)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Recurring schedule created');
+    closeCreateRecurringModal();
+    loadRecurring();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
 </script>
 
 </body>

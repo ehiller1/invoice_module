@@ -61,6 +61,21 @@
     </div>
   </div>
 
+  <!-- Bank Statement Upload Zone -->
+  <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
+    <h2 class="text-lg font-semibold text-slate-900 mb-3">Upload Bank Statement</h2>
+    <p class="text-sm text-slate-600 mb-4">Upload a CSV, OFX, or QFX statement to reconcile against your transactions</p>
+    <div id="statement-upload-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-navy-600 hover:bg-slate-50 transition-all cursor-pointer" onclick="document.getElementById('statement-file-input').click()">
+      <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="text-slate-600 font-medium text-sm">Drop statement file here or click to browse</p>
+      <p class="text-slate-400 text-xs mt-1">CSV, OFX, or QFX • Max 10 MB</p>
+      <input type="file" id="statement-file-input" accept=".csv,.ofx,.qfx" class="hidden" onchange="uploadStatement()" />
+    </div>
+    <div id="upload-status" class="hidden mt-3 text-sm"></div>
+  </div>
+
   <!-- Status Cards -->
   <div class="grid grid-cols-4 gap-4 mb-6">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
@@ -78,6 +93,30 @@
     <div class="bg-white border border-slate-200 rounded-lg p-4">
       <p class="text-xs text-slate-500 font-semibold uppercase">Variance</p>
       <p class="text-3xl font-bold text-slate-900" id="variance">$0</p>
+    </div>
+  </div>
+
+  <!-- Reconciliation Summary -->
+  <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Opening Balance</p>
+      <p class="text-2xl font-bold text-slate-900" id="opening-balance">$0.00</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Deposits</p>
+      <p class="text-2xl font-bold text-emerald-600" id="total-deposits">$0.00</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Disbursements</p>
+      <p class="text-2xl font-bold text-rose-600" id="total-disbursements">$0.00</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Closing Balance</p>
+      <p class="text-2xl font-bold text-slate-900" id="closing-balance">$0.00</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <p class="text-xs text-slate-500 font-semibold uppercase">Net Variance</p>
+      <p class="text-2xl font-bold text-slate-900" id="net-variance">$0.00</p>
     </div>
   </div>
 
@@ -119,6 +158,10 @@ EIMEShell.mount({
   activeNav: 'reconciliation',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'reconciliation',
+      payload: { church_id: 'holy_comforter', account_id: null }
+    });
     setDefaultDates();
     loadAccounts();
   }
@@ -159,6 +202,12 @@ async function loadAccounts() {
 async function loadTransactions() {
   const accountId = document.getElementById('account-select').value;
   if (!accountId) return;
+
+  window.eime.setContext({
+    page: 'reconciliation',
+    payload: { church_id: 'holy_comforter', account_id: accountId }
+  });
+
   try {
     const start = document.getElementById('period-start').value;
     const end = document.getElementById('period-end').value;
@@ -176,12 +225,32 @@ async function loadTransactions() {
 function updateCounts() {
   const matched = allTransactions.filter(t => t.matched).length;
   const exceptions = allTransactions.filter(t => !t.matched).length;
-  const variance = allTransactions.reduce((sum, t) => sum + (t.variance || 0), 0);
-  
+
+  // Calculate reconciliation summary
+  let openingBalance = 0;
+  let deposits = 0;
+  let disbursements = 0;
+  let closingBalance = 0;
+
+  allTransactions.forEach(t => {
+    if (t.opening_balance) openingBalance = t.opening_balance;
+    if (t.closing_balance) closingBalance = t.closing_balance;
+    if (t.amount > 0) deposits += t.amount;
+    else disbursements += Math.abs(t.amount);
+  });
+
+  const netVariance = closingBalance - (openingBalance + deposits - disbursements);
+
   document.getElementById('count-total').textContent = allTransactions.length;
   document.getElementById('count-matched').textContent = matched;
   document.getElementById('count-exceptions').textContent = exceptions;
-  document.getElementById('variance').textContent = `$${variance.toFixed(2)}`;
+  document.getElementById('variance').textContent = `$${Math.abs(netVariance).toFixed(2)}`;
+
+  document.getElementById('opening-balance').textContent = `$${openingBalance.toFixed(2)}`;
+  document.getElementById('total-deposits').textContent = `$${deposits.toFixed(2)}`;
+  document.getElementById('total-disbursements').textContent = `$${disbursements.toFixed(2)}`;
+  document.getElementById('closing-balance').textContent = `$${closingBalance.toFixed(2)}`;
+  document.getElementById('net-variance').textContent = `$${netVariance.toFixed(2)}`;
 }
 
 function renderTransactions() {
@@ -234,8 +303,85 @@ async function syncPlaid() {
 }
 
 async function autoMatch() {
-  alert('Auto-match will compare bank transactions to journal entries using exact match + fuzzy match (amount within $0.01, date within 3 days). This will take a moment...');
-  // Implementation pending API endpoint
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Matching...';
+  btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+  try {
+    const accountId = document.getElementById('account-select').value;
+    if (!accountId) {
+      alert('Please select a bank account first.');
+      return;
+    }
+
+    const res = await fetch(`${API}/api/churches/holy_comforter/plaid/auto-match?account_id=${accountId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!res.ok) {
+      // Backend not yet implemented — show coming soon message
+      btn.textContent = 'Auto-Match (Coming Soon)';
+      btn.disabled = true;
+      alert('Auto-match is coming soon. We\'ll compare bank transactions to journal entries using fuzzy matching (amount within $0.01, date within 3 days).');
+      return;
+    }
+
+    const data = await res.json();
+    alert(`Auto-match complete: ${data.matched} transactions matched, ${data.exceptions} exceptions.`);
+    await loadTransactions();
+  } catch (e) {
+    // Backend not yet implemented
+    btn.textContent = 'Auto-Match (Coming Soon)';
+    btn.disabled = true;
+    console.warn('Auto-match not yet available:', e.message);
+  }
+}
+
+async function uploadStatement() {
+  const fileInput = document.getElementById('statement-file-input');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const accountId = document.getElementById('account-select').value;
+  if (!accountId) {
+    alert('Please select a bank account first.');
+    return;
+  }
+
+  const status = document.getElementById('upload-status');
+  status.classList.remove('hidden');
+  status.className = 'mt-3 text-sm text-slate-600';
+  status.innerHTML = `<p>📤 Uploading ${file.name}...</p>`;
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('account_id', accountId);
+
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/bank-statements/upload`, {
+      method: 'POST',
+      body: fd
+    });
+
+    if (!res.ok) {
+      // Backend not yet implemented
+      status.className = 'mt-3 text-sm text-amber-600';
+      status.innerHTML = `<p>⚠️ Bank statement parser coming soon. We'll auto-ingest CSV/OFX/QFX files.</p>`;
+      return;
+    }
+
+    const data = await res.json();
+    status.className = 'mt-3 text-sm text-emerald-600';
+    status.innerHTML = `<p>✅ ${data.transactions_parsed || 0} transactions parsed from statement</p>`;
+    await loadTransactions();
+  } catch (e) {
+    // Backend not yet implemented
+    status.className = 'mt-3 text-sm text-amber-600';
+    status.innerHTML = `<p>⚠️ Bank statement upload feature coming soon (bank_statement_parser.py backend integration)</p>`;
+    console.warn('Bank statement upload not yet available:', e.message);
+  }
 }
 
 function showException(txnId) {

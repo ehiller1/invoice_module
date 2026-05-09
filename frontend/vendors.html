@@ -138,9 +138,13 @@ let allVendors = [];
 let editingVendorId = null;
 
 EIMEShell.mount({
-  activeNav: 'settings',
+  activeNav: 'vendors',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'vendors',
+      payload: { church_id: 'holy_comforter' }
+    });
     loadVendors();
     setupForm();
   }

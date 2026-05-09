@@ -127,9 +127,9 @@ async function bootstrap() {
     document.getElementById('kb-title').textContent =
       `Knowledge Base — ${churches[0].church_name || activeChurch}`;
     // Tell the chat rail which church we're focused on
-    if (window.eime && window.eime.dispatchAction) {
-      window.eime.dispatchAction('SET_CONTEXT', {
-        page: 'kb', payload: { church_id: activeChurch },
+    if (window.eime && window.eime.setContext) {
+      window.eime.setContext({
+        page: 'knowledge-base', payload: { church_id: activeChurch },
       });
     }
     if (window.eime && window.eime.setActiveChurch) {
@@ -143,6 +143,11 @@ async function bootstrap() {
     const opt = sel.options[sel.selectedIndex];
     document.getElementById('kb-title').textContent =
       `Knowledge Base — ${opt.textContent}`;
+    if (window.eime && window.eime.setContext) {
+      window.eime.setContext({
+        page: 'knowledge-base', payload: { church_id: activeChurch },
+      });
+    }
     if (window.eime && window.eime.setActiveChurch) {
       window.eime.setActiveChurch(activeChurch);
     }

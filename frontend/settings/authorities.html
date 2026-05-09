@@ -113,12 +113,20 @@ async function init() {
   if (churches.length) {
     activeChurch = churches[0].church_id;
     sel.value = activeChurch;
+    window.eime.setContext({
+      page: 'settings-authorities',
+      payload: { church_id: activeChurch }
+    });
     await load();
   }
 }
 
 async function switchChurch() {
   activeChurch = document.getElementById('church-selector').value;
+  window.eime.setContext({
+    page: 'settings-authorities',
+    payload: { church_id: activeChurch }
+  });
   await load();
 }
 

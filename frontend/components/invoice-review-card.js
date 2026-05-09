@@ -250,6 +250,41 @@
     `;
   }
 
+  /**
+   * Compute overall card status for summary banner
+   * Returns {status: 'OK'|'WARNING'|'OVER', label: string, color: string}
+   */
+  function computeCardStatus(jobData) {
+    const checks = jobData.budget_check || [];
+    let maxStatus = 'OK';
+    for (const c of checks) {
+      if (c.status === 'OVER_BUDGET') {
+        maxStatus = 'OVER';
+        break;
+      }
+      if (c.status === 'WARNING' && maxStatus !== 'OVER') {
+        maxStatus = 'WARNING';
+      }
+    }
+    const labels = {
+      'OK': { label: '✅ Ready to approve', color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+      'WARNING': { label: '⚠️ Budget approaching limits', color: 'bg-amber-50 border-amber-200 text-amber-800' },
+      'OVER': { label: '❌ Over budget', color: 'bg-rose-50 border-rose-200 text-rose-800' },
+    };
+    return labels[maxStatus];
+  }
+
+  function summaryBannerHtml(jobData) {
+    const status = computeCardStatus(jobData);
+    return `
+      <div class="px-6 py-4 border-b border-slate-200 bg-white">
+        <div class="rounded-lg border ${status.color} px-4 py-3 text-sm font-medium">
+          ${status.label}
+        </div>
+      </div>
+    `;
+  }
+
   function render(jobData, opts) {
     opts = opts || {};
     const containerId = opts.containerId || 'invoice-review-container';
@@ -264,12 +299,14 @@
     }
 
     const inv = jobData.invoice_document || {};
+    // Render with reordered sections (FR-04): Summary → Budget → GL → Items → Actions
     container.innerHTML = `
       <article class="invoice-review-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         ${headerHtml(inv)}
-        ${extractedSummaryHtml(inv.line_items)}
-        ${proposedGlHtml(jobData)}
+        ${summaryBannerHtml(jobData)}
         ${budgetImpactHtml(jobData)}
+        ${proposedGlHtml(jobData)}
+        ${extractedSummaryHtml(inv.line_items)}
         ${actionBarHtml()}
       </article>
     `;

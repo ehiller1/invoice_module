@@ -69,6 +69,15 @@
       console.warn('EIMEShell: EIMEChatRail not loaded');
     }
 
+    // Subscribe to NAVIGATE action for chat-driven page navigation (FR-10.2)
+    if (window.eime && typeof window.eime.subscribeAction === 'function') {
+      window.eime.subscribeAction('NAVIGATE', (payload) => {
+        if (payload && payload.url) {
+          window.location.href = payload.url;
+        }
+      });
+    }
+
     // Load church for the badge
     loadChurchBadge();
 

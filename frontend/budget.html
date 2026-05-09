@@ -26,8 +26,16 @@
 
 <template id="page-center-content">
 <div class="max-w-7xl mx-auto p-6">
-  <h1 class="text-3xl font-bold text-slate-900 mb-2">Budget Tracking</h1>
-  <p class="text-slate-600 mb-6">Monitor GL lines, track spending, and project year-end positions</p>
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 mb-2">Budget Tracking</h1>
+      <p class="text-slate-600">Monitor GL lines, track spending, and project year-end positions</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="showImportModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">📥 Import Budget</button>
+      <button onclick="showAdminMenu()" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">⚙️ Admin</button>
+    </div>
+  </div>
 
   <div class="grid grid-cols-3 gap-4 mb-8">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
@@ -57,6 +65,49 @@
       <button onclick="closeLineModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
     </div>
   </div>
+
+  <!-- Import Budget Modal -->
+  <div id="import-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4">Import Budget</h2>
+      <div class="mb-6">
+        <p class="text-sm text-slate-600 mb-4">Upload a CSV or Excel file with GL code, GL name, and annual budget columns</p>
+        <div id="budget-upload-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-navy-600 hover:bg-slate-50 transition-all cursor-pointer" onclick="document.getElementById('budget-file-input').click()">
+          <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <p class="text-slate-600 font-medium text-sm">Drop file here or click to browse</p>
+          <p class="text-slate-400 text-xs mt-1">CSV or XLSX • Max 10 MB</p>
+          <input type="file" id="budget-file-input" accept=".csv,.xlsx,.xls" class="hidden" onchange="importBudget()" />
+        </div>
+        <div id="import-status" class="hidden mt-3 text-sm"></div>
+      </div>
+      <button onclick="closeImportModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+    </div>
+  </div>
+
+  <!-- Admin Menu Modal -->
+  <div id="admin-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+      <h2 class="text-2xl font-bold text-slate-900 mb-4">Budget Administration</h2>
+      <div class="space-y-3 mb-6">
+        <button onclick="resetYTD()" class="w-full px-4 py-3 bg-amber-100 text-amber-900 rounded-lg hover:bg-amber-200 text-left font-medium">
+          Reset YTD Actuals to Zero
+        </button>
+        <button onclick="yearEndRollover()" class="w-full px-4 py-3 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 text-left font-medium">
+          Year-End Rollover
+        </button>
+        <div class="border-t border-slate-200 pt-3 mt-3">
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Budget Warning Threshold (%)</label>
+          <div class="flex gap-2">
+            <input type="number" id="threshold-input" min="0" max="100" value="85" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg" />
+            <button onclick="updateThreshold()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update</button>
+          </div>
+        </div>
+      </div>
+      <button onclick="closeAdminModal()" class="w-full px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+    </div>
+  </div>
 </div>
 </template>
 
@@ -68,6 +119,10 @@ EIMEShell.mount({
   activeNav: 'budget',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'budget',
+      payload: { church_id: 'holy_comforter' }
+    });
     loadBudget();
     setInterval(loadBudget, 10000);
   }
@@ -159,6 +214,93 @@ async function showLine(glCode) {
 function closeLineModal() {
   document.getElementById('line-modal').classList.add('hidden');
   selectedLine = null;
+}
+
+function showImportModal() {
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.add('hidden');
+}
+
+function showAdminMenu() {
+  document.getElementById('admin-modal').classList.remove('hidden');
+}
+
+function closeAdminModal() {
+  document.getElementById('admin-modal').classList.add('hidden');
+}
+
+async function importBudget() {
+  const fileInput = document.getElementById('budget-file-input');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('import-status');
+  status.classList.remove('hidden');
+  status.className = 'mt-3 text-sm text-slate-600';
+  status.innerHTML = `<p>📤 Uploading ${file.name}...</p>`;
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/budget/import-spreadsheet`, {
+      method: 'POST',
+      body: fd
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    status.className = 'mt-3 text-sm text-emerald-600';
+    status.innerHTML = `<p>✅ Budget imported: ${data.lines_imported || 0} lines loaded</p>`;
+    setTimeout(() => { closeImportModal(); loadBudget(); }, 2000);
+  } catch (e) {
+    status.className = 'mt-3 text-sm text-red-600';
+    status.innerHTML = `<p>❌ Error: ${e.message}</p>`;
+  }
+}
+
+async function resetYTD() {
+  if (!confirm('Reset YTD actuals to zero? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/budget/ytd-reset`, { method: 'PUT' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('YTD actuals reset to zero');
+    closeAdminModal();
+    loadBudget();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function yearEndRollover() {
+  if (!confirm('Perform year-end rollover? This closes the current budget and prepares for the next year.')) return;
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/budget/year-end-reset`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Year-end rollover complete');
+    closeAdminModal();
+    loadBudget();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function updateThreshold() {
+  const threshold = document.getElementById('threshold-input').value;
+  try {
+    const res = await fetch(`${API}/api/churches/holy_comforter/budget-warning-threshold`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threshold: parseInt(threshold) })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert(`Warning threshold updated to ${threshold}%`);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 </script>
 

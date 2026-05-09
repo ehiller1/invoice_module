@@ -49,6 +49,11 @@
   const center = document.getElementById('eime-center');
   center.appendChild(document.getElementById('model-config-page').content.cloneNode(true));
 
+  window.eime.setContext({
+    page: 'settings-model',
+    payload: {}
+  });
+
   const KNOWN_MODELS = [
     'claude-opus-4-7-20251231',
     'claude-sonnet-4-5-20250929',

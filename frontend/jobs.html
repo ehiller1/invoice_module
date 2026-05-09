@@ -21,6 +21,7 @@
 <script src="/eime-bus.js"></script>
 <script src="/eime-shell.js"></script>
 <script src="/eime-chat-rail.js"></script>
+<script src="/components/invoice-review-card.js"></script>
 </head>
 <body>
 
@@ -56,20 +57,16 @@
     <div id="jobs-list" class="divide-y divide-slate-200"></div>
   </div>
 
-  <!-- Detail Modal -->
+  <!-- Detail Modal with InvoiceReviewCard -->
   <div id="detail-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-bold text-slate-900" id="modal-vendor">Job Details</h2>
+    <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+        <h2 class="text-2xl font-bold text-slate-900">Invoice Review</h2>
         <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div id="modal-content" class="space-y-4 mb-6"></div>
-      <div class="flex gap-2">
-        <button onclick="closeModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
-        <button id="approve-btn" onclick="approveJob()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Approve & Emit</button>
-      </div>
+      <div id="invoice-review-container" class="overflow-y-auto"></div>
     </div>
   </div>
 </div>
@@ -84,6 +81,10 @@ EIMEShell.mount({
   activeNav: 'jobs',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'jobs',
+      payload: { church_id: 'holy_comforter', job_id: null }
+    });
     loadJobs();              // initial full load
     setInterval(pollJobs, 2000);  // efficient delta polling every 2s
   }
@@ -155,50 +156,144 @@ async function showJob(jobId) {
   try {
     const res = await fetch(`${API}/api/jobs/${jobId}`);
     currentJob = await res.json();
-    
-    document.getElementById('modal-vendor').textContent = currentJob.vendor_name || 'Invoice';
-    
-    const lineItems = (currentJob.line_items || []).map(li => `
-      <div class="border border-slate-200 rounded p-3 bg-slate-50">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="font-medium text-slate-900">${li.description}</p>
-            <p class="text-sm text-slate-600 mt-1">GL: <code class="bg-white px-2 py-0.5 rounded">${li.proposed_gl || 'TBD'}</code></p>
-          </div>
-          <div class="text-right">
-            <p class="font-bold text-slate-900">$${(li.amount || 0).toFixed(2)}</p>
-            <p class="text-xs text-slate-500">Confidence: ${(li.confidence * 100 || 0).toFixed(0)}%</p>
-          </div>
-        </div>
-      </div>
-    `).join('');
-    
-    document.getElementById('modal-content').innerHTML = `
-      <div>
-        <h3 class="font-semibold text-slate-900 mb-3">Amount: <code class="bg-slate-100 px-2 py-1 rounded">$${(currentJob.total_amount || 0).toFixed(2)}</code></h3>
-        <div class="space-y-2">${lineItems}</div>
-      </div>
-      ${currentJob.risk_level ? `<div class="bg-yellow-50 border border-yellow-200 rounded p-3"><p class="text-sm text-yellow-800"><strong>⚠ Risk:</strong> ${currentJob.risk_level}</p></div>` : ''}
-    `;
-    
+
+    window.eime.setContext({
+      page: 'jobs',
+      payload: { church_id: 'holy_comforter', job_id: jobId }
+    });
+
+    // Render the InvoiceReviewCard with callbacks for Approve, Reject, Override
+    InvoiceReviewCard.render(currentJob, {
+      containerId: 'invoice-review-container',
+      onApprove: handleApproveDecision,
+      onReject: handleRejectDecision,
+      onOverride: handleOverrideDecision,
+    });
+
     document.getElementById('detail-modal').classList.remove('hidden');
   } catch (e) {
     alert('Error loading job: ' + e.message);
   }
 }
 
-async function approveJob() {
+/**
+ * Handle Approve decision — all line items accepted as-is
+ */
+async function handleApproveDecision(decisions) {
   if (!currentJob) return;
   try {
-    await fetch(`${API}/api/jobs/${currentJob.job_id}/approve`, {
+    const lineDecisions = (currentJob.line_items || []).map(li => ({
+      line_id: li.line_id || li.description,
+      action: 'ACCEPT',
+      reviewer_id: 'staff',
+    }));
+
+    const res = await fetch(`${API}/api/jobs/${currentJob.job_id}/hitl`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'HITL_APPROVED' })
+      body: JSON.stringify({
+        line_decisions: lineDecisions,
+        budget_approval_attestation: true,
+      }),
     });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert('Error approving job: ' + (data.detail || res.statusText));
+      return;
+    }
+
     closeModal();
     loadJobs();
   } catch (e) {
     alert('Error approving job: ' + e.message);
+  }
+}
+
+/**
+ * Handle Reject decision — all line items rejected
+ */
+async function handleRejectDecision(decisions) {
+  if (!currentJob) return;
+  if (!confirm('Are you sure you want to reject this invoice? It will return to the upload queue.')) return;
+
+  try {
+    const lineDecisions = (currentJob.line_items || []).map(li => ({
+      line_id: li.line_id || li.description,
+      action: 'REJECT',
+      reviewer_id: 'staff',
+    }));
+
+    const res = await fetch(`${API}/api/jobs/${currentJob.job_id}/hitl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        line_decisions: lineDecisions,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert('Error rejecting job: ' + (data.detail || res.statusText));
+      return;
+    }
+
+    closeModal();
+    loadJobs();
+  } catch (e) {
+    alert('Error rejecting job: ' + e.message);
+  }
+}
+
+/**
+ * Handle Override decision — GL accounts have been changed with rationale
+ */
+async function handleOverrideDecision(decisions) {
+  if (!currentJob) return;
+
+  try {
+    // Build line decisions with OVERRIDE action and new GL codes
+    const lineDecisions = (decisions.overrides || []).map(override => ({
+      line_id: override.line_id,
+      action: 'OVERRIDE',
+      new_gl_code: override.new_account,
+      rationale: decisions.rationale,
+      reviewer_id: 'staff',
+    }));
+
+    // Include non-overridden lines as ACCEPT
+    const overriddenLineIds = new Set(decisions.overrides.map(o => o.line_id));
+    (currentJob.line_items || []).forEach(li => {
+      const lineId = li.line_id || li.description;
+      if (!overriddenLineIds.has(lineId)) {
+        lineDecisions.push({
+          line_id: lineId,
+          action: 'ACCEPT',
+          reviewer_id: 'staff',
+        });
+      }
+    });
+
+    const res = await fetch(`${API}/api/jobs/${currentJob.job_id}/hitl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        line_decisions: lineDecisions,
+        budget_approval_attestation: true,
+        override_rationale: decisions.rationale,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert('Error saving override: ' + (data.detail || res.statusText));
+      return;
+    }
+
+    closeModal();
+    loadJobs();
+  } catch (e) {
+    alert('Error saving override: ' + e.message);
   }
 }
 

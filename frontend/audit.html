@@ -126,6 +126,10 @@ EIMEShell.mount({
   activeNav: 'audit',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
+    window.eime.setContext({
+      page: 'audit',
+      payload: { church_id: 'holy_comforter' }
+    });
     setDefaultDates();
     loadAuditTrail();
   }

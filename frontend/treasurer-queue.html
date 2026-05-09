@@ -21,6 +21,7 @@
   <script src="/eime-bus.js"></script>
   <script src="/eime-chat-rail.js"></script>
   <script src="/eime-shell.js"></script>
+  <script src="/components/invoice-review-card.js"></script>
 </head>
 <body class="h-full bg-slate-50 font-sans">
 
@@ -36,14 +37,57 @@
     </div>
   </header>
 
-  <div class="px-8 py-6">
-    <div id="job-cards" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-    <div id="empty" class="hidden text-center py-12 text-slate-400">No jobs awaiting treasurer approval.</div>
+  <div class="flex flex-col h-full">
+    <!-- Job list on top, detail below -->
+    <div class="px-8 py-6 border-b border-slate-200 overflow-y-auto flex-shrink-0">
+      <div id="job-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      <div id="empty" class="hidden text-center py-8 text-slate-400">No jobs awaiting treasurer approval.</div>
+    </div>
+
+    <!-- Detail panel (hidden until job selected) -->
+    <div id="detail-panel" class="hidden flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <!-- Invoice Review Card will be rendered here -->
+      <div id="invoice-review-container"></div>
+
+      <!-- Budget Owner Decision Info -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-3">Budget Owner Decision</h3>
+        <div id="budget-owner-info" class="space-y-2 text-sm">
+          <p class="text-slate-600"><strong>Actor:</strong> <span id="bo-email" class="font-mono">—</span></p>
+          <p class="text-slate-600"><strong>Action:</strong> <span id="bo-action" class="font-medium">—</span></p>
+          <p class="text-slate-600"><strong>Timestamp:</strong> <span id="bo-timestamp" class="text-slate-500">—</span></p>
+          <div id="bo-notes-section" class="hidden mt-2 pt-2 border-t border-slate-200">
+            <p class="text-xs font-medium text-slate-600 mb-1">Notes:</p>
+            <p class="text-slate-700 whitespace-pre-wrap" id="bo-notes"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Treasurer Decision Form -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 class="text-sm font-semibold text-slate-800 mb-4">Treasurer Approval</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Treasurer ID / Email</label>
+            <input id="treasurer-id" type="text" placeholder="your.email@church.org" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-navy-600 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1.5">Decision Notes (optional)</label>
+            <textarea id="decision-notes" rows="3" placeholder="Any notes for the record..." class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-navy-600 outline-none resize-none"></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="submitTreasurerDecision('reject')" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg">Reject</button>
+            <button onclick="submitTreasurerDecision('approve')" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg">Approve to Post</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 let activeChurch = null;
+let currentJob = null;
 
 async function init() {
   await EIMEShell.mount({ activeNav: 'jes', pageTitle: 'Treasurer Queue' });
@@ -53,62 +97,134 @@ async function init() {
   if (churches.length) {
     activeChurch = churches[0].church_id;
     sel.value = activeChurch;
+    window.eime.setContext({
+      page: 'treasurer',
+      payload: { church_id: activeChurch }
+    });
     await loadJobs();
   }
 }
 
 async function loadJobs() {
   activeChurch = document.getElementById('church-selector').value;
+  window.eime.setContext({
+    page: 'treasurer',
+    payload: { church_id: activeChurch }
+  });
   const all = await fetch(`/api/jobs?church_id=${activeChurch}`).then(r => r.json());
   const jobs = all.filter(j => j.status === 'PENDING_TREASURER');
   const root = document.getElementById('job-cards');
   document.getElementById('empty').classList.toggle('hidden', jobs.length > 0);
-  root.innerHTML = jobs.map(j => render(j)).join('');
+  root.innerHTML = jobs.map(j => renderJobCard(j)).join('');
 }
 
-function render(j) {
+function renderJobCard(j) {
   const inv = j.invoice_document || {};
   const bo = j.budget_owner_decision || {};
-  const reasons = (j.reviewed_allocations?.lines || []).flatMap(l => l.reasons || []);
   return `
-    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="font-semibold text-slate-800">${esc(inv.vendor_name || j.filename)}</h3>
-        <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">PENDING_TREASURER</span>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm cursor-pointer hover:shadow-md hover:border-slate-300 transition-all" onclick="selectJob('${j.job_id}')">
+      <div class="flex items-start justify-between mb-2">
+        <h3 class="font-semibold text-slate-800 text-sm">${esc(inv.vendor_name || j.filename)}</h3>
+        <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full flex-shrink-0">REVIEW</span>
       </div>
-      <p class="text-sm text-slate-600 mb-1">Amount: <strong>$${esc(inv.total_amount || '?')}</strong></p>
-      <p class="text-sm text-slate-600 mb-1">Invoice #: ${esc(inv.invoice_number || '')}</p>
-      <p class="text-sm text-slate-600 mb-1">Budget owner: ${esc(bo.actor_email || '—')} (${esc(bo.action || '')})</p>
-      ${reasons.length ? `<div class="text-xs text-slate-500 mt-2"><strong>Reviewer notes:</strong><ul class="list-disc ml-4">${reasons.slice(0,3).map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}
-      <div class="mt-3 flex gap-2">
-        <button onclick="decide('${j.job_id}','approve')" class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded">Approve to Post</button>
-        <button onclick="decide('${j.job_id}','reject')" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">Reject</button>
-      </div>
+      <p class="text-sm text-slate-600">$${fmt(inv.total_amount || 0)}</p>
+      <p class="text-xs text-slate-500 mt-1">Invoice: ${esc(inv.invoice_number || '—')}</p>
+      <p class="text-xs text-slate-500">BO: ${esc(bo.actor_email || '—')}</p>
     </div>
   `;
 }
 
-function esc(s) { return String(s==null?'':s).replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c])); }
+function fmt(n) {
+  return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
-async function decide(jobId, action) {
-  const treasurer = prompt('Treasurer ID / email:');
-  if (!treasurer) return;
-  const notes = prompt('Notes (optional):') || '';
-  const r = await fetch(`/api/jobs/${jobId}/treasurer-decision`, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ action, treasurer_id: treasurer, notes }),
-  });
-  if (r.ok) {
-    alert('Decision recorded.');
+function esc(s) {
+  return String(s==null?'':s).replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c]));
+}
+
+async function selectJob(jobId) {
+  try {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    currentJob = await res.json();
+
+    window.eime.setContext({
+      page: 'treasurer',
+      payload: { church_id: activeChurch, job_id: jobId }
+    });
+
+    // Render the InvoiceReviewCard (read-only, no approve/reject on the card itself)
+    InvoiceReviewCard.render(currentJob, {
+      containerId: 'invoice-review-container',
+      onApprove: () => { /* handled via form below */ },
+      onReject: () => { /* handled via form below */ },
+      onOverride: () => { /* handled via form below */ },
+    });
+
+    // Display Budget Owner decision info (FR-05.3)
+    const bo = currentJob.budget_owner_decision || {};
+    document.getElementById('bo-email').textContent = bo.actor_email || '—';
+    document.getElementById('bo-action').textContent = bo.action || '—';
+    document.getElementById('bo-timestamp').textContent = bo.timestamp ? bo.timestamp.replace('T', ' ').split('.')[0] : '—';
+
+    const boNotes = bo.notes || bo.rationale || '';
+    if (boNotes) {
+      document.getElementById('bo-notes-section').classList.remove('hidden');
+      document.getElementById('bo-notes').textContent = boNotes;
+    } else {
+      document.getElementById('bo-notes-section').classList.add('hidden');
+    }
+
+    // Clear form fields
+    document.getElementById('treasurer-id').value = '';
+    document.getElementById('decision-notes').value = '';
+
+    // Show detail panel
+    document.getElementById('detail-panel').classList.remove('hidden');
+  } catch (e) {
+    alert('Error loading job: ' + e.message);
+  }
+}
+
+async function submitTreasurerDecision(action) {
+  if (!currentJob) return;
+
+  const treasurerId = document.getElementById('treasurer-id').value.trim();
+  const notes = document.getElementById('decision-notes').value.trim();
+
+  if (!treasurerId) {
+    alert('Please enter your treasurer ID or email.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/jobs/${currentJob.job_id}/treasurer-decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        treasurer_id: treasurerId,
+        notes,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert('Error: ' + (data.detail || res.statusText));
+      return;
+    }
+
+    alert('Decision recorded. ' + (action === 'approve' ? 'Invoice ready to post.' : 'Invoice rejected.'));
+    document.getElementById('detail-panel').classList.add('hidden');
+    currentJob = null;
     await loadJobs();
-  } else {
-    alert('Failed: ' + r.status);
+  } catch (e) {
+    alert('Error submitting decision: ' + e.message);
   }
 }
 
 window.loadJobs = loadJobs;
-window.decide = decide;
+window.selectJob = selectJob;
+window.submitTreasurerDecision = submitTreasurerDecision;
 
 init();
 </script>
