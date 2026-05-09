@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Operations Council</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script src="/components/card-renderer.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <div class="mb-8">
+    <h1 class="text-4xl font-bold text-slate-900 mb-2">Operations Council</h1>
+    <p class="text-slate-600">Governance, exceptions, and decisions requiring your attention</p>
+  </div>
+
+  <!-- Four-Queue Dashboard -->
+  <div class="grid grid-cols-4 gap-4 mb-8">
+    <!-- Exceptions Queue -->
+    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-bold text-red-900">⚠️ Exceptions</h2>
+        <span id="exception-count" class="inline-block bg-red-600 text-white text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center">0</span>
+      </div>
+      <p class="text-sm text-red-800 mb-4">Cases requiring human adjudication</p>
+      <button onclick="navigateToQueue('exceptions')" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+        View Queue →
+      </button>
+    </div>
+
+    <!-- Policy Queue -->
+    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-bold text-purple-900">📋 Policies</h2>
+        <span id="policy-count" class="inline-block bg-purple-600 text-white text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center">0</span>
+      </div>
+      <p class="text-sm text-purple-800 mb-4">Governance decisions and votes</p>
+      <button onclick="navigateToQueue('policies')" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
+        View Queue →
+      </button>
+    </div>
+
+    <!-- Questions Queue -->
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-bold text-blue-900">❓ Questions</h2>
+        <span id="question-count" class="inline-block bg-blue-600 text-white text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center">0</span>
+      </div>
+      <p class="text-sm text-blue-800 mb-4">Analyst queries awaiting response</p>
+      <button onclick="navigateToQueue('questions')" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+        View Queue →
+      </button>
+    </div>
+
+    <!-- Recommendations Queue -->
+    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-4 border border-emerald-200">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-bold text-emerald-900">⭐ NBA</h2>
+        <span id="recommendation-count" class="inline-block bg-emerald-600 text-white text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center">0</span>
+      </div>
+      <p class="text-sm text-emerald-800 mb-4">Next best action candidates</p>
+      <button onclick="navigateToQueue('recommendations')" class="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium">
+        View Queue →
+      </button>
+    </div>
+  </div>
+
+  <!-- Recent Items (all queues, sorted by recency) -->
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-2xl font-bold text-slate-900 mb-6">Recent Activity</h2>
+    <div id="recent-items" class="space-y-4">
+      <p class="text-slate-500 text-center py-8">Loading your queue items...</p>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let currentUserTier = 2; // T2 by default; from context in production
+let allCards = {
+  exceptions: [],
+  policies: [],
+  questions: [],
+  recommendations: []
+};
+
+EIMEShell.mount({
+  activeNav: 'council',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'council',
+      payload: { church_id: CHURCH_ID }
+    });
+    loadQueues();
+    // Poll every 10 seconds for updates
+    setInterval(loadQueues, 10000);
+  }
+});
+
+/**
+ * Load all four queues from backend.
+ * In Phase 2, these will be backed by real /api/council/queues endpoint.
+ * For now, we'll mock with empty arrays and expected card schemas.
+ */
+async function loadQueues() {
+  try {
+    // TODO: Replace with real endpoint GET /api/council/queues
+    // For now, initialize empty queues with expected structure
+    allCards.exceptions = [];
+    allCards.policies = [];
+    allCards.questions = [];
+    allCards.recommendations = [];
+
+    // Try to fetch from backend if endpoints exist
+    try {
+      const res = await fetch(`${API}/api/council/queues?church_id=${CHURCH_ID}`);
+      if (res.ok) {
+        const data = await res.json();
+        allCards = data;
+      }
+    } catch (e) {
+      console.log('Council queue endpoint not yet implemented; using empty queues');
+    }
+
+    updateDashboard();
+    renderRecentItems();
+  } catch (e) {
+    console.error('Error loading queues:', e);
+  }
+}
+
+function updateDashboard() {
+  document.getElementById('exception-count').textContent = allCards.exceptions.length;
+  document.getElementById('policy-count').textContent = allCards.policies.length;
+  document.getElementById('question-count').textContent = allCards.questions.length;
+  document.getElementById('recommendation-count').textContent = allCards.recommendations.length;
+}
+
+function renderRecentItems() {
+  // Combine all cards, sort by created_at (most recent first), take top 10
+  const allItems = [
+    ...allCards.exceptions.map(c => ({ ...c, queue: 'exceptions' })),
+    ...allCards.policies.map(c => ({ ...c, queue: 'policies' })),
+    ...allCards.questions.map(c => ({ ...c, queue: 'questions' })),
+    ...allCards.recommendations.map(c => ({ ...c, queue: 'recommendations' }))
+  ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+   .slice(0, 10);
+
+  const container = document.getElementById('recent-items');
+
+  if (allItems.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ All queues clear — no action items</p>';
+    return;
+  }
+
+  container.innerHTML = allItems.map(card => {
+    const queueLabel = {
+      exceptions: '⚠️ Exception',
+      policies: '📋 Policy',
+      questions: '❓ Question',
+      recommendations: '⭐ NBA'
+    }[card.queue];
+
+    return `
+      <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3 flex-1">
+            <span class="text-sm font-semibold text-slate-600">${queueLabel}</span>
+            <p class="font-semibold text-slate-900">${card.summary || card.title || card.query || 'Untitled'}</p>
+          </div>
+          <p class="text-xs text-slate-500 whitespace-nowrap">${formatDate(card.created_at)}</p>
+        </div>
+        <div class="ml-16">
+          ${CardRenderer.render(card, currentUserTier, {
+            onAction: (id, action) => handleCardAction(id, action, card.queue)
+          })}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now - date;
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+function navigateToQueue(queueName) {
+  // In Phase 2, this will navigate to queue detail pages
+  // For now, just scroll and highlight
+  console.log('Navigate to queue:', queueName);
+  alert(`Queue detail view for "${queueName}" coming in Phase 2`);
+}
+
+function handleCardAction(cardId, action, queue) {
+  console.log('Card action:', cardId, action, 'in queue:', queue);
+  // Actions will be implemented per-card type in Phase 2
+}
+</script>
+
+</body>
+</html>

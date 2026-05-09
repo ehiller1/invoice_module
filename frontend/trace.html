@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Trace Viewer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script src="/components/card-renderer.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-6xl mx-auto p-6">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">🔍 Trace Viewer</h1>
+    <p class="text-slate-600">Navigate any GL projection to its underlying events and evidence in ≤3 clicks (FRD §16.2)</p>
+  </div>
+
+  <!-- Search / Entry Point -->
+  <div class="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+    <div class="flex gap-4">
+      <div class="flex-1">
+        <label class="text-sm font-semibold text-slate-700 block mb-2">GL Account or Cell ID</label>
+        <input type="text" id="search-input" placeholder="e.g., 10200 (cash), revenue.pledge, or event_id"
+          class="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+      </div>
+      <div class="pt-7">
+        <button onclick="searchCell()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+          Trace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trace Results (three-level hierarchy) -->
+  <div id="trace-results" class="hidden space-y-6">
+    <!-- Level 1: Projection Cell -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-4">Level 1: Projection Cell</h2>
+      <div id="level-1-content" class="space-y-3"></div>
+    </div>
+
+    <!-- Level 2: Contributing Events -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-4">Level 2: Contributing Events</h2>
+      <div id="level-2-content" class="space-y-3">
+        <p class="text-slate-500">Click an event above to expand</p>
+      </div>
+    </div>
+
+    <!-- Level 3: Event Details & Evidence -->
+    <div class="bg-white rounded-lg border border-slate-200 p-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-4">Level 3: Event Details & Evidence</h2>
+      <div id="level-3-content" class="space-y-3">
+        <p class="text-slate-500">Click an event above to view full details</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div id="empty-state" class="bg-slate-50 rounded-lg border border-slate-200 p-8 text-center">
+    <p class="text-slate-600 text-lg">Enter a GL account or event ID to begin tracing</p>
+    <p class="text-slate-500 text-sm mt-2">Examples: "10200", "expense.office_supplies", "evt_12345"</p>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let currentUserTier = 2;
+let selectedEventId = null;
+
+EIMEShell.mount({
+  activeNav: 'trace',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'trace-viewer',
+      payload: { church_id: CHURCH_ID }
+    });
+    // Check for ?cell= or ?event= query params
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('cell') || params.has('event')) {
+      document.getElementById('search-input').value = params.get('cell') || params.get('event');
+      searchCell();
+    }
+  }
+});
+
+/**
+ * Click 1: Search for a GL cell and show its projection.
+ */
+async function searchCell() {
+  const cellId = document.getElementById('search-input').value.trim();
+  if (!cellId) {
+    alert('Enter a GL account or event ID');
+    return;
+  }
+
+  try {
+    // TODO: Real endpoint GET /api/trace/{cell_id}
+    // For now, return mock data
+    const projection = generateMockProjection(cellId);
+
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('trace-results').classList.remove('hidden');
+
+    renderLevel1(projection);
+    renderLevel2Empty();
+    renderLevel3Empty();
+
+    window.scrollTo(0, document.getElementById('trace-results').offsetTop);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function generateMockProjection(cellId) {
+  return {
+    cell_id: cellId,
+    account_type: 'Asset',
+    account_name: 'Operating Cash',
+    current_balance: 125432.50,
+    as_of_date: new Date().toISOString(),
+    contributing_events: [
+      {
+        event_id: 'evt_001',
+        event_type: 'recognition.cash_receipt',
+        emission_ts: new Date(Date.now() - 5 * 24 * 3600000).toISOString(),
+        amount: 50000,
+        description: 'Weekly pledge collection',
+        counterparty: { id: 'donor_123', display_name: 'Anonymous Donor', type: 'individual' },
+        classification: { gl_account: '10200', fund: 'unrestricted_general', restriction_class: 'unrestricted' },
+        confidence: 0.99
+      },
+      {
+        event_id: 'evt_002',
+        event_type: 'recognition.cash_disbursement',
+        emission_ts: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
+        amount: -15000,
+        description: 'Monthly payroll',
+        counterparty: { id: 'staff', display_name: 'Staff Salaries', type: 'internal' },
+        classification: { gl_account: '10200', fund: 'unrestricted_general', restriction_class: 'unrestricted' },
+        confidence: 1.0
+      },
+      {
+        event_id: 'evt_003',
+        event_type: 'recognition.grant_disbursement',
+        emission_ts: new Date(Date.now() - 1 * 24 * 3600000).toISOString(),
+        amount: -20000,
+        description: 'Mission grant: Health Initiative',
+        counterparty: { id: 'ngp_456', display_name: 'Health Initiative', type: 'nonprofit' },
+        classification: { gl_account: '10200', fund: 'mission_grants', restriction_class: 'restricted' },
+        confidence: 0.98
+      }
+    ]
+  };
+}
+
+function renderLevel1(projection) {
+  const content = document.getElementById('level-1-content');
+  const balanceColor = projection.current_balance >= 0 ? 'text-green-700' : 'text-red-700';
+
+  content.innerHTML = `
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <p class="text-xs text-slate-600 uppercase font-semibold">Account</p>
+          <p class="text-2xl font-bold text-slate-900">${projection.cell_id}</p>
+          <p class="text-sm text-slate-600">${projection.account_name}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-600 uppercase font-semibold">Current Balance</p>
+          <p class="text-2xl font-bold ${balanceColor}">$${projection.current_balance.toFixed(2)}</p>
+          <p class="text-xs text-slate-600">As of ${new Date(projection.as_of_date).toLocaleDateString()}</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-600">
+        <strong>${projection.contributing_events.length} contributing events below</strong> — Click to expand each event
+      </p>
+    </div>
+  `;
+}
+
+function renderLevel2Empty() {
+  const content = document.getElementById('level-2-content');
+  content.innerHTML = '<p class="text-slate-500 text-sm">Click an event badge above to see details</p>';
+}
+
+function renderLevel3Empty() {
+  const content = document.getElementById('level-3-content');
+  content.innerHTML = '<p class="text-slate-500 text-sm">Click an event above to view full evidence chain</p>';
+}
+
+/**
+ * Click 2: Show contributing events.
+ */
+function renderLevel2(projection) {
+  const content = document.getElementById('level-2-content');
+
+  content.innerHTML = projection.contributing_events.map(evt => {
+    const amountColor = evt.amount >= 0 ? 'text-green-600' : 'text-red-600';
+    const isSelected = evt.event_id === selectedEventId;
+
+    return `
+      <div class="border ${isSelected ? 'border-blue-400 bg-blue-50' : 'border-slate-200'} rounded-lg p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+        onclick="selectEvent('${evt.event_id}', ${JSON.stringify(evt).replace(/"/g, '&quot;')})">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <p class="font-semibold text-slate-900">${evt.event_type}</p>
+            <p class="text-xs text-slate-600 mt-1">${evt.description}</p>
+            <p class="text-xs text-slate-500 mt-2">
+              <strong>${evt.counterparty.display_name}</strong> · ${new Date(evt.emission_ts).toLocaleDateString()}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-lg font-bold ${amountColor}">$${Math.abs(evt.amount).toFixed(2)}</p>
+            <p class="text-xs text-slate-600">confidence: ${(evt.confidence * 100).toFixed(0)}%</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Click 3: Show full event details with evidence chain.
+ */
+function selectEvent(eventId, eventData) {
+  selectedEventId = eventId;
+
+  // Re-render level 2 with selection highlight
+  const projection = getCurrentProjection();
+  if (projection) {
+    renderLevel2(projection);
+  }
+
+  // Render level 3 with full details
+  renderLevel3(eventData);
+}
+
+function renderLevel3(event) {
+  const content = document.getElementById('level-3-content');
+
+  content.innerHTML = `
+    <div class="space-y-4">
+      <!-- Event Summary Card -->
+      <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <h3 class="font-semibold text-slate-900 mb-3">Event Details</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">Event ID</p>
+            <p class="font-mono text-slate-700">${event.event_id}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">Type</p>
+            <p class="text-slate-700">${event.event_type}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">Amount</p>
+            <p class="text-slate-900 font-bold">$${Math.abs(event.amount).toFixed(2)}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">Confidence</p>
+            <p class="text-slate-900">${(event.confidence * 100).toFixed(0)}%</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">Counterparty</p>
+            <p class="text-slate-700">${event.counterparty.display_name}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-600 uppercase font-semibold">GL Account</p>
+            <p class="font-mono text-slate-700">${event.classification.gl_account}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Classification -->
+      <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+        <h3 class="font-semibold text-blue-900 mb-2">Classification</h3>
+        <div class="text-sm text-blue-900 space-y-1">
+          <p><strong>Fund:</strong> ${event.classification.fund}</p>
+          <p><strong>Restriction:</strong> ${event.classification.restriction_class}</p>
+        </div>
+      </div>
+
+      <!-- Evidence Chain (provenance) -->
+      <div class="border border-slate-200 rounded-lg p-4">
+        <h3 class="font-semibold text-slate-900 mb-3">Evidence Chain</h3>
+        <div class="space-y-2 text-xs text-slate-700">
+          <p><strong>Source System:</strong> ACS Realm (plugged-in real-time)</p>
+          <p><strong>Source ID:</strong> rec_${event.event_id.substring(4)}</p>
+          <p><strong>Raw Payload:</strong> <code class="bg-slate-100 px-2 py-1 rounded text-xs font-mono">$ref:acs_realm/${event.event_id}</code></p>
+          <p class="mt-2 text-slate-600">
+            ✓ Verified by Recognition Membrane (high confidence pattern match)
+            <br />✓ Ledgered in Decision Ledger (immutable record)
+            <br />✓ Observable in GL at ${event.classification.gl_account}
+          </p>
+        </div>
+      </div>
+
+      <!-- Decision Ledger Entry (future phase) -->
+      <div class="bg-amber-50 rounded-lg p-4 border border-amber-200 text-xs text-amber-900">
+        <p><strong>Decision Ledger:</strong> This event is linked to decision ledger entries (FRD §14.1).</p>
+        <p class="mt-1">In Phase 3, you can view the full reasoning chain of any decision that touched this event.</p>
+      </div>
+    </div>
+  `;
+}
+
+function getCurrentProjection() {
+  // Return the last loaded projection (simplified; in production, track state)
+  return null; // Will be refactored in Phase 3
+}
+</script>
+
+</body>
+</html>

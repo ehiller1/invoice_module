@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Forecast vs Actual Merge</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3/dist/chart.min.js"></script>
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-7xl mx-auto p-6">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">📊 Forecast vs Actual Merge</h1>
+    <p class="text-slate-600">Current projection vs prior projection-as-of-date with variance attribution (FRD §16.3)</p>
+  </div>
+
+  <!-- Controls -->
+  <div class="bg-white rounded-lg border border-slate-200 p-4 mb-6">
+    <div class="grid grid-cols-4 gap-4">
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">Current Period</label>
+        <select id="period-select" onchange="loadForecastData()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="2026-Q2">2026 Q2 (Current)</option>
+          <option value="2026-Q1">2026 Q1</option>
+          <option value="2025-Q4">2025 Q4</option>
+          <option value="2025-Q3">2025 Q3</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">Compare to</label>
+        <select id="compare-select" onchange="loadForecastData()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="2026-Q1">Prior Period (Q1)</option>
+          <option value="budget">Annual Budget</option>
+          <option value="previous-year">Previous Year (Q2 2025)</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">Group By</label>
+        <select id="groupby-select" onchange="loadForecastData()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="fund">Fund</option>
+          <option value="account">GL Account</option>
+          <option value="department">Department</option>
+        </select>
+      </div>
+      <div class="pt-7">
+        <button onclick="exportVarianceReport()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+          📥 Export
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Metrics -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs text-slate-600 uppercase font-semibold">Total Variance</p>
+      <p class="text-2xl font-bold text-slate-900" id="total-variance">$0</p>
+      <p class="text-xs text-slate-600 mt-1">vs projection</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs text-slate-600 uppercase font-semibold">Favorable</p>
+      <p class="text-2xl font-bold text-green-700" id="favorable-count">0</p>
+      <p class="text-xs text-slate-600 mt-1">lines</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs text-slate-600 uppercase font-semibold">Unfavorable</p>
+      <p class="text-2xl font-bold text-red-700" id="unfavorable-count">0</p>
+      <p class="text-xs text-slate-600 mt-1">lines</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs text-slate-600 uppercase font-semibold">At Risk</p>
+      <p class="text-2xl font-bold text-orange-700" id="at-risk-count">0</p>
+      <p class="text-xs text-slate-600 mt-1">lines</p>
+    </div>
+  </div>
+
+  <!-- Variance Chart -->
+  <div class="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+    <h2 class="text-lg font-bold text-slate-900 mb-4">Variance Attribution</h2>
+    <canvas id="variance-chart"></canvas>
+  </div>
+
+  <!-- Variance Table -->
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-lg font-bold text-slate-900 mb-4">Detailed Variance Analysis</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold text-slate-900">Category</th>
+            <th class="text-right px-4 py-3 font-semibold text-slate-900">Current</th>
+            <th class="text-right px-4 py-3 font-semibold text-slate-900">Prior Projection</th>
+            <th class="text-right px-4 py-3 font-semibold text-slate-900">Variance</th>
+            <th class="text-right px-4 py-3 font-semibold text-slate-900">% Change</th>
+            <th class="text-left px-4 py-3 font-semibold text-slate-900">Attribution</th>
+          </tr>
+        </thead>
+        <tbody id="variance-table" class="divide-y divide-slate-200">
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 text-slate-900 font-medium">General Fund Revenue</td>
+            <td class="text-right px-4 py-3 text-slate-900 font-mono">$487,200</td>
+            <td class="text-right px-4 py-3 text-slate-600 font-mono">$475,000</td>
+            <td class="text-right px-4 py-3 text-green-700 font-bold">+$12,200</td>
+            <td class="text-right px-4 py-3 text-green-700">+2.6%</td>
+            <td class="text-left px-4 py-3 text-slate-600 text-xs">Strong pledge collection (Q2 campaign)</td>
+          </tr>
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 text-slate-900 font-medium">Payroll Expenses</td>
+            <td class="text-right px-4 py-3 text-slate-900 font-mono">$156,800</td>
+            <td class="text-right px-4 py-3 text-slate-600 font-mono">$158,000</td>
+            <td class="text-right px-4 py-3 text-green-700 font-bold">-$1,200</td>
+            <td class="text-right px-4 py-3 text-green-700">-0.8%</td>
+            <td class="text-left px-4 py-3 text-slate-600 text-xs">Favorable: unfilled position in June</td>
+          </tr>
+          <tr class="hover:bg-slate-50 bg-red-50">
+            <td class="px-4 py-3 text-slate-900 font-medium">Facility Maintenance</td>
+            <td class="text-right px-4 py-3 text-slate-900 font-mono">$34,500</td>
+            <td class="text-right px-4 py-3 text-slate-600 font-mono">$22,000</td>
+            <td class="text-right px-4 py-3 text-red-700 font-bold">+$12,500</td>
+            <td class="text-right px-4 py-3 text-red-700">+56.8%</td>
+            <td class="text-left px-4 py-3 text-slate-600 text-xs">Unbudgeted roof repairs (3 events)</td>
+          </tr>
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 text-slate-900 font-medium">Mission Grants</td>
+            <td class="text-right px-4 py-3 text-slate-900 font-mono">$45,200</td>
+            <td class="text-right px-4 py-3 text-slate-600 font-mono">$50,000</td>
+            <td class="text-right px-4 py-3 text-green-700 font-bold">-$4,800</td>
+            <td class="text-right px-4 py-3 text-green-700">-9.6%</td>
+            <td class="text-left px-4 py-3 text-slate-600 text-xs">Conservative: two grants moved to Q3</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Variance Waterfall (planned for Phase 3) -->
+  <div class="mt-6 bg-slate-50 rounded-lg border border-slate-200 p-4 text-sm text-slate-600">
+    <p><strong>Waterfall Analysis coming in Phase 3:</strong> Drill into individual variance drivers (pledge collection timing, discretionary spending, headcount changes) with interactive drill-down.</p>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let varianceChart = null;
+
+EIMEShell.mount({
+  activeNav: 'forecast-merge',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'forecast-merge',
+      payload: { church_id: CHURCH_ID }
+    });
+    loadForecastData();
+  }
+});
+
+/**
+ * Load forecast vs actual data.
+ * TODO: Real endpoint GET /api/forecast/merge?current_period=...&compare_to=...&group_by=...
+ */
+async function loadForecastData() {
+  try {
+    const currentPeriod = document.getElementById('period-select').value;
+    const compareTo = document.getElementById('compare-select').value;
+    const groupBy = document.getElementById('groupby-select').value;
+
+    // Mock data structure
+    const mergeData = generateMockMergeData(currentPeriod, compareTo, groupBy);
+    renderSummary(mergeData);
+    renderChart(mergeData);
+  } catch (e) {
+    console.error('Error loading forecast data:', e);
+  }
+}
+
+function generateMockMergeData(period, compareTo, groupBy) {
+  return {
+    current_period: period,
+    compare_to: compareTo,
+    group_by: groupBy,
+    total_variance: -5500,
+    favorable_lines: 6,
+    unfavorable_lines: 2,
+    at_risk_lines: 1,
+    lines: [
+      { category: 'General Fund Revenue', current: 487200, prior: 475000, variance: 12200, pct_change: 2.6, attribution: 'Strong Q2 pledge collection' },
+      { category: 'Payroll Expenses', current: 156800, prior: 158000, variance: -1200, pct_change: -0.8, attribution: 'Unfilled position' },
+      { category: 'Facility Maintenance', current: 34500, prior: 22000, variance: 12500, pct_change: 56.8, attribution: 'Unbudgeted roof repairs' },
+      { category: 'Mission Grants', current: 45200, prior: 50000, variance: -4800, pct_change: -9.6, attribution: 'Conservative grant timing' },
+      { category: 'Office Supplies', current: 8900, prior: 9200, variance: -300, pct_change: -3.3, attribution: 'Bulk purchase timing' }
+    ]
+  };
+}
+
+function renderSummary(data) {
+  document.getElementById('total-variance').textContent = `$${Math.abs(data.total_variance).toFixed(0)}`;
+  document.getElementById('favorable-count').textContent = data.favorable_lines;
+  document.getElementById('unfavorable-count').textContent = data.unfavorable_lines;
+  document.getElementById('at-risk-count').textContent = data.at_risk_lines;
+}
+
+function renderChart(data) {
+  const ctx = document.getElementById('variance-chart');
+
+  if (varianceChart) {
+    varianceChart.destroy();
+  }
+
+  const labels = data.lines.map(l => l.category);
+  const variances = data.lines.map(l => l.variance);
+  const colors = variances.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)');
+
+  varianceChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Variance ($)',
+        data: variances,
+        backgroundColor: colors,
+        borderColor: variances.map(v => v >= 0 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)'),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `$${context.parsed.x.toFixed(0)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { callback: (v) => `$${v/1000}k` }
+        }
+      }
+    }
+  });
+}
+
+function exportVarianceReport() {
+  const period = document.getElementById('period-select').value;
+  const filename = `variance-report-${period}.csv`;
+  alert(`Export to ${filename} coming in Phase 3`);
+}
+</script>
+
+</body>
+</html>

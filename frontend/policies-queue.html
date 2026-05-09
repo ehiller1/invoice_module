@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Policy Queue</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script src="/components/card-renderer.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-6xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 mb-2">📋 Policy Queue</h1>
+      <p class="text-slate-600">Governance decisions and votes — <span id="queue-count">0</span> pending</p>
+    </div>
+    <button onclick="toggleFilterPanel()" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">🔍 Filter</button>
+  </div>
+
+  <!-- Filter Panel -->
+  <div id="filter-panel" class="hidden bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">Type</label>
+        <select id="filter-type" onchange="applyFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="">All Types</option>
+          <option value="discretionary_fund_size">Fund Size</option>
+          <option value="new_channel">New Channel</option>
+          <option value="quasi_endowment_draw">Endowment Draw</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">State</label>
+        <select id="filter-state" onchange="applyFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="">All States</option>
+          <option value="OPEN">Open</option>
+          <option value="IN_REVIEW">In Review</option>
+          <option value="CLOSED">Closed</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-700 block mb-2">Decision</label>
+        <select id="filter-decision" onchange="applyFilters()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <option value="">All Decisions</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="tabled">Tabled</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Policy Cards List -->
+  <div id="policies-list" class="space-y-4">
+    <p class="text-slate-500 text-center py-8">Loading policy queue...</p>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let currentUserTier = 2;
+let allPolicies = [];
+let filteredPolicies = [];
+
+EIMEShell.mount({
+  activeNav: 'council',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'policies-queue',
+      payload: { church_id: CHURCH_ID }
+    });
+    loadPolicies();
+    setInterval(loadPolicies, 10000);
+  }
+});
+
+async function loadPolicies() {
+  try {
+    allPolicies = [
+      {
+        policy_id: 'pol_001',
+        policy_type: 'discretionary_fund_size',
+        state: 'OPEN',
+        title: 'Discretionary Fund Size Adjustment',
+        description: 'Increase discretionary fund from $50K to $75K annually',
+        proposed_action: 'Approve increase to $75K',
+        effective_date: new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
+        voted_by: [
+          { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
+          { actor_id: 'finance_chair', tier: 'T2', vote: 'yes' }
+        ],
+        decision: null,
+        privacy_class: 'P2',
+        version: 1,
+        created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 12 * 3600000).toISOString()
+      },
+      {
+        policy_id: 'pol_002',
+        policy_type: 'quasi_endowment_draw',
+        state: 'CLOSED',
+        title: 'Quasi-Endowment Annual Draw Policy',
+        description: 'Establish 4.5% annual draw from quasi-endowment for operations',
+        proposed_action: 'Approve 4.5% draw policy',
+        effective_date: new Date(Date.now() + 60 * 24 * 3600000).toISOString(),
+        voted_by: [
+          { actor_id: 'treasurer', tier: 'T2', vote: 'yes' },
+          { actor_id: 'finance_chair', tier: 'T2', vote: 'abstain' },
+          { actor_id: 'vestry_senior', tier: 'T3', vote: 'yes' }
+        ],
+        decision: 'approved',
+        privacy_class: 'P2',
+        version: 1,
+        created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 24 * 3600000).toISOString()
+      }
+    ];
+
+    filteredPolicies = [...allPolicies];
+    applyFilters();
+    renderPolicies();
+  } catch (e) {
+    console.error('Error loading policies:', e);
+  }
+}
+
+function toggleFilterPanel() {
+  document.getElementById('filter-panel').classList.toggle('hidden');
+}
+
+function applyFilters() {
+  const type = document.getElementById('filter-type').value;
+  const state = document.getElementById('filter-state').value;
+  const decision = document.getElementById('filter-decision').value;
+
+  filteredPolicies = allPolicies.filter(pol => {
+    if (type && pol.policy_type !== type) return false;
+    if (state && pol.state !== state) return false;
+    if (decision && pol.decision !== decision) return false;
+    return true;
+  });
+
+  renderPolicies();
+}
+
+function renderPolicies() {
+  document.getElementById('queue-count').textContent = filteredPolicies.filter(p => p.state === 'OPEN').length;
+
+  const container = document.getElementById('policies-list');
+
+  if (filteredPolicies.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No policies match the current filter</p>';
+    return;
+  }
+
+  container.innerHTML = filteredPolicies.map(pol => {
+    const decisionColor = {
+      'approved': 'bg-green-50 text-green-700',
+      'rejected': 'bg-red-50 text-red-700',
+      'tabled': 'bg-orange-50 text-orange-700'
+    }[pol.decision] || (pol.state === 'OPEN' ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-700');
+
+    const votesSummary = pol.voted_by.length > 0 ?
+      `${pol.voted_by.filter(v => v.vote === 'yes').length} yes, ${pol.voted_by.filter(v => v.vote === 'no').length} no, ${pol.voted_by.filter(v => v.vote === 'abstain').length} abstain`
+      : 'No votes yet';
+
+    return `
+      <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <p class="font-semibold text-slate-900">${pol.title}</p>
+            <p class="text-sm text-slate-700 mt-1">${pol.description}</p>
+          </div>
+          <span class="text-xs font-semibold rounded px-2 py-1 ${decisionColor}">
+            ${pol.decision || pol.state}
+          </span>
+        </div>
+        <div class="bg-slate-50 rounded p-3 mb-3 text-xs">
+          <p class="text-slate-700"><strong>Proposed:</strong> ${pol.proposed_action}</p>
+          <p class="text-slate-600 mt-1"><strong>Votes:</strong> ${votesSummary}</p>
+        </div>
+        ${pol.state === 'OPEN' ? `
+          <div class="flex gap-2">
+            <button onclick="votePolicy('${pol.policy_id}', 'yes')" class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Vote Yes</button>
+            <button onclick="votePolicy('${pol.policy_id}', 'no')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Vote No</button>
+            <button onclick="votePolicy('${pol.policy_id}', 'abstain')" class="text-xs px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700">Abstain</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now - date;
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+async function votePolicy(policyId, vote) {
+  try {
+    const res = await fetch(`${API}/api/policies/${policyId}/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vote })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert(`Vote recorded: ${vote}`);
+    loadPolicies();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+</script>
+
+</body>
+</html>

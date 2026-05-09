@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EIME — Recommendations Queue</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script src="/components/card-renderer.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-6xl mx-auto p-6">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">⭐ NBA Queue</h1>
+    <p class="text-slate-600">Next best action candidates — <span id="queue-count">0</span> pending decision</p>
+  </div>
+
+  <!-- Recommendations List -->
+  <div id="recommendations-list" class="space-y-4">
+    <p class="text-slate-500 text-center py-8">Loading recommendation queue...</p>
+  </div>
+</div>
+</template>
+
+<script>
+const API = 'http://localhost:8000';
+const CHURCH_ID = 'holy_comforter';
+let currentUserTier = 2;
+let allRecommendations = [];
+
+EIMEShell.mount({
+  activeNav: 'council',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime.setContext({
+      page: 'recommendations-queue',
+      payload: { church_id: CHURCH_ID }
+    });
+    loadRecommendations();
+    setInterval(loadRecommendations, 10000);
+  }
+});
+
+async function loadRecommendations() {
+  try {
+    allRecommendations = [
+      {
+        recommendation_id: 'rec_001',
+        state: 'OPEN',
+        title: 'Establish Monthly Cash Reserve Target',
+        description: 'Build cash reserves to cover 6 months of operating expenses',
+        candidates: [
+          { id: 'c1', description: 'Immediate: Allocate 15% of monthly surplus', impact_projection: '+$25K/month' },
+          { id: 'c2', description: 'Gradual: Build over 3 years via 10% allocation', impact_projection: '+$17K/month' },
+          { id: 'c3', description: 'Deferred: Allocate only after achieving $500K baseline', impact_projection: '+$0K/month (now)' }
+        ],
+        selected_candidate: null,
+        rationale: 'Current reserves at 2.1 months; industry standard is 4-6 months',
+        impact_projection: {
+          cash_impact: '$25K monthly increase in reserves',
+          covenant_impact: 'Improves liquidity covenants',
+          mission_impact: 'Enables counter-cyclical grant-making during downturns'
+        },
+        decision_deadline: new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+        decided_by: null,
+        decision: null,
+        privacy_class: 'P2',
+        version: 1,
+        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 48 * 3600000).toISOString()
+      },
+      {
+        recommendation_id: 'rec_002',
+        state: 'OPEN',
+        title: 'Reallocate Underperforming Fund',
+        description: 'Move $75K from Legacy Scholarship (0 grants) to Active Mission Fund',
+        candidates: [
+          { id: 'c1', description: 'Full reallocation: $75K to Active Mission', impact_projection: '+$12 grants/year' },
+          { id: 'c2', description: 'Partial: $50K reallocation, keep $25K reserves', impact_projection: '+$8 grants/year' }
+        ],
+        selected_candidate: null,
+        rationale: 'Legacy Scholarship has no qualified applications; Active Mission has 40+ pending requests',
+        impact_projection: {
+          cash_impact: '$75K annual redistribution',
+          mission_impact: 'Increase active grants from 8 to 20 per year',
+          covenant_impact: 'Maintains restricted fund intent via Active Mission alignment'
+        },
+        decision_deadline: new Date(Date.now() + 7 * 24 * 3600000).toISOString(),
+        decided_by: null,
+        decision: null,
+        privacy_class: 'P2',
+        version: 1,
+        created_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 3 * 24 * 3600000).toISOString()
+      }
+    ];
+
+    renderRecommendations();
+  } catch (e) {
+    console.error('Error loading recommendations:', e);
+  }
+}
+
+function renderRecommendations() {
+  document.getElementById('queue-count').textContent = allRecommendations.filter(r => r.state === 'OPEN').length;
+
+  const container = document.getElementById('recommendations-list');
+
+  if (allRecommendations.length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No recommendations pending</p>';
+    return;
+  }
+
+  container.innerHTML = allRecommendations.map(rec => {
+    const daysUntilDeadline = Math.floor((new Date(rec.decision_deadline) - new Date()) / (24 * 3600000));
+    const urgency = daysUntilDeadline < 3 ? 'text-red-900 bg-red-100' : daysUntilDeadline < 7 ? 'text-orange-900 bg-orange-100' : 'text-blue-900 bg-blue-100';
+
+    return `
+      <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <p class="font-semibold text-slate-900">${rec.title}</p>
+            <p class="text-sm text-slate-700 mt-1">${rec.description}</p>
+          </div>
+          <span class="text-xs font-semibold rounded px-2 py-1 ${urgency}">
+            ${daysUntilDeadline} days
+          </span>
+        </div>
+
+        <div class="bg-slate-50 rounded p-3 mb-4">
+          <p class="text-sm font-semibold text-slate-900 mb-2">Rationale</p>
+          <p class="text-sm text-slate-700">${rec.rationale}</p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+          <p class="text-xs font-semibold text-blue-900 mb-2">Projected Impact</p>
+          <div class="grid grid-cols-2 gap-2 text-xs text-blue-900">
+            <div>💰 Cash: ${rec.impact_projection.cash_impact}</div>
+            <div>🎯 Mission: ${rec.impact_projection.mission_impact}</div>
+            ${rec.impact_projection.covenant_impact ? `<div>📋 Covenant: ${rec.impact_projection.covenant_impact}</div>` : ''}
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <p class="text-xs font-semibold text-slate-900 mb-2">Candidates</p>
+          <div class="space-y-2">
+            ${rec.candidates.map(cand => `
+              <div class="border border-slate-200 rounded p-2 text-xs">
+                <p class="font-medium text-slate-900">${cand.description}</p>
+                <p class="text-slate-600 mt-1">${cand.impact_projection}</p>
+                ${rec.state === 'OPEN' ? `
+                  <button onclick="selectCandidate('${rec.recommendation_id}', '${cand.id}')" class="mt-2 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs">
+                    Select
+                  </button>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        ${rec.state === 'OPEN' ? `
+          <div class="flex gap-2">
+            <button onclick="acceptRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Accept</button>
+            <button onclick="declineRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Decline</button>
+            <button onclick="modifyRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Modify</button>
+          </div>
+        ` : `
+          <div class="text-xs text-slate-600">
+            <strong>Decision:</strong> ${rec.decision} by ${rec.decided_by || 'pending'}
+          </div>
+        `}
+      </div>
+    `;
+  }).join('');
+}
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now - date;
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+async function selectCandidate(recId, candId) {
+  try {
+    const res = await fetch(`${API}/api/recommendations/${recId}/select`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candId })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Candidate selected');
+    loadRecommendations();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function acceptRecommendation(recId) {
+  try {
+    const res = await fetch(`${API}/api/recommendations/${recId}/accept`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Recommendation accepted');
+    loadRecommendations();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function declineRecommendation(recId) {
+  try {
+    const res = await fetch(`${API}/api/recommendations/${recId}/decline`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alert('Recommendation declined');
+    loadRecommendations();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function modifyRecommendation(recId) {
+  alert('Modification interface coming in Phase 3');
+}
+</script>
+
+</body>
+</html>
