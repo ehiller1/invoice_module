@@ -93,8 +93,8 @@ def seeded_church():
     if church_pk:
         connection.execute_query(
             """
-            INSERT INTO gl_accounts (church_id, account_number, account_name, account_type, created_at)
-            VALUES (%s, %s, %s, %s, NOW())
+            INSERT INTO gl_accounts (church_id, account_number, name, account_type, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, NOW(), NOW())
             ON CONFLICT (church_id, account_number) DO NOTHING
             """,
             (church_pk, "7200", "Utilities - Electric", "EXPENSE")
