@@ -48,6 +48,14 @@ class TagKind(str, Enum):
     JOB          = "job"           # processing job id
     ENTRY        = "entry"         # journal entry id
     PAYMENT      = "payment"       # payment id
+    MINISTRY     = "ministry"      # ministry/program (e.g., "worship", "youth", "community_outreach")
+    BENEFICIARY  = "beneficiary"   # primary beneficiary (e.g., "congregation", "community", "staff")
+    COST_CENTER  = "cost_center"   # operational cost center/department
+    GEOGRAPHY    = "geography"     # location/campus/site
+    MISSION_IMPACT = "mission_impact"  # mission outcome (e.g., "spiritual_growth", "community_service")
+    FUNDING_SOURCE = "funding_source"  # source of funds (e.g., "donations", "grants", "earned_income", "endowment")
+    CAPITALIZATION_ELIGIBLE = "capitalization_eligible"  # asset class flag (true/false)
+    GIFT_PURPOSE = "gift_purpose"  # donor intent/designation (e.g., "undesignated", "designated", "endowment")
 
 
 class EventTag(BaseModel):

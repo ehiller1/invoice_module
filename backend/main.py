@@ -2413,11 +2413,13 @@ async def list_plaid_transactions(
 
 @app.post("/api/churches/{church_id}/plaid/webhook")
 async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
-    """Receive Plaid webhook events. We just persist them to the audit log."""
+    """Receive Plaid webhook events. On TRANSACTIONS events, sync accounts and emit BankItemObserved."""
     try:
         body = await request.json()
     except Exception:
         body = {}
+
+    # Always audit log the webhook
     audit_path = Path(__file__).resolve().parent / "data" / f"plaid_webhook_{church_id}.jsonl"
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     with audit_path.open("a") as fh:
@@ -2425,6 +2427,26 @@ async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
             "ts": datetime.utcnow().isoformat(),
             "body": body,
         }) + "\n")
+
+    # If it's a TRANSACTIONS event, sync all Plaid accounts for this church
+    webhook_type = body.get("webhook_type")
+    if webhook_type == "TRANSACTIONS":
+        from .db import plaid_store as db_plaid_store
+        from .tools import plaid_store as tools_plaid_store
+
+        try:
+            # Load all Plaid accounts for this church
+            accounts = db_plaid_store.load_plaid_accounts(church_id)
+            for acct in accounts:
+                # Trigger transaction sync for each account (60 days back)
+                # This calls the Plaid API, stores txns, and emits BankItemObserved events
+                tools_plaid_store.fetch_and_store_transactions(
+                    church_id, acct.account_id, days_back=60
+                )
+        except Exception:
+            # Log webhook audit but don't fail the response if sync fails
+            pass
+
     return _json({"ok": True})
 
 
@@ -3579,122 +3601,206 @@ async def list_events(
 ) -> JSONResponse:
     """List economic events with full fidelity (provenance, dimensions, confidence).
 
-    Mock data for Phase 1. Production will query event substrate.
-    Filters: account, project, customer, geography, esG_category, segment, capitalization_eligibility, tax_treatment
+    Queries the real events table and joins with event_tags for semantic dimensions.
     """
-    events = [
-        {
-            "event_id": "evt_001",
-            "timestamp": "2026-05-01T14:30:00Z",
-            "event_type": "invoice_received",
-            "source": "vendor_portal",
-            "provenance": {
-                "source_system": "vendor_portal",
-                "document_id": "INV-2026-0451",
-                "confidence": 0.98
-            },
-            "economic_substance": {
-                "transaction_type": "expense",
-                "amount": 4200.00,
-                "vendor": "ABC Cleaning Services",
-                "description": "Monthly cleaning services"
-            },
-            "dimensions": {
-                "account": "6100",
-                "project": "facility_maintenance",
-                "customer": None,
-                "function": "operations",
-                "geography": "US-MA",
-                "esg_category": None,
-                "segment": "operations",
-                "capitalization_eligible": False,
-                "tax_treatment": "deductible"
-            },
-            "confidence": 0.95,
-            "lineage": [
-                {"stage": "perception", "timestamp": "2026-05-01T14:30:00Z", "status": "complete"},
-                {"stage": "recognition", "timestamp": "2026-05-01T14:35:00Z", "status": "complete"},
-                {"stage": "coding", "timestamp": "2026-05-01T14:36:00Z", "status": "complete"},
-                {"stage": "accrual", "timestamp": "2026-05-01T14:37:00Z", "status": "complete"}
-            ]
-        },
-        {
-            "event_id": "evt_002",
-            "timestamp": "2026-05-02T09:15:00Z",
-            "event_type": "cash_receipt",
-            "source": "bank_feed",
-            "provenance": {
-                "source_system": "plaid",
-                "feed_id": "txn_98765",
-                "confidence": 1.0
-            },
-            "economic_substance": {
-                "transaction_type": "revenue",
-                "amount": 15000.00,
-                "customer": "First Community Outreach",
-                "description": "Donation - unrestricted"
-            },
-            "dimensions": {
-                "account": "1010",
-                "project": None,
-                "customer": "First Community Outreach",
-                "function": "fundraising",
-                "geography": "US-MA",
-                "esg_category": "community_support",
-                "segment": "donations",
-                "capitalization_eligible": False,
-                "tax_treatment": "tax_exempt"
-            },
-            "confidence": 1.0,
-            "lineage": [
-                {"stage": "perception", "timestamp": "2026-05-02T09:15:00Z", "status": "complete"},
-                {"stage": "recognition", "timestamp": "2026-05-02T09:16:00Z", "status": "complete"},
-                {"stage": "coding", "timestamp": "2026-05-02T09:17:00Z", "status": "complete"},
-                {"stage": "accrual", "timestamp": "2026-05-02T09:18:00Z", "status": "complete"}
-            ]
-        }
-    ]
-    return _json({"church_id": church_id, "total": len(events), "events": events, "offset": offset, "limit": limit})
+    from .db import connection
+
+    try:
+        church_pk = connection.execute_query(
+            "SELECT id FROM churches WHERE church_id = %s",
+            (church_id,),
+            fetch_one=True
+        )
+
+        if not church_pk:
+            return _json({"church_id": church_id, "total": 0, "events": [], "offset": offset, "limit": limit})
+
+        church_pk = church_pk["id"]
+
+        # Count total events for pagination
+        count_result = connection.execute_query(
+            "SELECT COUNT(*) as total FROM events WHERE church_id = %s",
+            (church_pk,),
+            fetch_one=True
+        )
+        total = count_result["total"] if count_result else 0
+
+        # Query events with pagination
+        rows = connection.execute_query(
+            """SELECT e.event_id, e.event_type, e.occurred_at, e.actor, e.confidence, e.payload, e.correlation_id
+               FROM events e
+               WHERE e.church_id = %s
+               ORDER BY e.occurred_at DESC
+               LIMIT %s OFFSET %s""",
+            (church_pk, limit, offset)
+        ) or []
+
+        # Build event response objects
+        events = []
+        for row in rows:
+            event_id = str(row["event_id"])
+            payload = row["payload"] or {}
+
+            # Fetch tags for this event
+            tag_rows = connection.execute_query(
+                "SELECT tag_kind, tag_value FROM event_tags WHERE event_id = %s",
+                (row["event_id"],)
+            ) or []
+
+            dimensions = {}
+            for tag_row in tag_rows:
+                dimensions[tag_row["tag_kind"]] = tag_row["tag_value"]
+
+            # Build response object matching the mock structure
+            event_obj = {
+                "event_id": event_id,
+                "timestamp": row["occurred_at"].isoformat() if row["occurred_at"] else None,
+                "event_type": row["event_type"],
+                "source": payload.get("source", "system"),
+                "provenance": {
+                    "source_system": payload.get("source", "system"),
+                    "document_id": payload.get("document_id", event_id),
+                    "confidence": float(row["confidence"] or 1.0)
+                },
+                "economic_substance": {
+                    "transaction_type": payload.get("transaction_type", "unknown"),
+                    "amount": payload.get("amount", 0),
+                    "vendor": payload.get("vendor", None),
+                    "description": payload.get("description", "")
+                },
+                "dimensions": {
+                    "account": dimensions.get("account", None),
+                    "project": dimensions.get("project", None),
+                    "customer": dimensions.get("customer", None),
+                    "function": dimensions.get("function", None),
+                    "geography": dimensions.get("geography", None),
+                    "esg_category": dimensions.get("esg_category", None),
+                    "segment": dimensions.get("segment", None),
+                    "capitalization_eligible": dimensions.get("capitalization_eligible") == "yes",
+                    "tax_treatment": dimensions.get("tax_treatment", None)
+                },
+                "confidence": float(row["confidence"] or 1.0),
+                "lineage": payload.get("lineage", [])
+            }
+            events.append(event_obj)
+
+        return _json({"church_id": church_id, "total": total, "events": events, "offset": offset, "limit": limit})
+
+    except Exception as e:
+        return _json({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/events/{event_id}")
 async def get_event(event_id: str) -> JSONResponse:
     """Get full details of a single economic event."""
+    from .db import connection
+    from uuid import UUID
+
+    try:
+        # Parse event_id as UUID
+        try:
+            event_uuid = UUID(event_id)
+        except ValueError:
+            return _json({"error": f"Invalid event_id: {event_id}"}, status_code=400)
+
+        # Query single event
+        row = connection.execute_query(
+            """SELECT e.event_id, e.event_type, e.occurred_at, e.actor, e.confidence, e.payload, e.correlation_id
+               FROM events e
+               WHERE e.event_id = %s""",
+            (event_uuid,),
+            fetch_one=True
+        )
+
+        if not row:
+            return _json({"error": f"Event not found: {event_id}"}, status_code=404)
+
+        # Fetch tags for this event
+        tag_rows = connection.execute_query(
+            "SELECT tag_kind, tag_value FROM event_tags WHERE event_id = %s",
+            (event_uuid,)
+        ) or []
+
+        dimensions = {}
+        for tag_row in tag_rows:
+            dimensions[tag_row["tag_kind"]] = tag_row["tag_value"]
+
+        payload = row["payload"] or {}
+
+        # Build response object
+        return _json({
+            "event_id": event_id,
+            "timestamp": row["occurred_at"].isoformat() if row["occurred_at"] else None,
+            "event_type": row["event_type"],
+            "source": payload.get("source", "system"),
+            "provenance": {
+                "source_system": payload.get("source", "system"),
+                "document_id": payload.get("document_id", event_id),
+                "confidence": float(row["confidence"] or 1.0)
+            },
+            "economic_substance": {
+                "transaction_type": payload.get("transaction_type", "unknown"),
+                "amount": payload.get("amount", 0),
+                "vendor": payload.get("vendor", None),
+                "description": payload.get("description", "")
+            },
+            "dimensions": {
+                "account": dimensions.get("account", None),
+                "project": dimensions.get("project", None),
+                "customer": dimensions.get("customer", None),
+                "function": dimensions.get("function", None),
+                "geography": dimensions.get("geography", None),
+                "esg_category": dimensions.get("esg_category", None),
+                "segment": dimensions.get("segment", None),
+                "capitalization_eligible": dimensions.get("capitalization_eligible") == "yes",
+                "tax_treatment": dimensions.get("tax_treatment", None)
+            },
+            "confidence": float(row["confidence"] or 1.0),
+            "lineage": payload.get("lineage", [])
+        })
+
+    except Exception as e:
+        return _json({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/decisions")
+async def list_decisions(
+    church_id: str = "holy_comforter",
+    category: Optional[str] = None,
+    job_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> JSONResponse:
+    """Return paginated decision ledger entries.
+
+    Mirrors /api/churches/{id}/decision-ledger but with consistent API shape
+    (query params instead of path params, pagination support).
+
+    Query params:
+      church_id — church identifier (default: holy_comforter)
+      category  — filter by DecisionCategory (recognize, code, route, approve, override, disavow)
+      job_id    — filter to entries for a specific processing job
+      limit     — max entries returned (default 100)
+      offset    — pagination offset (default 0)
+    """
+    ledger = flow.get_ledger(church_id)
+    entries = list(reversed(ledger.entries))  # most recent first
+
+    if category:
+        entries = [e for e in entries if e.category.value == category.lower()]
+    if job_id:
+        entries = [e for e in entries if e.decision_id.startswith(job_id)]
+
+    total = len(entries)
+    entries = entries[offset:offset+limit]
+
     return _json({
-        "event_id": event_id,
-        "timestamp": "2026-05-01T14:30:00Z",
-        "event_type": "invoice_received",
-        "source": "vendor_portal",
-        "provenance": {
-            "source_system": "vendor_portal",
-            "document_id": "INV-2026-0451",
-            "document_url": "/api/events/evt_001/document",
-            "confidence": 0.98
-        },
-        "economic_substance": {
-            "transaction_type": "expense",
-            "amount": 4200.00,
-            "vendor": "ABC Cleaning Services",
-            "description": "Monthly cleaning services"
-        },
-        "dimensions": {
-            "account": "6100",
-            "project": "facility_maintenance",
-            "customer": None,
-            "function": "operations",
-            "geography": "US-MA",
-            "esg_category": None,
-            "segment": "operations",
-            "capitalization_eligible": False,
-            "tax_treatment": "deductible"
-        },
-        "confidence": 0.95,
-        "lineage": [
-            {"stage": "perception", "timestamp": "2026-05-01T14:30:00Z", "status": "complete", "agent": "pdf_extractor"},
-            {"stage": "recognition", "timestamp": "2026-05-01T14:35:00Z", "status": "complete", "agent": "expense_recognizer", "decision": "recognize_immediately"},
-            {"stage": "coding", "timestamp": "2026-05-01T14:36:00Z", "status": "complete", "agent": "coa_classifier", "decision": "6100 (Facility Maintenance)"},
-            {"stage": "accrual", "timestamp": "2026-05-01T14:37:00Z", "status": "complete", "agent": "accrual_estimator", "decision": "no_accrual_needed"}
-        ]
+        "church_id": church_id,
+        "total": total,
+        "returned": len(entries),
+        "offset": offset,
+        "limit": limit,
+        "decisions": [e.model_dump(mode="json") for e in entries],
     })
 
 
