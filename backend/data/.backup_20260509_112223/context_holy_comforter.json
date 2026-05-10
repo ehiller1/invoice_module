@@ -1,0 +1,1099 @@
+{
+  "church_id": "holy_comforter",
+  "church_name": "Church of the Holy Comforter",
+  "denomination_type": "EPISCOPAL",
+  "fiscal_year": 2026,
+  "fiscal_year_start": "2026-01-01",
+  "accounts": [
+    {
+      "account_number": "1010",
+      "account_name": "Operating Cash",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1020",
+      "account_name": "Outreach Cash",
+      "account_type": "Asset",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1030",
+      "account_name": "Memorial Cash",
+      "account_type": "Asset",
+      "fund_id": "MEMORIAL",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1040",
+      "account_name": "Rector's Discretionary Cash",
+      "account_type": "Asset",
+      "fund_id": "RECTOR_DISC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "1100",
+      "account_name": "Pledges Receivable",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1500",
+      "account_name": "Land",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1510",
+      "account_name": "Church Buildings",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1520",
+      "account_name": "Parish Hall",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1530",
+      "account_name": "Rectory",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1540",
+      "account_name": "Organ & Liturgical Equipment",
+      "account_type": "Asset",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1900",
+      "account_name": "Endowment Investments - Principal",
+      "account_type": "Asset",
+      "fund_id": "ENDOW_PRIN",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "active": true
+    },
+    {
+      "account_number": "1910",
+      "account_name": "Endowment Investments - Accumulated Income",
+      "account_type": "Asset",
+      "fund_id": "ENDOW_INC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "2010",
+      "account_name": "Accounts Payable",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2020",
+      "account_name": "Pass-Through Outreach Liability",
+      "account_type": "Liability",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "2030",
+      "account_name": "Payroll Liabilities",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2040",
+      "account_name": "CPF Payable",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2050",
+      "account_name": "Diocesan Assessment Payable",
+      "account_type": "Liability",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "3100",
+      "account_name": "Net Assets - Without Restriction",
+      "account_type": "Equity",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "3200",
+      "account_name": "Net Assets - Purpose Restricted",
+      "account_type": "Equity",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "3300",
+      "account_name": "Net Assets - Endowment Principal",
+      "account_type": "Equity",
+      "fund_id": "ENDOW_PRIN",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "active": true
+    },
+    {
+      "account_number": "3310",
+      "account_name": "Net Assets - Endowment Income",
+      "account_type": "Equity",
+      "fund_id": "ENDOW_INC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4100",
+      "account_name": "Pledge Income",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4110",
+      "account_name": "Plate Offerings",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4120",
+      "account_name": "Loose Plate / Visitor Offerings",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4200",
+      "account_name": "Designated Gifts - Outreach",
+      "account_type": "Revenue",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4210",
+      "account_name": "Designated Gifts - Memorial",
+      "account_type": "Revenue",
+      "fund_id": "MEMORIAL",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4300",
+      "account_name": "Endowment Income Distributions",
+      "account_type": "Revenue",
+      "fund_id": "ENDOW_INC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "4400",
+      "account_name": "Investment Income",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4500",
+      "account_name": "Facility Use / Wedding Fees",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4900",
+      "account_name": "Rector's Discretionary Contributions",
+      "account_type": "Revenue",
+      "fund_id": "RECTOR_DISC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "5100",
+      "account_name": "Clergy Salary (Rector)",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5101",
+      "account_name": "Clergy Housing Allowance",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5102",
+      "account_name": "Clergy SECA Reimbursement",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5103",
+      "account_name": "Clergy Continuing Education",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5104",
+      "account_name": "Clergy Travel & Auto",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5210",
+      "account_name": "CPF Pension Assessment (18%)",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5220",
+      "account_name": "Clergy Healthcare Premium",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5221",
+      "account_name": "Clergy Dental & Vision",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5222",
+      "account_name": "Clergy Life & Disability",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5300",
+      "account_name": "Lay Staff Wages - Parish Administrator",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5310",
+      "account_name": "Lay Staff Wages - Music Director",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5320",
+      "account_name": "Lay Staff Wages - Sexton",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5400",
+      "account_name": "Lay Staff Benefits - Health",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5410",
+      "account_name": "Lay Staff Benefits - Retirement (DTL)",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5420",
+      "account_name": "Payroll Taxes (Employer FICA)",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6100",
+      "account_name": "Worship - Music & Choir",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6110",
+      "account_name": "Altar Guild & Communion Supplies",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6120",
+      "account_name": "Liturgical Vestments & Linens",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6200",
+      "account_name": "Christian Formation - Children",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6210",
+      "account_name": "Christian Formation - Youth (EYC)",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6220",
+      "account_name": "Christian Formation - Adult",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6300",
+      "account_name": "Pastoral Care & Visitation",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6400",
+      "account_name": "Outreach - Pass-Through Disbursements",
+      "account_type": "Expense",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "6410",
+      "account_name": "Episcopal Relief & Development (ERD)",
+      "account_type": "Expense",
+      "fund_id": "OUTREACH",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "6500",
+      "account_name": "Memorial Designated Disbursements",
+      "account_type": "Expense",
+      "fund_id": "MEMORIAL",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "6900",
+      "account_name": "Rector's Discretionary Disbursements",
+      "account_type": "Expense",
+      "fund_id": "RECTOR_DISC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    },
+    {
+      "account_number": "7100",
+      "account_name": "Mortgage / Rent",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7200",
+      "account_name": "Utilities - Electric",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7210",
+      "account_name": "Utilities - Gas",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7220",
+      "account_name": "Utilities - Water/Sewer",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7230",
+      "account_name": "Utilities - Internet/Phone",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7300",
+      "account_name": "Maintenance & Repairs",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7310",
+      "account_name": "Janitorial / Sexton Supplies",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7320",
+      "account_name": "Grounds & Landscaping",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7400",
+      "account_name": "Insurance - Property & Liability",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7410",
+      "account_name": "Insurance - Workers Comp",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7500",
+      "account_name": "Technology & Software",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8100",
+      "account_name": "Office Supplies",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8200",
+      "account_name": "Legal & Audit",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8300",
+      "account_name": "Bank Fees & Merchant Processing",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8400",
+      "account_name": "Stewardship Campaign",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8410",
+      "account_name": "Diocesan Assessment",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8420",
+      "account_name": "National Church / Province Pledge",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    }
+  ],
+  "funds": [
+    {
+      "fund_id": "GEN",
+      "fund_name": "General Operating",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "fund_category": "GENERAL_OPERATING",
+      "purpose_description": "Plate, pledge, and unrestricted gifts; pays clergy comp, CPF, diocesan assessment",
+      "expenditure_rules": "Unrestricted - any operating expense",
+      "current_balance": "125000"
+    },
+    {
+      "fund_id": "OUTREACH",
+      "fund_name": "Outreach & Mission",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Designated outreach gifts; pass-through to ERD and partner agencies",
+      "expenditure_rules": "Pass-through only to qualifying outreach organizations (ERD, diocesan outreach)",
+      "current_balance": "18500"
+    },
+    {
+      "fund_id": "MEMORIAL",
+      "fund_name": "Memorial Gifts",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Donor-purposed gifts (altar flowers, music, sanctuary improvements)",
+      "expenditure_rules": "Spend per donor's stated purpose; vestry tracks intent on each gift",
+      "current_balance": "7200"
+    },
+    {
+      "fund_id": "RECTOR_DISC",
+      "fund_name": "Rector's Discretionary Fund",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "BOARD_DESIGNATED",
+      "purpose_description": "TEC Canon I.7 fund for charitable aid; rector sole signatory",
+      "expenditure_rules": "IRS-substantiated charitable disbursements only; never personal use of rector",
+      "current_balance": "3850"
+    },
+    {
+      "fund_id": "ENDOW_PRIN",
+      "fund_name": "Endowment - Principal",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "fund_category": "PERMANENTLY_RESTRICTED",
+      "purpose_description": "Corpus preserved in perpetuity per UPMIFA",
+      "expenditure_rules": "Principal never spent; only income may be drawn (see ENDOW_INC)",
+      "current_balance": "450000"
+    },
+    {
+      "fund_id": "ENDOW_INC",
+      "fund_name": "Endowment - Income",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Spendable income from endowment (typ. 4-5% rolling-average draw)",
+      "expenditure_rules": "Distributed per vestry-approved spending policy; supports parish operations",
+      "current_balance": "21000"
+    }
+  ],
+  "allocation_schedules": [
+    {
+      "schedule_id": "CPF_18PCT",
+      "name": "Church Pension Fund - 18% Clergy Assessment",
+      "basis": "pct_of_clergy_comp",
+      "allocations": [
+        {
+          "source_account": "5100",
+          "include_pct": 100.0,
+          "note": "Clergy salary - assessable base"
+        },
+        {
+          "source_account": "5101",
+          "include_pct": 100.0,
+          "note": "Clergy housing allowance - assessable base"
+        },
+        {
+          "source_account": "5102",
+          "include_pct": 100.0,
+          "note": "Clergy SECA reimbursement - assessable base"
+        },
+        {
+          "target_expense_account": "5210",
+          "target_liability_account": "2040",
+          "rate_pct": 18.0,
+          "note": "Mandatory CPF assessment per General Convention"
+        }
+      ],
+      "applies_to_categories": [
+        "CLERGY_COMPENSATION",
+        "CLERGY_HOUSING",
+        "SECA_REIMBURSEMENT"
+      ]
+    }
+  ],
+  "capitalisation_threshold_usd": "2500",
+  "parsonage_allowance_current_year": "42000",
+  "parsonage_allowance_used_ytd": "0",
+  "apportionment_accounts": [
+    {
+      "account_number": "8410",
+      "pct_of_revenue": "12.5"
+    }
+  ],
+  "warnings": [
+    "Diocesan assessment rate (12.5%) is a planning placeholder - confirm with diocese for actual rate and base definition (NOI).",
+    "CPF allocation schedule (CPF_18PCT) is informational; gl_mapper integration of basis='pct_of_clergy_comp' pending."
+  ],
+  "budget": {
+    "fiscal_year": 2026,
+    "plan_date": "2026-05-06",
+    "amendment_number": 0,
+    "accounts": {
+      "1100": {
+        "jan": "0",
+        "feb": "0",
+        "mar": "0",
+        "apr": "0",
+        "may": "0",
+        "jun": "0",
+        "jul": "0",
+        "aug": "0",
+        "sep": "0",
+        "oct": "0",
+        "nov": "0",
+        "dec": "0",
+        "annual_total": "0"
+      },
+      "2040": {
+        "jan": "1500",
+        "feb": "1500",
+        "mar": "1500",
+        "apr": "1500",
+        "may": "1500",
+        "jun": "1500",
+        "jul": "1500",
+        "aug": "1500",
+        "sep": "1500",
+        "oct": "1500",
+        "nov": "1500",
+        "dec": "1500",
+        "annual_total": "18000"
+      },
+      "3100": {
+        "jan": "0",
+        "feb": "0",
+        "mar": "0",
+        "apr": "0",
+        "may": "0",
+        "jun": "0",
+        "jul": "0",
+        "aug": "0",
+        "sep": "0",
+        "oct": "0",
+        "nov": "0",
+        "dec": "0",
+        "annual_total": "0"
+      },
+      "4100": {
+        "jan": "15000",
+        "feb": "15000",
+        "mar": "15000",
+        "apr": "15000",
+        "may": "15000",
+        "jun": "15000",
+        "jul": "15000",
+        "aug": "15000",
+        "sep": "15000",
+        "oct": "15000",
+        "nov": "15000",
+        "dec": "15000",
+        "annual_total": "180000"
+      },
+      "4200": {
+        "jan": "2000",
+        "feb": "2000",
+        "mar": "2000",
+        "apr": "2000",
+        "may": "2000",
+        "jun": "2000",
+        "jul": "2000",
+        "aug": "2000",
+        "sep": "2000",
+        "oct": "2000",
+        "nov": "2000",
+        "dec": "2000",
+        "annual_total": "24000"
+      },
+      "4300": {
+        "jan": "500",
+        "feb": "500",
+        "mar": "500",
+        "apr": "500",
+        "may": "500",
+        "jun": "500",
+        "jul": "500",
+        "aug": "500",
+        "sep": "500",
+        "oct": "500",
+        "nov": "500",
+        "dec": "500",
+        "annual_total": "6000"
+      },
+      "4900": {
+        "jan": "250",
+        "feb": "250",
+        "mar": "250",
+        "apr": "250",
+        "may": "250",
+        "jun": "250",
+        "jul": "250",
+        "aug": "250",
+        "sep": "250",
+        "oct": "250",
+        "nov": "250",
+        "dec": "250",
+        "annual_total": "3000"
+      },
+      "5100": {
+        "jan": "6000",
+        "feb": "6000",
+        "mar": "6000",
+        "apr": "6000",
+        "may": "6000",
+        "jun": "6000",
+        "jul": "6000",
+        "aug": "6000",
+        "sep": "6000",
+        "oct": "6000",
+        "nov": "6000",
+        "dec": "6000",
+        "annual_total": "72000"
+      },
+      "5101": {
+        "jan": "2000",
+        "feb": "2000",
+        "mar": "2000",
+        "apr": "2000",
+        "may": "2000",
+        "jun": "2000",
+        "jul": "2000",
+        "aug": "2000",
+        "sep": "2000",
+        "oct": "2000",
+        "nov": "2000",
+        "dec": "2000",
+        "annual_total": "24000"
+      },
+      "5102": {
+        "jan": "458",
+        "feb": "458",
+        "mar": "458",
+        "apr": "458",
+        "may": "458",
+        "jun": "458",
+        "jul": "458",
+        "aug": "458",
+        "sep": "458",
+        "oct": "458",
+        "nov": "459",
+        "dec": "459",
+        "annual_total": "5500"
+      },
+      "5210": {
+        "jan": "900",
+        "feb": "900",
+        "mar": "900",
+        "apr": "900",
+        "may": "900",
+        "jun": "900",
+        "jul": "900",
+        "aug": "900",
+        "sep": "900",
+        "oct": "900",
+        "nov": "900",
+        "dec": "900",
+        "annual_total": "10800"
+      },
+      "5220": {
+        "jan": "800",
+        "feb": "800",
+        "mar": "800",
+        "apr": "800",
+        "may": "800",
+        "jun": "800",
+        "jul": "800",
+        "aug": "800",
+        "sep": "800",
+        "oct": "800",
+        "nov": "800",
+        "dec": "800",
+        "annual_total": "9600"
+      },
+      "5222": {
+        "jan": "100",
+        "feb": "100",
+        "mar": "100",
+        "apr": "100",
+        "may": "100",
+        "jun": "100",
+        "jul": "100",
+        "aug": "100",
+        "sep": "100",
+        "oct": "100",
+        "nov": "100",
+        "dec": "100",
+        "annual_total": "1200"
+      },
+      "5400": {
+        "jan": "1500",
+        "feb": "1500",
+        "mar": "1500",
+        "apr": "1500",
+        "may": "1500",
+        "jun": "1500",
+        "jul": "1500",
+        "aug": "1500",
+        "sep": "1500",
+        "oct": "1500",
+        "nov": "1500",
+        "dec": "1500",
+        "annual_total": "18000"
+      },
+      "6100": {
+        "jan": "250",
+        "feb": "250",
+        "mar": "250",
+        "apr": "250",
+        "may": "250",
+        "jun": "250",
+        "jul": "250",
+        "aug": "250",
+        "sep": "250",
+        "oct": "250",
+        "nov": "250",
+        "dec": "250",
+        "annual_total": "3000"
+      },
+      "6200": {
+        "jan": "200",
+        "feb": "200",
+        "mar": "200",
+        "apr": "200",
+        "may": "200",
+        "jun": "200",
+        "jul": "200",
+        "aug": "200",
+        "sep": "200",
+        "oct": "200",
+        "nov": "200",
+        "dec": "200",
+        "annual_total": "2400"
+      },
+      "6300": {
+        "jan": "150",
+        "feb": "150",
+        "mar": "150",
+        "apr": "150",
+        "may": "150",
+        "jun": "150",
+        "jul": "150",
+        "aug": "150",
+        "sep": "150",
+        "oct": "150",
+        "nov": "150",
+        "dec": "150",
+        "annual_total": "1800"
+      },
+      "6400": {
+        "jan": "200",
+        "feb": "200",
+        "mar": "200",
+        "apr": "200",
+        "may": "200",
+        "jun": "200",
+        "jul": "200",
+        "aug": "200",
+        "sep": "200",
+        "oct": "200",
+        "nov": "200",
+        "dec": "200",
+        "annual_total": "2400"
+      },
+      "6500": {
+        "jan": "1000",
+        "feb": "1000",
+        "mar": "1000",
+        "apr": "1000",
+        "may": "1000",
+        "jun": "1000",
+        "jul": "1000",
+        "aug": "1000",
+        "sep": "1000",
+        "oct": "1000",
+        "nov": "1000",
+        "dec": "1000",
+        "annual_total": "12000"
+      },
+      "6900": {
+        "jan": "250",
+        "feb": "250",
+        "mar": "250",
+        "apr": "250",
+        "may": "250",
+        "jun": "250",
+        "jul": "250",
+        "aug": "250",
+        "sep": "250",
+        "oct": "250",
+        "nov": "250",
+        "dec": "250",
+        "annual_total": "3000"
+      },
+      "7100": {
+        "jan": "400",
+        "feb": "400",
+        "mar": "400",
+        "apr": "400",
+        "may": "400",
+        "jun": "400",
+        "jul": "400",
+        "aug": "400",
+        "sep": "400",
+        "oct": "400",
+        "nov": "400",
+        "dec": "400",
+        "annual_total": "4800"
+      },
+      "7200": {
+        "jan": "200",
+        "feb": "200",
+        "mar": "200",
+        "apr": "200",
+        "may": "200",
+        "jun": "200",
+        "jul": "200",
+        "aug": "200",
+        "sep": "200",
+        "oct": "200",
+        "nov": "200",
+        "dec": "200",
+        "annual_total": "2400"
+      },
+      "7300": {
+        "jan": "300",
+        "feb": "300",
+        "mar": "300",
+        "apr": "300",
+        "may": "300",
+        "jun": "300",
+        "jul": "300",
+        "aug": "300",
+        "sep": "300",
+        "oct": "300",
+        "nov": "300",
+        "dec": "300",
+        "annual_total": "3600"
+      },
+      "7500": {
+        "jan": "500",
+        "feb": "500",
+        "mar": "500",
+        "apr": "500",
+        "may": "500",
+        "jun": "500",
+        "jul": "500",
+        "aug": "500",
+        "sep": "500",
+        "oct": "500",
+        "nov": "500",
+        "dec": "500",
+        "annual_total": "6000"
+      },
+      "8410": {
+        "jan": "1625",
+        "feb": "1625",
+        "mar": "1625",
+        "apr": "1625",
+        "may": "1625",
+        "jun": "1625",
+        "jul": "1625",
+        "aug": "1625",
+        "sep": "1625",
+        "oct": "1625",
+        "nov": "1625",
+        "dec": "1625",
+        "annual_total": "19500"
+      },
+      "8420": {
+        "jan": "200",
+        "feb": "200",
+        "mar": "200",
+        "apr": "200",
+        "may": "200",
+        "jun": "200",
+        "jul": "200",
+        "aug": "200",
+        "sep": "200",
+        "oct": "200",
+        "nov": "200",
+        "dec": "200",
+        "annual_total": "2400"
+      }
+    },
+    "uploaded_at": "2026-05-06T14:37:59.716562",
+    "uploaded_by": null,
+    "source_filename": "holy-comforter-budget-2024.csv"
+  },
+  "ytd_actuals": {},
+  "budget_warning_threshold": 0.8
+}

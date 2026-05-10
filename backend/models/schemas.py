@@ -127,6 +127,21 @@ class ProcessingStatus(str, Enum):
     TREASURER_APPROVED = "TREASURER_APPROVED"
 
 
+class RouteReason(str, Enum):
+    """Phase 6: Typed reason codes for why a line/JE was routed or escalated.
+
+    Used on ReviewedLine.reason and exceptions inbox cards so UI can branch
+    and tests can assert on specific signals rather than free-text strings.
+    """
+    INSUFFICIENT_CONTEXT = "INSUFFICIENT_CONTEXT"    # missing vendor, amount, GL details
+    CRITICAL_SIGNAL = "CRITICAL_SIGNAL"              # fraud, compliance, policy flags
+    BUDGET_OVER = "BUDGET_OVER"                      # exceeds account or GL pattern budget
+    RESTRICTION_VIOLATED = "RESTRICTION_VIOLATED"    # donor/fund restriction conflict
+    POSTING_BLOCKED = "POSTING_BLOCKED"              # ACS Realm or external posting failed
+    REVIEWER_ESCALATION = "REVIEWER_ESCALATION"      # human escalated from queue
+    UNMATCHED_BANK_ITEM = "UNMATCHED_BANK_ITEM"      # bank txn not structurally matched
+
+
 class JEStatus(str, Enum):
     DRAFT = "DRAFT"                            # AI-generated, not yet reviewed
     OPEN = "OPEN"                              # human-reviewed, awaiting budget-owner approval
@@ -340,7 +355,8 @@ class DraftAllocations(BaseModel):
 class ReviewedLine(BaseModel):
     line_id: str
     verdict: Verdict
-    reasons: List[str] = Field(default_factory=list)
+    reason: Optional[RouteReason] = None  # Phase 6: typed reason for routing/escalation
+    reasons: List[str] = Field(default_factory=list)  # legacy: kept for backwards compat
     revised_postings: Optional[List[Posting]] = None
 
 

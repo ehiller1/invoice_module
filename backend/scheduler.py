@@ -229,6 +229,46 @@ def draft_recurring_jes() -> None:
             )
 
 
+def sync_all_plaid_accounts() -> None:
+    """Phase 5c: Continuous Plaid sync background job (every 30 minutes).
+
+    Syncs Plaid transactions for all churches without UI intervention.
+    Runs automatically; structural matching happens on each sync.
+    """
+    try:
+        from .db import connection, plaid_store
+
+        # Load all churches
+        rows = connection.execute_query("SELECT church_id FROM churches") or []
+        for row in rows:
+            church_id = row.get("church_id")
+            if not church_id:
+                continue
+            try:
+                # Get all Plaid accounts for this church
+                accounts = plaid_store.load_plaid_accounts(church_id)
+                for account in accounts:
+                    try:
+                        new_txns = plaid_store.fetch_and_store_transactions(
+                            church_id,
+                            account.get("account_id") or "",
+                            days_back=60
+                        )
+                        logger.info(
+                            f"Plaid sync: {church_id} / {account.get('account_id')} "
+                            f"synced {len(new_txns)} transactions"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Plaid sync failed for {church_id} / "
+                            f"{account.get('account_id')}: {e}"
+                        )
+            except Exception as e:
+                logger.warning(f"Plaid sync failed for {church_id}: {e}")
+    except Exception as e:
+        logger.error(f"Plaid background sync job error: {e}")
+
+
 def start_scheduler() -> None:
     """Start the background scheduler. No-op if APScheduler unavailable."""
     global _scheduler
@@ -252,6 +292,14 @@ def start_scheduler() -> None:
         hour="2",
         minute="0",
         id="recurring_je_draft",
+        replace_existing=True,
+    )
+    # Plaid background sync every 30 minutes (Phase 5c: continuous reconciliation).
+    _scheduler.add_job(
+        sync_all_plaid_accounts,
+        "interval",
+        minutes=30,
+        id="plaid_sync",
         replace_existing=True,
     )
     _scheduler.start()

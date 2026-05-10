@@ -1,0 +1,147 @@
+{
+  "church_id": "test_presbyterian",
+  "church_name": "Test Presbyterian Church",
+  "denomination_type": "PRESBYTERIAN_PCUSA",
+  "fiscal_year": 2025,
+  "fiscal_year_start": "2025-01-01",
+  "accounts": [
+    {
+      "account_number": "1000",
+      "account_name": "Cash - Checking",
+      "account_type": "ASSET",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1100",
+      "account_name": "Cash - Savings",
+      "account_type": "ASSET",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "1200",
+      "account_name": "Investments",
+      "account_type": "ASSET",
+      "fund_id": "END",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "2010",
+      "account_name": "Accounts Payable",
+      "account_type": "LIABILITY",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "4000",
+      "account_name": "Tithes & Offerings",
+      "account_type": "Revenue",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5000",
+      "account_name": "Clergy Compensation",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5010",
+      "account_name": "Clergy Salary",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5050",
+      "account_name": "Nursery Staff Salary",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "5101",
+      "account_name": "Housing Allowance",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "7000",
+      "account_name": "Facilities",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8000",
+      "account_name": "Administration",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8310",
+      "account_name": "World Service Fund",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8320",
+      "account_name": "Episcopal Fund",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "8710",
+      "account_name": "GA Per Capita",
+      "account_type": "EXPENSE",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    }
+  ],
+  "funds": [
+    {
+      "fund_id": "GEN",
+      "fund_name": "General Operating Fund",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "fund_category": "GENERAL_OPERATING",
+      "purpose_description": null,
+      "expenditure_rules": null,
+      "current_balance": "0"
+    },
+    {
+      "fund_id": "END",
+      "fund_name": "Endowment Fund",
+      "restriction_class": "WITH_RESTRICTION_PERMANENT",
+      "fund_category": "PERMANENTLY_RESTRICTED",
+      "purpose_description": null,
+      "expenditure_rules": null,
+      "current_balance": "0"
+    }
+  ],
+  "allocation_schedules": [],
+  "capitalisation_threshold_usd": "2500",
+  "parsonage_allowance_current_year": "0",
+  "parsonage_allowance_used_ytd": "0",
+  "apportionment_accounts": [],
+  "warnings": []
+}

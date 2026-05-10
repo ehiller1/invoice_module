@@ -1,0 +1,80 @@
+{
+  "church_id": "test_phase1",
+  "church_name": "Test",
+  "denomination_type": "EPISCOPAL",
+  "fiscal_year": 2026,
+  "fiscal_year_start": "2026-01-01",
+  "accounts": [
+    {
+      "account_number": "7100",
+      "account_name": "Office",
+      "account_type": "Expense",
+      "fund_id": "GEN",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "active": true
+    },
+    {
+      "account_number": "6900",
+      "account_name": "Rector Discretionary",
+      "account_type": "Expense",
+      "fund_id": "DISC",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "active": true
+    }
+  ],
+  "funds": [
+    {
+      "fund_id": "GEN",
+      "fund_name": "General",
+      "restriction_class": "WITHOUT_RESTRICTION",
+      "fund_category": "GENERAL_OPERATING",
+      "purpose_description": null,
+      "expenditure_rules": null,
+      "current_balance": "0"
+    },
+    {
+      "fund_id": "DISC",
+      "fund_name": "Rector's Discretionary",
+      "restriction_class": "WITH_RESTRICTION_PURPOSE",
+      "fund_category": "TEMP_RESTRICTED_PURPOSE",
+      "purpose_description": "Pastoral discretionary care only",
+      "expenditure_rules": null,
+      "current_balance": "0"
+    }
+  ],
+  "allocation_schedules": [],
+  "capitalisation_threshold_usd": "2500",
+  "parsonage_allowance_current_year": "0",
+  "parsonage_allowance_used_ytd": "0",
+  "apportionment_accounts": [],
+  "warnings": [],
+  "budget": {
+    "fiscal_year": 2026,
+    "plan_date": "2026-01-01",
+    "amendment_number": 0,
+    "accounts": {
+      "7100": {
+        "jan": "0",
+        "feb": "0",
+        "mar": "0",
+        "apr": "0",
+        "may": "0",
+        "jun": "0",
+        "jul": "0",
+        "aug": "0",
+        "sep": "0",
+        "oct": "0",
+        "nov": "0",
+        "dec": "0",
+        "annual_total": "1000"
+      }
+    },
+    "uploaded_at": "2026-05-07T10:19:06.562089",
+    "uploaded_by": null,
+    "source_filename": null
+  },
+  "ytd_actuals": {
+    "6900": "200"
+  },
+  "budget_warning_threshold": 0.8
+}

@@ -52,17 +52,7 @@
   <div class="flex items-center justify-between mb-6">
     <div>
       <h1 class="text-3xl font-bold text-slate-900 mb-1">Bank Reconciliation <span class="text-sm text-amber-700 font-normal">(legacy)</span></h1>
-      <p class="text-slate-600">Match bank transactions to journal entries for the selected period</p>
-    </div>
-    <div class="flex items-center gap-3">
-      <!-- Auto-match status pill (hidden until first run) -->
-      <div id="automatch-status" class="hidden text-xs text-slate-500 text-right leading-tight"></div>
-      <button id="sync-btn" onclick="syncPlaid()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-        Sync Plaid
-      </button>
-      <button id="automatch-btn" onclick="autoMatch()" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 transition-colors">
-        Auto-Match
-      </button>
+      <p class="text-slate-600">This page is read-only. Reconciliation now runs continuously in the background.</p>
     </div>
   </div>
 
@@ -86,24 +76,13 @@
     </div>
   </div>
 
-  <!-- Statement upload zone -->
-  <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
-    <h2 class="text-lg font-semibold text-slate-900 mb-1">Upload Bank Statement</h2>
-    <p class="text-sm text-slate-500 mb-4">Upload a CSV, OFX, or QFX export — transactions are parsed and added to the match queue automatically.</p>
-    <div id="statement-upload-zone"
-         class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-navy-600 hover:bg-slate-50 transition-all cursor-pointer"
-         onclick="document.getElementById('statement-file-input').click()"
-         ondragover="event.preventDefault(); this.classList.add('border-navy-600','bg-slate-50')"
-         ondragleave="this.classList.remove('border-navy-600','bg-slate-50')"
-         ondrop="event.preventDefault(); this.classList.remove('border-navy-600','bg-slate-50'); handleDrop(event)">
-      <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-      </svg>
-      <p class="text-slate-600 font-medium text-sm">Drop statement file here or click to browse</p>
-      <p class="text-slate-400 text-xs mt-1">CSV, OFX, or QFX · Max 10 MB</p>
-      <input type="file" id="statement-file-input" accept=".csv,.ofx,.qfx" class="hidden" onchange="uploadStatement(this.files[0])" />
-    </div>
-    <div id="upload-status" class="hidden mt-3 text-sm"></div>
+  <!-- Deprecation notice for upload -->
+  <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
+    <p class="text-sm text-slate-600">
+      <strong>Bank statement uploads</strong> are now handled as continuous event sources.
+      Use the <a href="/exceptions-queue.html" class="underline font-semibold">Exceptions Queue</a>
+      to surface unmatched items for review.
+    </p>
   </div>
 
   <!-- ── Stat cards + close-status narrative ── -->
