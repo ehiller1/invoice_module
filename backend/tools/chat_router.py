@@ -613,7 +613,14 @@ async def route_question(
     kb_hits: List[Any] = []
     try:
         from . import knowledge_base
-        kb_hits = knowledge_base.kb_search(question, church_id=effective_church, k=3)
+        # Phase 6: filter KB by church's denomination to avoid cross-denomination citations
+        denomination = getattr(ctx, "denomination_type", None) if ctx else None
+        kb_hits = knowledge_base.kb_search(
+            question,
+            church_id=effective_church,
+            k=3,
+            denomination=denomination
+        )
     except Exception:
         kb_hits = []
 
