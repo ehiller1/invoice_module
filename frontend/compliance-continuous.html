@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Continuous Compliance — Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <template id="page-center-content">
+        <div class="p-6 max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Continuous Compliance</h1>
+                <p class="text-gray-600">Live compliance position: covenant trajectories, GAAP conformance, tax position, materiality tracking. Preemptive alerts before breaches occur.</p>
+            </div>
+
+            <!-- Status Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Covenant Health</p>
+                    <p class="text-2xl font-bold text-green-600">GREEN</p>
+                    <p class="text-xs text-gray-600 mt-2">No violations detected</p>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm font-medium text-gray-600 mb-2">GAAP Conformance</p>
+                    <p class="text-2xl font-bold text-green-600">✓ Compliant</p>
+                    <p class="text-xs text-gray-600 mt-2">0 violations</p>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Tax Position</p>
+                    <p class="text-2xl font-bold text-green-600">LOW RISK</p>
+                    <p class="text-xs text-gray-600 mt-2">Audit risk: low</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Materiality Budget</p>
+                    <p class="text-2xl font-bold text-blue-600">$62.5K</p>
+                    <p class="text-xs text-gray-600 mt-2">Remaining capacity</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <div class="flex gap-4 overflow-x-auto">
+                    <button onclick="switchCompTab('covenants')" id="tabCompCovenants" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm whitespace-nowrap">
+                        Covenants
+                    </button>
+                    <button onclick="switchCompTab('gaap')" id="tabCompGAAP" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        GAAP/IFRS
+                    </button>
+                    <button onclick="switchCompTab('tax')" id="tabCompTax" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Tax Position
+                    </button>
+                    <button onclick="switchCompTab('materiality')" id="tabCompMat" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Materiality
+                    </button>
+                </div>
+            </div>
+
+            <!-- COVENANTS Tab -->
+            <div id="tabContentCovenants" class="space-y-6">
+                <div id="covenantsList"></div>
+            </div>
+
+            <!-- GAAP Tab -->
+            <div id="tabContentGAAP" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">GAAP/IFRS Conformance</h2>
+                    <div id="gaapStatus"></div>
+                </div>
+            </div>
+
+            <!-- TAX Tab -->
+            <div id="tabContentTax" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Tax Position Health</h2>
+                    <div id="taxStatus"></div>
+                </div>
+            </div>
+
+            <!-- MATERIALITY Tab -->
+            <div id="tabContentMateriality" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Materiality Tracking</h2>
+                    <div id="materialityStatus"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="eime-bus.js"></script>
+    <script src="eime-shell.js"></script>
+    <script src="eime-chat-rail.js"></script>
+    <script>
+        let complianceData = {};
+        const CHURCH_ID = 'holy_comforter';
+
+        async function loadComplianceData() {
+            try {
+                const response = await fetch(`/api/compliance/status?church_id=${CHURCH_ID}`);
+                complianceData = await response.json();
+
+                renderCovenantsTab();
+                renderGAAPTab();
+                renderTaxTab();
+                renderMaterialityTab();
+            } catch (error) {
+                console.error('Error loading compliance data:', error);
+            }
+        }
+
+        function renderCovenantsTab() {
+            const covenants = complianceData.covenants || [];
+            if (covenants.length === 0) {
+                document.getElementById('covenantsList').innerHTML = '<div class="text-center text-gray-500">No covenants configured</div>';
+                return;
+            }
+
+            document.getElementById('covenantsList').innerHTML = covenants.map((covenant, idx) => {
+                const remaining = covenant.threshold - covenant.current_position;
+                const pBreach = covenant.trajectory_p_breach_6m || 0;
+                const status = pBreach < 0.1 ? 'green' : pBreach < 0.3 ? 'yellow' : 'red';
+                const breachPercentage = (pBreach * 100).toFixed(0);
+
+                const statusColors = {
+                    green: 'bg-green-50 border-l-4 border-green-500',
+                    yellow: 'bg-yellow-50 border-l-4 border-yellow-500',
+                    red: 'bg-red-50 border-l-4 border-red-500'
+                };
+
+                const statusBadges = {
+                    green: 'bg-green-100 text-green-800',
+                    yellow: 'bg-yellow-100 text-yellow-800',
+                    red: 'bg-red-100 text-red-800'
+                };
+
+                return `
+                    <div class="bg-white rounded-lg shadow-sm p-6 ${statusColors[status]}">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">${covenant.name}</h3>
+                                <p class="text-sm text-gray-600 mt-1">Threshold: $${(covenant.threshold || 0).toLocaleString()}</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusBadges[status]}">
+                                ${status.toUpperCase()} - ${breachPercentage}% breach risk
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <p class="text-xs font-medium text-gray-600">Current</p>
+                                <p class="text-xl font-bold text-gray-900">$${(covenant.current_position || 0).toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-medium text-gray-600">Trajectory (6m)</p>
+                                <p class="text-xl font-bold text-gray-900">$${(covenant.trajectory_6m || covenant.current_position || 0).toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-medium text-gray-600">Remaining</p>
+                                <p class="text-xl font-bold ${remaining > 0 ? 'text-green-600' : 'text-red-600'}">$${remaining.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        <!-- Progress bar -->
+                        <div class="mb-6">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600">Utilization</span>
+                                <span class="text-xs font-medium text-gray-900">${((covenant.current_position || 0) / (covenant.threshold || 1) * 100).toFixed(1)}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div style="width: ${Math.min((covenant.current_position || 0) / (covenant.threshold || 1) * 100, 100)}%" class="bg-${status}-600 h-2 rounded-full"></div>
+                            </div>
+                        </div>
+
+                        ${covenant.recovery_levers && covenant.recovery_levers.length > 0 ? `
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 mb-3">Recovery Levers</p>
+                                <div class="space-y-2">
+                                    ${covenant.recovery_levers.map(lever => `
+                                        <div class="flex items-center justify-between bg-white p-3 rounded border border-gray-200">
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">${lever.lever}</p>
+                                                <p class="text-xs text-gray-600 mt-1">Timing: ${lever.timeline}</p>
+                                            </div>
+                                            <p class="text-sm font-bold text-gray-900">${lever.impact}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderGAAPTab() {
+            const gaap = complianceData.gaap_conformance || {};
+            const violations = gaap.violations || [];
+
+            const html = `
+                <div class="mb-4">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Conformance Status</p>
+                    <p class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                        gaap.status === 'compliant' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }">
+                        ${gaap.status === 'compliant' ? '✓ COMPLIANT' : 'VIOLATIONS DETECTED'}
+                    </p>
+                </div>
+
+                ${violations.length > 0 ? `
+                    <div>
+                        <p class="text-sm font-medium text-gray-900 mb-3">Violations</p>
+                        <div class="space-y-2">
+                            ${violations.map(v => `
+                                <div class="border border-red-200 bg-red-50 p-3 rounded">
+                                    <p class="text-sm font-medium text-red-900">${v.description || 'Unknown violation'}</p>
+                                    <p class="text-xs text-red-700 mt-1">${v.detail || ''}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : `
+                    <div class="text-center py-6">
+                        <p class="text-sm text-green-600 font-medium">✓ All transactions conform to GAAP standards</p>
+                    </div>
+                `}
+
+                <div class="mt-6 text-xs text-gray-600">
+                    Last check: ${gaap.last_check ? new Date(gaap.last_check).toLocaleString() : 'Never'}
+                </div>
+            `;
+            document.getElementById('gaapStatus').innerHTML = html;
+        }
+
+        function renderTaxTab() {
+            const tax = complianceData.tax_position || {};
+
+            const html = `
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 mb-2">Audit Risk</p>
+                        <p class="text-2xl font-bold ${
+                            tax.audit_risk === 'low' ? 'text-green-600' :
+                            tax.audit_risk === 'medium' ? 'text-yellow-600' :
+                            'text-red-600'
+                        }">${(tax.audit_risk || 'unknown').toUpperCase()}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 mb-2">Status</p>
+                        <p class="text-2xl font-bold ${
+                            tax.status === 'compliant' ? 'text-green-600' : 'text-red-600'
+                        }">${tax.status === 'compliant' ? '✓ Compliant' : 'Issues'}</p>
+                    </div>
+                </div>
+
+                ${tax.uncertain_positions && tax.uncertain_positions.length > 0 ? `
+                    <div>
+                        <p class="text-sm font-medium text-gray-900 mb-3">Uncertain Tax Positions</p>
+                        <div class="space-y-2">
+                            ${tax.uncertain_positions.map(pos => `
+                                <div class="border border-yellow-200 bg-yellow-50 p-3 rounded">
+                                    <p class="text-sm font-medium text-yellow-900">${pos.description || 'Unknown position'}</p>
+                                    <p class="text-xs text-yellow-800 mt-1">Risk level: ${pos.risk_level || 'medium'}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : `
+                    <div class="text-center py-6">
+                        <p class="text-sm text-green-600 font-medium">✓ No uncertain tax positions</p>
+                    </div>
+                `}
+
+                <div class="mt-6 text-xs text-gray-600">
+                    Materiality threshold: $${(tax.materiality_threshold || 0).toLocaleString()}
+                </div>
+            `;
+            document.getElementById('taxStatus').innerHTML = html;
+        }
+
+        function renderMaterialityTab() {
+            const mat = complianceData.materiality || {};
+
+            const consumed = mat.consumed_ytd || 0;
+            const performance = mat.performance_materiality || mat.audit_materiality || 100000;
+            const consumedPercent = (consumed / performance * 100).toFixed(1);
+
+            const html = `
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Materiality Budget</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-blue-50 p-4 rounded border border-blue-200">
+                            <p class="text-xs font-medium text-gray-600">Audit Materiality</p>
+                            <p class="text-lg font-bold text-blue-600">$${(mat.audit_materiality || 0).toLocaleString()}</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded border border-purple-200">
+                            <p class="text-xs font-medium text-gray-600">Performance Materiality</p>
+                            <p class="text-lg font-bold text-purple-600">$${(mat.performance_materiality || 0).toLocaleString()}</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded border border-orange-200">
+                            <p class="text-xs font-medium text-gray-600">Consumed YTD</p>
+                            <p class="text-lg font-bold text-orange-600">$${consumed.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded border border-green-200">
+                            <p class="text-xs font-medium text-gray-600">Remaining</p>
+                            <p class="text-lg font-bold text-green-600">$${(mat.remaining || 0).toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Consumption Rate</span>
+                        <span class="text-sm font-bold text-gray-900">${consumedPercent}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div style="width: ${Math.min(parseFloat(consumedPercent), 100)}%" class="bg-${
+                            parseFloat(consumedPercent) < 50 ? 'green' :
+                            parseFloat(consumedPercent) < 75 ? 'yellow' :
+                            'red'
+                        }-500 h-3 rounded-full"></div>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+                    <p class="text-sm text-blue-900">
+                        <strong>Status: ${mat.status === 'green' ? '✓ On track' : mat.status === 'yellow' ? '⚠ Monitor' : '✗ At risk'}</strong>
+                    </p>
+                    <p class="text-xs text-blue-800 mt-2">
+                        At current burn rate, estimated consumption will reach ${Math.round(parseFloat(consumedPercent) + (parseFloat(consumedPercent) / 6))}% by year-end (7-month projection).
+                    </p>
+                </div>
+            `;
+            document.getElementById('materialityStatus').innerHTML = html;
+        }
+
+        function switchCompTab(tab) {
+            const tabs = ['covenants', 'gaap', 'tax', 'materiality'];
+            tabs.forEach(t => {
+                const content = document.getElementById(`tabContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                const button = document.getElementById(`tabComp${t === 'gaap' ? 'GAAP' : t === 'materiality' ? 'Mat' : t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (content) content.classList.add('hidden');
+                if (button) {
+                    button.classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+                    button.classList.add('border-transparent', 'text-gray-600');
+                }
+            });
+
+            const selectedContent = document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            const selectedButton = document.getElementById(`tabComp${tab === 'gaap' ? 'GAAP' : tab === 'materiality' ? 'Mat' : tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (selectedContent) selectedContent.classList.remove('hidden');
+            if (selectedButton) {
+                selectedButton.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+                selectedButton.classList.remove('border-transparent', 'text-gray-600');
+            }
+        }
+
+        async function onMounted() {
+            await loadComplianceData();
+            eime.setContext({
+                page: 'compliance-continuous',
+                payload: { churchId: CHURCH_ID }
+            });
+        }
+
+        EIMEShell.mount({
+            onMounted: onMounted,
+            navAttribute: 'data-nav'
+        });
+    </script>
+</body>
+</html>

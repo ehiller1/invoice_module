@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Continuous Reconciliation — Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <template id="page-center-content">
+        <div class="p-6 max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Continuous Reconciliation</h1>
+                <p class="text-gray-600">Real-time reconciliation status across all sub-ledgers. Only genuine exceptions shown (pattern anomalies, not rounding errors).</p>
+            </div>
+
+            <!-- Last Updated -->
+            <div class="mb-6 text-sm text-gray-600">
+                Last updated: <span id="lastUpdated">-</span> • Auto-refreshes every 5 minutes
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                <div id="cardCash" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Cash</p>
+                    <p class="text-2xl font-bold text-gray-900">$<span id="cashAmount">-</span></p>
+                    <p class="text-xs text-gray-500 mt-2">Status: <span id="cashStatus" class="font-medium">-</span></p>
+                </div>
+                <div id="cardAR" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Accounts Receivable</p>
+                    <p class="text-2xl font-bold text-gray-900">$<span id="arAmount">-</span></p>
+                    <p class="text-xs text-gray-500 mt-2"><span id="arExceptions" class="font-medium">0</span> exceptions</p>
+                </div>
+                <div id="cardAP" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Accounts Payable</p>
+                    <p class="text-2xl font-bold text-gray-900">$<span id="apAmount">-</span></p>
+                    <p class="text-xs text-gray-500 mt-2"><span id="apExceptions" class="font-medium">0</span> exceptions</p>
+                </div>
+                <div id="cardPayroll" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Payroll</p>
+                    <p class="text-2xl font-bold text-gray-900">$<span id="payrollAmount">-</span></p>
+                    <p class="text-xs text-gray-500 mt-2">Status: <span id="payrollStatus" class="font-medium">-</span></p>
+                </div>
+                <div id="cardInterco" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-gray-500">
+                    <p class="text-sm font-medium text-gray-600 mb-2">Intercompany</p>
+                    <p class="text-2xl font-bold text-gray-900">$<span id="intercoAmount">-</span></p>
+                    <p class="text-xs text-gray-500 mt-2">Status: <span id="intercoStatus" class="font-medium">-</span></p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <div class="flex gap-4 overflow-x-auto">
+                    <button onclick="switchReconcTab('cash')" id="tabReconcCash" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm whitespace-nowrap">
+                        Cash
+                    </button>
+                    <button onclick="switchReconcTab('ar')" id="tabReconcAR" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        AR
+                    </button>
+                    <button onclick="switchReconcTab('ap')" id="tabReconcAP" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        AP
+                    </button>
+                    <button onclick="switchReconcTab('aging')" id="tabReconcAging" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Aging Analysis
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cash Tab -->
+            <div id="tabContentCash" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Cash Reconciliation</h2>
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Expected (GL)</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="cashExpected">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Actual (Bank)</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="cashActual">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Difference</p>
+                            <p id="cashDiff" class="text-2xl font-bold text-green-600">$-</p>
+                        </div>
+                    </div>
+                    <div id="cashExceptions" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- AR Tab -->
+            <div id="tabContentAR" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Accounts Receivable</h2>
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Current</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="arCurrent">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">30 Days</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="ar30">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">60 Days</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="ar60">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">90+ Days</p>
+                            <p class="text-2xl font-bold text-red-600">$<span id="ar90">-</span></p>
+                        </div>
+                    </div>
+                    <div id="arExceptionsList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- AP Tab -->
+            <div id="tabContentAP" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Accounts Payable</h2>
+                    <div class="grid grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Current</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="apCurrent">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">30 Days</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="ap30">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">60 Days</p>
+                            <p class="text-2xl font-bold text-gray-900">$<span id="ap60">-</span></p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">90+ Days</p>
+                            <p class="text-2xl font-bold text-orange-600">$<span id="ap90">-</span></p>
+                        </div>
+                    </div>
+                    <div id="apExceptionsList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Aging Analysis Tab -->
+            <div id="tabContentAging" class="hidden space-y-6">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Aging Analysis</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-600 mb-3">AR Aging Distribution</h3>
+                            <canvas id="arAgingChart" class="max-h-48"></canvas>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-600 mb-3">AP Aging Distribution</h3>
+                            <canvas id="apAgingChart" class="max-h-48"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="eime-bus.js"></script>
+    <script src="eime-shell.js"></script>
+    <script src="eime-chat-rail.js"></script>
+    <script>
+        let reconcData = {};
+        const CHURCH_ID = 'holy_comforter';
+        let arAgingChart, apAgingChart;
+
+        async function loadReconcData() {
+            try {
+                const response = await fetch(`/api/reconciliation/status?church_id=${CHURCH_ID}`);
+                reconcData = await response.json();
+
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+
+                // Update summary cards
+                updateCashCard();
+                updateARCard();
+                updateAPCard();
+                updatePayrollCard();
+                updateIntercoCard();
+
+                // Render tab content
+                renderCashTab();
+                renderARTab();
+                renderAPTab();
+                initAgingCharts();
+            } catch (error) {
+                console.error('Error loading reconciliation data:', error);
+            }
+        }
+
+        function updateCashCard() {
+            const cash = reconcData.cash || {};
+            document.getElementById('cashAmount').textContent = (cash.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('cashStatus').textContent = cash.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+            const cardCash = document.getElementById('cardCash');
+            if (cash.status === 'reconciled') {
+                cardCash.classList.remove('border-orange-500', 'border-red-500');
+                cardCash.classList.add('border-green-500');
+            }
+        }
+
+        function updateARCard() {
+            const ar = reconcData.ar || {};
+            document.getElementById('arAmount').textContent = (ar.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('arExceptions').textContent = (ar.exceptions || []).length;
+            const cardAR = document.getElementById('cardAR');
+            if ((ar.exceptions || []).length > 0) {
+                cardAR.classList.remove('border-blue-500');
+                cardAR.classList.add('border-orange-500');
+            }
+        }
+
+        function updateAPCard() {
+            const ap = reconcData.ap || {};
+            document.getElementById('apAmount').textContent = (ap.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('apExceptions').textContent = (ap.exceptions || []).length;
+            const cardAP = document.getElementById('cardAP');
+            if ((ap.exceptions || []).length > 0) {
+                cardAP.classList.remove('border-orange-500');
+                cardAP.classList.add('border-red-500');
+            }
+        }
+
+        function updatePayrollCard() {
+            const payroll = reconcData.payroll || {};
+            document.getElementById('payrollAmount').textContent = (payroll.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('payrollStatus').textContent = payroll.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+        }
+
+        function updateIntercoCard() {
+            const interco = reconcData.intercompany || {};
+            document.getElementById('intercoAmount').textContent = (interco.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('intercoStatus').textContent = interco.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+        }
+
+        function renderCashTab() {
+            const cash = reconcData.cash || {};
+            document.getElementById('cashExpected').textContent = (cash.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('cashActual').textContent = (cash.actual || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('cashDiff').textContent = '$' + ((cash.actual || 0) - (cash.expected || 0)).toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            const exceptions = cash.exceptions || [];
+            if (exceptions.length === 0) {
+                document.getElementById('cashExceptions').innerHTML = '<div class="text-sm text-green-600 font-medium">✓ No exceptions</div>';
+            } else {
+                document.getElementById('cashExceptions').innerHTML = exceptions.map(exc => `
+                    <div class="border border-orange-200 bg-orange-50 rounded p-3">
+                        <p class="text-sm font-medium text-gray-900">${exc.description || 'Unknown exception'}</p>
+                        <p class="text-xs text-gray-600 mt-1">Amount: $${(exc.amount || 0).toLocaleString()}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function renderARTab() {
+            const ar = reconcData.ar || {};
+            const aging = ar.aging || {};
+            document.getElementById('arCurrent').textContent = (aging.current || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ar30').textContent = (aging['30_days'] || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ar60').textContent = (aging['60_days'] || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ar90').textContent = ((ar.expected || 0) - (aging.current || 0) - (aging['30_days'] || 0) - (aging['60_days'] || 0)).toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            const exceptions = ar.exceptions || [];
+            if (exceptions.length === 0) {
+                document.getElementById('arExceptionsList').innerHTML = '<div class="text-sm text-green-600 font-medium">✓ No exceptions</div>';
+            } else {
+                document.getElementById('arExceptionsList').innerHTML = exceptions.map(exc => `
+                    <div class="border border-orange-200 bg-orange-50 rounded p-3">
+                        <p class="text-sm font-medium text-gray-900">${exc.customer}</p>
+                        <p class="text-xs text-gray-600 mt-1">Outstanding: $${(exc.amount || 0).toLocaleString()} • ${exc.days_outstanding} days • ${exc.type}</p>
+                        <p class="text-xs text-gray-700 mt-2">${exc.reason}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function renderAPTab() {
+            const ap = reconcData.ap || {};
+            const aging = ap.aging || {};
+            document.getElementById('apCurrent').textContent = (aging.current || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ap30').textContent = (aging['30_days'] || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ap60').textContent = (aging['60_days'] || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('ap90').textContent = ((ap.expected || 0) - (aging.current || 0) - (aging['30_days'] || 0) - (aging['60_days'] || 0)).toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            const exceptions = ap.exceptions || [];
+            if (exceptions.length === 0) {
+                document.getElementById('apExceptionsList').innerHTML = '<div class="text-sm text-green-600 font-medium">✓ No exceptions</div>';
+            } else {
+                document.getElementById('apExceptionsList').innerHTML = exceptions.map(exc => `
+                    <div class="border border-red-200 bg-red-50 rounded p-3">
+                        <p class="text-sm font-medium text-gray-900">${exc.vendor}</p>
+                        <p class="text-xs text-gray-600 mt-1">Variance: $${(exc.amount || 0).toLocaleString()} (${(exc.variance_pct || 0).toFixed(1)}%) • ${exc.type}</p>
+                        <p class="text-xs text-gray-700 mt-2">${exc.reason}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function initAgingCharts() {
+            const ar = reconcData.ar || {};
+            const ap = reconcData.ap || {};
+            const aging_ar = ar.aging || {};
+            const aging_ap = ap.aging || {};
+
+            // AR Aging Chart
+            const arCtx = document.getElementById('arAgingChart').getContext('2d');
+            if (arAgingChart) arAgingChart.destroy();
+            arAgingChart = new Chart(arCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Current', '30 Days', '60 Days', '90+ Days'],
+                    datasets: [{
+                        data: [
+                            aging_ar.current || 0,
+                            aging_ar['30_days'] || 0,
+                            aging_ar['60_days'] || 0,
+                            (ar.expected || 0) - (aging_ar.current || 0) - (aging_ar['30_days'] || 0) - (aging_ar['60_days'] || 0)
+                        ],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // AP Aging Chart
+            const apCtx = document.getElementById('apAgingChart').getContext('2d');
+            if (apAgingChart) apAgingChart.destroy();
+            apAgingChart = new Chart(apCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Current', '30 Days', '60 Days', '90+ Days'],
+                    datasets: [{
+                        data: [
+                            aging_ap.current || 0,
+                            aging_ap['30_days'] || 0,
+                            aging_ap['60_days'] || 0,
+                            (ap.expected || 0) - (aging_ap.current || 0) - (aging_ap['30_days'] || 0) - (aging_ap['60_days'] || 0)
+                        ],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function switchReconcTab(tab) {
+            ['cash', 'ar', 'ap', 'aging'].forEach(t => {
+                document.getElementById(`tabContentReconcTab${t.toUpperCase()}`).classList.remove('hidden');
+                document.getElementById(`tabReconcTab${t.toUpperCase()}`).classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+                document.getElementById(`tabReconcTab${t.toUpperCase()}`).classList.add('border-transparent', 'text-gray-600');
+            });
+            // Fix: proper tab names
+            document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            document.getElementById(`tabReconcTab${tab.charAt(0).toUpperCase() + (tab.length > 1 ? tab.slice(1) : '')}`).classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById(`tabReconcTab${tab.charAt(0).toUpperCase() + (tab.length > 1 ? tab.slice(1) : '')}`).classList.remove('border-transparent', 'text-gray-600');
+        }
+
+        async function onMounted() {
+            await loadReconcData();
+            eime.setContext({
+                page: 'reconciliation-continuous',
+                payload: { churchId: CHURCH_ID }
+            });
+        }
+
+        EIMEShell.mount({
+            onMounted: onMounted,
+            navAttribute: 'data-nav'
+        });
+    </script>
+</body>
+</html>
