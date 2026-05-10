@@ -422,6 +422,28 @@ async def run_pipeline(job_id: str) -> None:
                 "total_lines_checked": len(budget_results),
             })
 
+            # Phase 6: Emit BudgetThresholdCrossed events for alerts
+            for b in warn + over:
+                try:
+                    budget_event = FinancialEvent(
+                        event_type=EventType.BUDGET_THRESHOLD_CROSSED,
+                        church_id=job.church_id,
+                        payload={
+                            "account_number": b.account_number,
+                            "status": b.status.value,
+                            "annual_budget": str(b.annual_budget),
+                            "ytd_actual": str(b.ytd_actual),
+                            "projected_after_this_line": str(b.ytd_actual + b.amount_on_line),
+                            "reason": b.reason,
+                        },
+                        correlation_id=job.job_id,
+                    )
+                    budget_event.add_tag(TagKind.ACCOUNT, b.account_number)
+                    budget_event.add_tag(TagKind.JOB, job.job_id)
+                    emit_event(budget_event)
+                except Exception:
+                    pass  # Non-fatal: continue processing even if event emission fails
+
         # Step 7c: FR-05.2 budget-owner approval gate.
         if await _maybe_request_budget_owner_approval(job, reviewed):
             return
