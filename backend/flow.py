@@ -753,6 +753,28 @@ async def _build_and_emit(
                 f"have fund-restriction violations."
             ),
         })
+
+        # Phase 6: Emit RestrictionRejected event for audit trail
+        try:
+            from .events.schemas import EventType, FinancialEvent, TagKind
+            from .events.emitter import emit_event
+
+            reject_event = FinancialEvent(
+                event_type=EventType.RESTRICTION_REJECTED,
+                church_id=job.church_id,
+                payload={
+                    "job_id": job.job_id,
+                    "violating_lines": violating,
+                    "reason": f"{len(violating)} line(s) have fund-restriction violations",
+                    "rejected_at": datetime.utcnow().isoformat(),
+                },
+            )
+            reject_event.add_tag(TagKind.JOB, job.job_id)
+            reject_event.add_tag(TagKind.DOCUMENT, job.invoice_document.source_file if job.invoice_document else "unknown")
+            emit_event(reject_event)
+        except Exception:
+            pass  # Non-fatal: event emission failure doesn't block the restriction guard
+
         return
 
     _update_job(job, ProcessingStatus.BUILDING_ENTRY)
