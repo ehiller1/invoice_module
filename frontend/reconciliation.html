@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>EIME — Bank Reconciliation</title>
+<title>Reconciliation — Books</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -26,77 +26,110 @@
 
 <template id="page-center-content">
 <div class="max-w-7xl mx-auto p-6">
+
+  <!-- Continuity banner -->
+  <div id="recon-continuity-banner" class="hidden mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+    <div class="flex items-center gap-2">
+      <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      <span id="recon-continuity-text"></span>
+    </div>
+    <button onclick="document.getElementById('recon-continuity-banner').classList.add('hidden')" class="text-emerald-500 hover:text-emerald-700 text-xs">Dismiss</button>
+  </div>
+
+  <!-- Phase 5c: This page is deprecated. Reconciliation is now structural
+       and continuous; only exceptions surface in the Exceptions Queue. -->
+  <div class="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900">
+    <div>
+      <strong>This page is deprecated.</strong>
+      Reconciliation now runs continuously in the background. Open the
+      <a href="/exceptions-queue.html" class="underline font-semibold">Exceptions Queue</a>
+      to review items that could not be matched structurally.
+    </div>
+    <a href="/exceptions-queue.html" class="px-3 py-1.5 bg-amber-700 text-white rounded hover:bg-amber-800 text-xs font-semibold whitespace-nowrap">Go to Exceptions →</a>
+  </div>
+
+  <!-- Header -->
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-3xl font-bold text-slate-900 mb-1">Bank Reconciliation</h1>
-      <p class="text-slate-600">Match Plaid transactions to journal entries with fuzzy matching and exception analysis</p>
+      <h1 class="text-3xl font-bold text-slate-900 mb-1">Bank Reconciliation <span class="text-sm text-amber-700 font-normal">(legacy)</span></h1>
+      <p class="text-slate-600">Match bank transactions to journal entries for the selected period</p>
     </div>
-    <div class="flex gap-2">
-      <button onclick="syncPlaid()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+    <div class="flex items-center gap-3">
+      <!-- Auto-match status pill (hidden until first run) -->
+      <div id="automatch-status" class="hidden text-xs text-slate-500 text-right leading-tight"></div>
+      <button id="sync-btn" onclick="syncPlaid()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
         Sync Plaid
       </button>
-      <button onclick="autoMatch()" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">
+      <button id="automatch-btn" onclick="autoMatch()" class="px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 transition-colors">
         Auto-Match
       </button>
     </div>
   </div>
 
-  <!-- Account Selector -->
+  <!-- Account / Period selector -->
   <div class="bg-white border border-slate-200 rounded-lg p-4 mb-6">
     <div class="grid grid-cols-3 gap-4">
       <div>
         <label class="text-sm font-semibold text-slate-700 mb-1 block">Bank Account</label>
-        <select id="account-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none">
+        <select id="account-select" onchange="loadTransactions()" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none">
           <option value="">Loading accounts…</option>
         </select>
       </div>
       <div>
         <label class="text-sm font-semibold text-slate-700 mb-1 block">Period Start</label>
-        <input type="date" id="period-start" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+        <input type="date" id="period-start" onchange="loadTransactions()" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
       </div>
       <div>
         <label class="text-sm font-semibold text-slate-700 mb-1 block">Period End</label>
-        <input type="date" id="period-end" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+        <input type="date" id="period-end" onchange="loadTransactions()" class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
       </div>
     </div>
   </div>
 
-  <!-- Bank Statement Upload Zone -->
+  <!-- Statement upload zone -->
   <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
-    <h2 class="text-lg font-semibold text-slate-900 mb-3">Upload Bank Statement</h2>
-    <p class="text-sm text-slate-600 mb-4">Upload a CSV, OFX, or QFX statement to reconcile against your transactions</p>
-    <div id="statement-upload-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-navy-600 hover:bg-slate-50 transition-all cursor-pointer" onclick="document.getElementById('statement-file-input').click()">
+    <h2 class="text-lg font-semibold text-slate-900 mb-1">Upload Bank Statement</h2>
+    <p class="text-sm text-slate-500 mb-4">Upload a CSV, OFX, or QFX export — transactions are parsed and added to the match queue automatically.</p>
+    <div id="statement-upload-zone"
+         class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-navy-600 hover:bg-slate-50 transition-all cursor-pointer"
+         onclick="document.getElementById('statement-file-input').click()"
+         ondragover="event.preventDefault(); this.classList.add('border-navy-600','bg-slate-50')"
+         ondragleave="this.classList.remove('border-navy-600','bg-slate-50')"
+         ondrop="event.preventDefault(); this.classList.remove('border-navy-600','bg-slate-50'); handleDrop(event)">
       <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
       </svg>
       <p class="text-slate-600 font-medium text-sm">Drop statement file here or click to browse</p>
-      <p class="text-slate-400 text-xs mt-1">CSV, OFX, or QFX • Max 10 MB</p>
-      <input type="file" id="statement-file-input" accept=".csv,.ofx,.qfx" class="hidden" onchange="uploadStatement()" />
+      <p class="text-slate-400 text-xs mt-1">CSV, OFX, or QFX · Max 10 MB</p>
+      <input type="file" id="statement-file-input" accept=".csv,.ofx,.qfx" class="hidden" onchange="uploadStatement(this.files[0])" />
     </div>
     <div id="upload-status" class="hidden mt-3 text-sm"></div>
   </div>
 
-  <!-- Status Cards -->
-  <div class="grid grid-cols-4 gap-4 mb-6">
+  <!-- ── Stat cards + close-status narrative ── -->
+  <div class="grid grid-cols-4 gap-4 mb-3">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Total Transactions</p>
-      <p class="text-3xl font-bold text-slate-900" id="count-total">0</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Total Transactions</p>
+      <p class="text-3xl font-bold text-slate-400 mt-1" id="count-total">—</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Auto-Matched</p>
-      <p class="text-3xl font-bold text-green-600" id="count-matched">0</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Auto-Matched</p>
+      <p class="text-3xl font-bold text-slate-400 mt-1" id="count-matched">—</p>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-lg p-4 cursor-pointer hover:border-orange-300 transition-colors" onclick="switchTabTo('unmatched')">
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Unmatched</p>
+      <p class="text-3xl font-bold text-slate-400 mt-1" id="count-exceptions">—</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Exceptions</p>
-      <p class="text-3xl font-bold text-orange-600" id="count-exceptions">0</p>
-    </div>
-    <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">Variance</p>
-      <p class="text-3xl font-bold text-slate-900" id="variance">$0</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Variance</p>
+      <p class="text-3xl font-bold text-slate-400 mt-1" id="variance">—</p>
     </div>
   </div>
 
-  <!-- Reconciliation Summary -->
+  <!-- Close-status narrative — the sentence that links the four numbers -->
+  <div id="close-narrative" class="mb-6 px-4 py-3 rounded-lg text-sm font-medium hidden"></div>
+
+  <!-- Reconciliation balance summary -->
   <div class="grid grid-cols-5 gap-4 mb-6">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
       <p class="text-xs text-slate-500 font-semibold uppercase">Opening Balance</p>
@@ -120,63 +153,92 @@
     </div>
   </div>
 
-  <!-- Tabs -->
-  <div class="border-b border-slate-200 mb-4">
+  <!-- Tabs
+       "Unmatched" replaces "Exceptions" — unmatched Plaid txns are a reconciliation
+       concept (amount/date mismatch). Formal workflow exceptions (donor intent,
+       fraud flags, policy gaps) live in Inbox → Exceptions.
+  -->
+  <div class="border-b border-slate-200 mb-4 flex items-end justify-between">
     <div class="flex gap-4">
-      <button onclick="switchTab('exceptions')" class="recon-tab active px-4 py-2 text-sm font-medium border-b-2 border-navy-600 text-navy-600">Exceptions</button>
-      <button onclick="switchTab('matched')" class="recon-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Matched</button>
-      <button onclick="switchTab('all')" class="recon-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">All Transactions</button>
+      <button onclick="switchTabTo('unmatched')" data-tab="unmatched" class="recon-tab active px-4 py-2 text-sm font-medium border-b-2 border-navy-600 text-navy-600">
+        Unmatched <span id="tab-unmatched-badge" class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs hidden"></span>
+      </button>
+      <button onclick="switchTabTo('matched')" data-tab="matched" class="recon-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+        Matched
+      </button>
+      <button onclick="switchTabTo('all')" data-tab="all" class="recon-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+        All Transactions
+      </button>
+    </div>
+    <!-- Cross-link to Inbox for formal exception handling -->
+    <a href="/inbox.html" class="mb-1 text-xs text-slate-500 hover:text-navy-700 flex items-center gap-1">
+      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+      Formal exceptions → Inbox
+    </a>
+  </div>
+
+  <!-- Transaction list -->
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div id="transactions-list" class="divide-y divide-slate-200">
+      <div class="px-6 py-12 text-center text-slate-400 text-sm">Select an account above to load transactions.</div>
     </div>
   </div>
 
-  <!-- Transaction List -->
-  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
-    <div id="transactions-list" class="divide-y divide-slate-200"></div>
-  </div>
-
-  <!-- Exception Modal -->
+  <!-- Unmatched transaction detail drawer -->
   <div id="exception-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
-      <h2 class="text-2xl font-bold text-slate-900 mb-4">Exception Analysis</h2>
+      <div class="flex items-start justify-between mb-4">
+        <h2 class="text-xl font-bold text-slate-900">Unmatched Transaction</h2>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
       <div id="exception-content" class="space-y-4 mb-6"></div>
       <div class="flex gap-2">
-        <button onclick="closeModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
-        <button id="create-je-btn" onclick="createCorrectiveJE()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Corrective JE</button>
+        <button onclick="closeModal()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm">Dismiss</button>
+        <a href="/inbox.html" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm text-center">Escalate to Inbox</a>
+        <button id="create-je-btn" onclick="createCorrectiveJE()" class="flex-1 px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800 text-sm">Draft Corrective JE</button>
       </div>
     </div>
   </div>
+
 </div>
 </template>
 
 <script>
 const API = 'http://localhost:8000';
+const CHURCH = 'holy_comforter';
+
 let allTransactions = [];
-let activeTab = 'exceptions';
+let activeTab = 'unmatched';
 let currentException = null;
+let lastAutoMatchResult = null;
 
 EIMEShell.mount({
   activeNav: 'reconciliation',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
-    window.eime.setContext({
-      page: 'reconciliation',
-      payload: { church_id: 'holy_comforter', account_id: null }
-    });
+    window.eime.setContext({ page: 'reconciliation', payload: { church_id: CHURCH } });
     setDefaultDates();
     loadAccounts();
+    _showContinuityBanner();
   }
 });
 
+// ── Dates ──────────────────────────────────────────────────────────────────
+
 function setDefaultDates() {
   const today = new Date();
-  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  document.getElementById('period-start').value = lastMonth.toISOString().split('T')[0];
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('period-start').value = firstOfMonth.toISOString().split('T')[0];
   document.getElementById('period-end').value = today.toISOString().split('T')[0];
 }
 
+// ── Accounts ───────────────────────────────────────────────────────────────
+
 async function loadAccounts() {
   try {
-    const res = await fetch(`${API}/api/churches/holy_comforter/plaid/accounts`);
+    const res = await fetch(`${API}/api/churches/${CHURCH}/plaid/accounts`);
     const accounts = await res.json();
     const select = document.getElementById('account-select');
     if (!accounts || accounts.length === 0) {
@@ -184,244 +246,422 @@ async function loadAccounts() {
       document.getElementById('transactions-list').innerHTML = `
         <div class="px-6 py-12 text-center">
           <p class="text-slate-700 font-medium mb-2">No Bank Accounts Connected</p>
-          <p class="text-sm text-slate-500 mb-4">Link a bank account via Plaid to start reconciliation</p>
+          <p class="text-sm text-slate-500 mb-4">Link a bank account via Plaid to start reconciliation.</p>
           <a href="/settings/plaid-linking.html" class="inline-block px-4 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">Set Up Plaid →</a>
-        </div>
-      `;
+        </div>`;
       return;
     }
-    select.innerHTML = accounts.map(a => `<option value="${a.account_id}">${a.name} (${a.mask || '****'})</option>`).join('');
-    select.addEventListener('change', loadTransactions);
+    select.innerHTML = accounts.map(a =>
+      `<option value="${a.account_id}">${a.name} ···${a.mask || '****'}</option>`
+    ).join('');
     loadTransactions();
   } catch (e) {
-    console.error('Error loading accounts:', e);
     document.getElementById('account-select').innerHTML = '<option value="">Error loading accounts</option>';
   }
 }
 
+// ── Transactions ───────────────────────────────────────────────────────────
+
 async function loadTransactions() {
   const accountId = document.getElementById('account-select').value;
   if (!accountId) return;
+  const start = document.getElementById('period-start').value;
+  const end   = document.getElementById('period-end').value;
 
-  window.eime.setContext({
-    page: 'reconciliation',
-    payload: { church_id: 'holy_comforter', account_id: accountId }
-  });
+  window.eime.setContext({ page: 'reconciliation', payload: { church_id: CHURCH, account_id: accountId } });
+
+  document.getElementById('transactions-list').innerHTML =
+    '<div class="px-6 py-8 text-center text-slate-400 text-sm">Loading transactions…</div>';
 
   try {
-    const start = document.getElementById('period-start').value;
-    const end = document.getElementById('period-end').value;
-    const res = await fetch(`${API}/api/churches/holy_comforter/plaid/transactions?account_id=${accountId}&start=${start}&end=${end}`);
+    const params = new URLSearchParams({ account_id: accountId });
+    if (start) params.set('from_', start);
+    if (end)   params.set('to', end);
+    const res = await fetch(`${API}/api/churches/${CHURCH}/plaid/transactions?${params}`);
     allTransactions = await res.json();
     updateCounts();
     renderTransactions();
   } catch (e) {
-    console.error('Error loading transactions:', e);
     allTransactions = [];
     renderTransactions();
   }
 }
 
+// ── Counts + narrative ─────────────────────────────────────────────────────
+
 function updateCounts() {
-  const matched = allTransactions.filter(t => t.matched).length;
-  const exceptions = allTransactions.filter(t => !t.matched).length;
+  const matched    = allTransactions.filter(t => t.matched).length;
+  const unmatched  = allTransactions.filter(t => !t.matched).length;
+  const total      = allTransactions.length;
 
-  // Calculate reconciliation summary
-  let openingBalance = 0;
-  let deposits = 0;
-  let disbursements = 0;
-  let closingBalance = 0;
-
+  let openingBalance = 0, deposits = 0, disbursements = 0, closingBalance = 0;
   allTransactions.forEach(t => {
     if (t.opening_balance) openingBalance = t.opening_balance;
     if (t.closing_balance) closingBalance = t.closing_balance;
     if (t.amount > 0) deposits += t.amount;
     else disbursements += Math.abs(t.amount);
   });
-
   const netVariance = closingBalance - (openingBalance + deposits - disbursements);
 
-  document.getElementById('count-total').textContent = allTransactions.length;
-  document.getElementById('count-matched').textContent = matched;
-  document.getElementById('count-exceptions').textContent = exceptions;
-  document.getElementById('variance').textContent = `$${Math.abs(netVariance).toFixed(2)}`;
+  _saveReconSnapshot(matched, unmatched, netVariance);
 
-  document.getElementById('opening-balance').textContent = `$${openingBalance.toFixed(2)}`;
-  document.getElementById('total-deposits').textContent = `$${deposits.toFixed(2)}`;
-  document.getElementById('total-disbursements').textContent = `$${disbursements.toFixed(2)}`;
-  document.getElementById('closing-balance').textContent = `$${closingBalance.toFixed(2)}`;
-  document.getElementById('net-variance').textContent = `$${netVariance.toFixed(2)}`;
+  // Stat cards — switch from empty-state grey to live colors
+  _setCard('count-total',      total,                        'text-slate-900');
+  _setCard('count-matched',    matched,                      'text-emerald-600');
+  _setCard('count-exceptions', unmatched,                    unmatched > 0 ? 'text-orange-500' : 'text-emerald-600');
+  _setCard('variance',         '$' + Math.abs(netVariance).toFixed(2),
+                                                             Math.abs(netVariance) >= 0.01 ? 'text-red-600' : 'text-emerald-600');
+
+  // Unmatched tab badge
+  const badge = document.getElementById('tab-unmatched-badge');
+  if (unmatched > 0) { badge.textContent = unmatched; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+
+  // Balance summary
+  document.getElementById('opening-balance').textContent    = '$' + openingBalance.toFixed(2);
+  document.getElementById('total-deposits').textContent     = '$' + deposits.toFixed(2);
+  document.getElementById('total-disbursements').textContent= '$' + disbursements.toFixed(2);
+  document.getElementById('closing-balance').textContent    = '$' + closingBalance.toFixed(2);
+  document.getElementById('net-variance').textContent       = '$' + netVariance.toFixed(2);
+
+  // ── Close-status narrative ──────────────────────────────────────────────
+  // Synthesises the four numbers into one sentence so the user always knows
+  // exactly where they are in the close without having to do mental arithmetic.
+  const narEl = document.getElementById('close-narrative');
+  let narText = '', narClass = '';
+
+  if (total === 0) {
+    narText  = 'No transactions in this period. Upload a bank statement or sync Plaid to begin.';
+    narClass = 'bg-slate-50 border border-slate-200 text-slate-600';
+  } else if (unmatched === 0 && Math.abs(netVariance) < 0.01) {
+    narText  = `✓ All ${total} transaction${total !== 1 ? 's' : ''} matched and the period balances to zero — ready to close.`;
+    narClass = 'bg-emerald-50 border border-emerald-200 text-emerald-800';
+  } else if (unmatched === 0 && Math.abs(netVariance) >= 0.01) {
+    narText  = `All ${total} transactions are matched but a $${Math.abs(netVariance).toFixed(2)} variance remains — check for missing journal entries or a balance carry-forward error.`;
+    narClass = 'bg-amber-50 border border-amber-200 text-amber-800';
+  } else if (unmatched > 0 && Math.abs(netVariance) < 0.01) {
+    narText  = `${matched} of ${total} transaction${total !== 1 ? 's' : ''} matched. Resolve ${unmatched} unmatched item${unmatched !== 1 ? 's' : ''} before closing — the variance is currently $0.00.`;
+    narClass = 'bg-amber-50 border border-amber-200 text-amber-800';
+  } else {
+    narText  = `${matched} of ${total} matched · ${unmatched} unmatched · $${Math.abs(netVariance).toFixed(2)} variance. Clear the unmatched items and the variance before closing the period.`;
+    narClass = 'bg-red-50 border border-red-200 text-red-800';
+  }
+
+  narEl.textContent = narText;
+  narEl.className   = `mb-6 px-4 py-3 rounded-lg text-sm font-medium ${narClass}`;
+  narEl.classList.remove('hidden');
 }
+
+function _setCard(id, value, colorClass) {
+  const el = document.getElementById(id);
+  el.textContent = value;
+  el.classList.remove('text-slate-400', 'text-slate-900', 'text-emerald-600',
+                       'text-orange-500', 'text-red-600');
+  el.classList.add(colorClass);
+}
+
+// ── Render transaction rows ─────────────────────────────────────────────────
 
 function renderTransactions() {
   let txns = allTransactions;
-  if (activeTab === 'exceptions') txns = allTransactions.filter(t => !t.matched);
+  if (activeTab === 'unmatched') txns = allTransactions.filter(t => !t.matched);
   else if (activeTab === 'matched') txns = allTransactions.filter(t => t.matched);
-  
+
   const list = document.getElementById('transactions-list');
   if (txns.length === 0) {
-    list.innerHTML = `<div class="px-6 py-12 text-center text-slate-500">No ${activeTab === 'all' ? '' : activeTab} transactions found</div>`;
+    const labels = { unmatched: 'unmatched', matched: 'matched', all: '' };
+    list.innerHTML = `
+      <div class="px-6 py-12 text-center text-slate-400 text-sm">
+        ${activeTab === 'unmatched'
+          ? '✓ No unmatched transactions — all clear.'
+          : `No ${labels[activeTab] || ''} transactions.`}
+      </div>`;
     return;
   }
-  
+
   list.innerHTML = txns.map(t => `
-    <div class="px-6 py-4 hover:bg-slate-50 ${!t.matched ? 'cursor-pointer' : ''} transition-colors" ${!t.matched ? `onclick="showException('${t.transaction_id}')"` : ''}>
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <p class="font-medium text-slate-900">${t.description || t.name || 'Transaction'}</p>
-          <p class="text-sm text-slate-500">${t.date || '—'} • ${t.category || 'Uncategorized'}</p>
-          ${t.matched ? `<p class="text-xs text-green-600 mt-1">✓ Matched to JE ${t.matched_je_id || 'unknown'}</p>` : ''}
+    <div class="px-6 py-4 hover:bg-slate-50 transition-colors ${!t.matched ? 'cursor-pointer' : ''}"
+         ${!t.matched ? `onclick="showException('${t.txn_id || t.transaction_id}')"` : ''}>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-slate-900 truncate">${t.description || t.name || 'Transaction'}</p>
+          <p class="text-xs text-slate-500 mt-0.5">${t.date || '—'} · ${t.category || 'Uncategorized'}</p>
+          ${t.matched
+            ? `<p class="text-xs text-emerald-600 mt-1">✓ Matched → JE ${t.matched_je_id || '—'}</p>`
+            : '<p class="text-xs text-orange-600 mt-1">No matching journal entry found within tolerance</p>'}
         </div>
-        <div class="text-right">
-          <p class="font-bold ${t.amount < 0 ? 'text-red-600' : 'text-green-600'}">${t.amount < 0 ? '-' : '+'}$${Math.abs(t.amount || 0).toFixed(2)}</p>
-          ${!t.matched ? '<span class="px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs">Unmatched</span>' : ''}
+        <div class="text-right flex-shrink-0">
+          <p class="font-bold tabular-nums ${t.amount < 0 ? 'text-red-600' : 'text-emerald-600'}">
+            ${t.amount < 0 ? '−' : '+'}$${Math.abs(t.amount || 0).toFixed(2)}
+          </p>
+          ${!t.matched
+            ? '<span class="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Unmatched</span>'
+            : '<span class="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">Matched</span>'}
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function switchTab(tab) {
+// ── Tabs ───────────────────────────────────────────────────────────────────
+
+function switchTabTo(tab) {
   activeTab = tab;
-  document.querySelectorAll('.recon-tab').forEach(t => {
-    t.classList.remove('border-navy-600', 'text-navy-600', 'active');
-    t.classList.add('border-transparent', 'text-slate-600');
+  document.querySelectorAll('.recon-tab').forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
+    btn.classList.toggle('border-navy-600', isActive);
+    btn.classList.toggle('text-navy-600', isActive);
+    btn.classList.toggle('border-transparent', !isActive);
+    btn.classList.toggle('text-slate-600', !isActive);
   });
-  event.target.classList.add('border-navy-600', 'text-navy-600', 'active');
-  event.target.classList.remove('border-transparent', 'text-slate-600');
   renderTransactions();
 }
 
+// ── Sync Plaid ─────────────────────────────────────────────────────────────
+
 async function syncPlaid() {
+  const btn = document.getElementById('sync-btn');
+  const accountId = document.getElementById('account-select').value;
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+
   try {
-    document.getElementById('transactions-list').innerHTML = '<div class="px-6 py-12 text-center text-slate-500">Syncing transactions from Plaid…</div>';
-    await fetch(`${API}/api/churches/holy_comforter/plaid/sync-transactions`, { method: 'POST' });
-    loadTransactions();
+    const res = await fetch(`${API}/api/churches/${CHURCH}/plaid/sync-transactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_id: accountId || '', days_back: 60 }),
+    });
+    const data = await res.json();
+    await loadTransactions();
+    btn.textContent = `Synced (${data.transactions_synced ?? '?'} new)`;
+    setTimeout(() => { btn.textContent = 'Sync Plaid'; btn.disabled = false; }, 3000);
   } catch (e) {
-    alert('Error syncing: ' + e.message);
+    btn.textContent = 'Sync Failed';
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = 'Sync Plaid'; }, 3000);
   }
 }
+
+// ── Auto-match ─────────────────────────────────────────────────────────────
+// Compares Plaid transactions to journal entries (amount ±$0.01, date ±3 days).
+// Shows a persistent status pill so users know this is on-demand, not continuous.
 
 async function autoMatch() {
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = 'Matching...';
-  btn.classList.add('opacity-50', 'cursor-not-allowed');
-
-  try {
-    const accountId = document.getElementById('account-select').value;
-    if (!accountId) {
-      alert('Please select a bank account first.');
-      return;
-    }
-
-    const res = await fetch(`${API}/api/churches/holy_comforter/plaid/auto-match?account_id=${accountId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (!res.ok) {
-      // Backend not yet implemented — show coming soon message
-      btn.textContent = 'Auto-Match (Coming Soon)';
-      btn.disabled = true;
-      alert('Auto-match is coming soon. We\'ll compare bank transactions to journal entries using fuzzy matching (amount within $0.01, date within 3 days).');
-      return;
-    }
-
-    const data = await res.json();
-    alert(`Auto-match complete: ${data.matched} transactions matched, ${data.exceptions} exceptions.`);
-    await loadTransactions();
-  } catch (e) {
-    // Backend not yet implemented
-    btn.textContent = 'Auto-Match (Coming Soon)';
-    btn.disabled = true;
-    console.warn('Auto-match not yet available:', e.message);
-  }
-}
-
-async function uploadStatement() {
-  const fileInput = document.getElementById('statement-file-input');
-  const file = fileInput.files[0];
-  if (!file) return;
-
+  const btn = document.getElementById('automatch-btn');
   const accountId = document.getElementById('account-select').value;
+  const statusEl = document.getElementById('automatch-status');
+
   if (!accountId) {
-    alert('Please select a bank account first.');
+    statusEl.innerHTML = '⚠ Select an account first';
+    statusEl.classList.remove('hidden');
     return;
   }
 
-  const status = document.getElementById('upload-status');
-  status.classList.remove('hidden');
-  status.className = 'mt-3 text-sm text-slate-600';
-  status.innerHTML = `<p>📤 Uploading ${file.name}...</p>`;
-
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('account_id', accountId);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>Matching…';
+  statusEl.innerHTML = '<span class="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1"></span>Running auto-match…';
+  statusEl.classList.remove('hidden');
 
   try {
-    const res = await fetch(`${API}/api/churches/holy_comforter/bank-statements/upload`, {
-      method: 'POST',
-      body: fd
-    });
-
-    if (!res.ok) {
-      // Backend not yet implemented
-      status.className = 'mt-3 text-sm text-amber-600';
-      status.innerHTML = `<p>⚠️ Bank statement parser coming soon. We'll auto-ingest CSV/OFX/QFX files.</p>`;
-      return;
-    }
-
+    const res = await fetch(
+      `${API}/api/churches/${CHURCH}/plaid/auto-match?account_id=${accountId}`,
+      { method: 'POST' }
+    );
     const data = await res.json();
-    status.className = 'mt-3 text-sm text-emerald-600';
-    status.innerHTML = `<p>✅ ${data.transactions_parsed || 0} transactions parsed from statement</p>`;
-    await loadTransactions();
+    lastAutoMatchResult = data;
+
+    await loadTransactions();  // reload so matched flags reflect new results
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    statusEl.innerHTML =
+      `Last run: ${now} · ${data.matched ?? 0} matched, ${data.exceptions ?? 0} unmatched`;
+    btn.textContent = 'Auto-Match';
+    btn.disabled = false;
   } catch (e) {
-    // Backend not yet implemented
-    status.className = 'mt-3 text-sm text-amber-600';
-    status.innerHTML = `<p>⚠️ Bank statement upload feature coming soon (bank_statement_parser.py backend integration)</p>`;
-    console.warn('Bank statement upload not yet available:', e.message);
+    statusEl.innerHTML = '⚠ Auto-match error — check server';
+    btn.textContent = 'Auto-Match';
+    btn.disabled = false;
   }
 }
 
+// ── Upload bank statement ──────────────────────────────────────────────────
+
+function handleDrop(event) {
+  const file = event.dataTransfer.files[0];
+  if (file) uploadStatement(file);
+}
+
+async function uploadStatement(file) {
+  if (!file) return;
+  const accountId = document.getElementById('account-select').value;
+  const status = document.getElementById('upload-status');
+
+  status.className = 'mt-3 text-sm text-slate-600';
+  status.innerHTML = `<span class="inline-block w-3 h-3 border-2 border-navy-600 border-t-transparent rounded-full animate-spin mr-1"></span>Uploading ${file.name}…`;
+  status.classList.remove('hidden');
+
+  const fd = new FormData();
+  fd.append('file', file);
+  if (accountId) fd.append('account_id', accountId);
+
+  try {
+    const res = await fetch(`${API}/api/churches/${CHURCH}/bank-statements/upload`, {
+      method: 'POST',
+      body: fd,
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      status.className = 'mt-3 text-sm text-red-600';
+      status.innerHTML = `⚠ ${data.error || 'Upload failed'}`;
+      return;
+    }
+
+    const n = data.transactions_parsed ?? 0;
+    status.className = 'mt-3 text-sm text-emerald-700';
+    status.innerHTML =
+      `✓ ${n} transaction${n !== 1 ? 's' : ''} imported from <strong>${file.name}</strong>` +
+      (n > 0 ? ' — <button class="underline hover:no-underline" onclick="autoMatch()">run auto-match now</button>' : '');
+
+    // Reload transactions so the new entries are visible
+    if (n > 0) await loadTransactions();
+  } catch (e) {
+    status.className = 'mt-3 text-sm text-red-600';
+    status.innerHTML = `⚠ Upload error: ${e.message}`;
+  }
+}
+
+// ── Exception / unmatched detail modal ─────────────────────────────────────
+
 function showException(txnId) {
-  currentException = allTransactions.find(t => t.transaction_id === txnId);
+  currentException = allTransactions.find(t => (t.txn_id || t.transaction_id) === txnId);
   if (!currentException) return;
-  
+  const t = currentException;
+
   document.getElementById('exception-content').innerHTML = `
-    <div class="bg-orange-50 border border-orange-200 rounded p-4">
-      <p class="font-semibold text-orange-900">Unmatched Transaction</p>
-      <p class="text-sm text-orange-800 mt-1">${currentException.description}</p>
-      <p class="text-sm text-orange-800">Amount: $${Math.abs(currentException.amount).toFixed(2)} on ${currentException.date}</p>
-    </div>
-    
-    <div>
-      <p class="text-sm font-semibold text-slate-700 mb-2">Possible Matches</p>
-      <div class="space-y-2">
-        <p class="text-sm text-slate-500">No similar journal entries found within tolerance.</p>
+    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+      <div class="flex justify-between items-start">
+        <div>
+          <p class="font-semibold text-orange-900">${t.description || 'Transaction'}</p>
+          <p class="text-sm text-orange-800 mt-1">${t.date || '—'} · ${t.category || 'Uncategorized'}</p>
+        </div>
+        <p class="text-lg font-bold tabular-nums ${t.amount < 0 ? 'text-red-700' : 'text-emerald-700'}">
+          ${t.amount < 0 ? '−' : '+'}$${Math.abs(t.amount || 0).toFixed(2)}
+        </p>
       </div>
     </div>
-    
+
     <div>
-      <p class="text-sm font-semibold text-slate-700 mb-2">AI Analysis</p>
-      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-900">
-        This transaction appears to be unrecorded in your journal. Consider creating a corrective JE to capture this transaction.
+      <p class="text-sm font-semibold text-slate-700 mb-2">Why wasn't this matched?</p>
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 space-y-1">
+        <p>Auto-match looks for a journal entry whose net cash amount is within <strong>$0.01</strong> and whose date is within <strong>3 calendar days</strong>.</p>
+        <p class="mt-2 text-slate-500">No qualifying journal entry was found for this transaction. Common causes:</p>
+        <ul class="list-disc list-inside text-slate-500 mt-1 space-y-0.5">
+          <li>The transaction hasn't been posted as a JE yet</li>
+          <li>The JE amount differs by more than $0.01 (rounding, bank fee)</li>
+          <li>The JE date is more than 3 days from the bank date</li>
+        </ul>
       </div>
     </div>
-  `;
-  
+
+    <div>
+      <p class="text-sm font-semibold text-slate-700 mb-2">Options</p>
+      <div class="text-sm text-slate-600 space-y-2">
+        <p>• <strong>Draft Corrective JE</strong> — create a journal entry to record this transaction in the books</p>
+        <p>• <strong>Escalate to Inbox</strong> — flag as a formal exception for Finance Committee review</p>
+        <p>• <strong>Dismiss</strong> — if this is a known reconciling item (outstanding cheque, timing difference)</p>
+      </div>
+    </div>`;
+
   document.getElementById('exception-modal').classList.remove('hidden');
 }
 
 async function createCorrectiveJE() {
   if (!currentException) return;
-  alert('Corrective JE will be drafted with: From "Operating Cash" To "Suspense" for $' + Math.abs(currentException.amount).toFixed(2) + '. Review in Journal Entries page.');
-  closeModal();
+  const t = currentException;
+  // Route to chat with a pre-filled JE draft request
+  if (window.eime && window.eime.sendMessage) {
+    closeModal();
+    window.eime.sendMessage(
+      `Create a journal entry: debit Suspense account, credit Operating Cash, ` +
+      `amount $${Math.abs(t.amount || 0).toFixed(2)}, ` +
+      `memo "${t.description || 'Bank transaction'}" dated ${t.date || 'today'}`
+    );
+  } else {
+    alert(
+      `Draft JE: Debit Suspense / Credit Operating Cash for $${Math.abs(t.amount || 0).toFixed(2)}.\n` +
+      `Review and post in the Journal Entries page.`
+    );
+    closeModal();
+  }
 }
 
 function closeModal() {
   document.getElementById('exception-modal').classList.add('hidden');
   currentException = null;
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', e => {
+  if (e.target.id === 'exception-modal') closeModal();
+});
+
+// ── Persistence & continuity banner ────────────────────────────────────────
+
+function _saveReconSnapshot(matched, exceptions, netVariance) {
+  try {
+    const select    = document.getElementById('account-select');
+    const accountName = select?.options[select.selectedIndex]?.text ?? null;
+    const snapshot  = {
+      account: accountName,
+      accountId: select?.value ?? null,
+      periodStart: document.getElementById('period-start')?.value ?? null,
+      periodEnd:   document.getElementById('period-end')?.value ?? null,
+      matched, exceptions,
+      variance: netVariance,
+      balanced: Math.abs(netVariance) < 0.01,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem('eime_last_reconciled', JSON.stringify(snapshot));
+  } catch (e) {}
+}
+
+function _showContinuityBanner() {
+  try {
+    const raw = localStorage.getItem('eime_last_reconciled');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s?.savedAt) return;
+
+    const secs = Math.round((Date.now() - new Date(s.savedAt).getTime()) / 1000);
+    const ago  = secs < 60 ? 'just now'
+               : secs < 3600 ? `${Math.round(secs/60)}m ago`
+               : secs < 86400 ? `${Math.round(secs/3600)}h ago`
+               : new Date(s.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    const period = s.periodEnd
+      ? (() => { try { const [y,m] = s.periodEnd.split('-'); return new Date(y, m-1, 1).toLocaleDateString('en-US',{month:'long',year:'numeric'}); } catch(e) { return s.periodEnd; } })()
+      : 'last period';
+
+    const acct   = s.account ? ` · ${s.account}` : '';
+    const statusTxt = Math.abs(s.variance || 0) < 0.01 ? 'Balanced ✓' : `$${Math.abs(s.variance||0).toFixed(2)} variance`;
+
+    const banner = document.getElementById('recon-continuity-banner');
+    const text   = document.getElementById('recon-continuity-text');
+    if (!banner || !text) return;
+    text.textContent = `Last reconciled ${ago}: ${period}${acct} · ${statusTxt}`;
+
+    if (Math.abs(s.variance || 0) >= 0.01) {
+      banner.classList.replace('bg-emerald-50','bg-amber-50');
+      banner.classList.replace('border-emerald-200','border-amber-200');
+      banner.classList.replace('text-emerald-800','text-amber-800');
+      banner.querySelector('svg').classList.replace('text-emerald-600','text-amber-600');
+      const dismissBtn = banner.querySelector('button');
+      dismissBtn.classList.replace('text-emerald-500','text-amber-500');
+      if (dismissBtn.classList.contains('hover:text-emerald-700'))
+        dismissBtn.classList.replace('hover:text-emerald-700','hover:text-amber-700');
+    }
+    banner.classList.remove('hidden');
+  } catch (e) {}
 }
 </script>
 

@@ -35,6 +35,8 @@ from .integrations.email import tokens as email_tokens
 from .integrations.email.smtp_sender import send_email
 from .decision_ledger import DecisionLedger, DecisionCategory, DecisionOutcome, LedgerEntry
 from .db import processing_job_store, decision_ledger_store
+from .events.emitter import emit_event
+from .events.schemas import EventType, FinancialEvent, TagKind
 
 
 def get_ledger(church_id: str) -> DecisionLedger:
@@ -154,6 +156,59 @@ async def run_pipeline(job_id: str) -> None:
         ))
         _persist_job(job)
 
+        # Phase 5d: INSUFFICIENT_CONTEXT escalation. The vision says routing
+        # should fire on genuine ambiguity, and zero line items is the
+        # paradigm case. The Holy Comforter sample invoice produced 0 line
+        # items (OCR fallback unconfigured) and the auto-reviewer rubber-
+        # stamped it as APPROVED. That path is now closed: no line items,
+        # or a vendor we couldn't read, sends the job straight to HITL with
+        # an explicit reason — never auto-approve.
+        _insufficient: List[str] = []
+        if len(invoice.line_items) == 0:
+            _insufficient.append("zero line items extracted")
+        if not (invoice.vendor_name or "").strip() or invoice.vendor_name == "Unknown vendor":
+            _insufficient.append("vendor name unreadable")
+        if Decimal(str(invoice.total_amount or 0)) <= Decimal("0"):
+            _insufficient.append("total amount zero or missing")
+        if _insufficient:
+            _update_job(job, ProcessingStatus.PENDING_HITL)
+            job.audit_log.append({
+                "ts": datetime.utcnow().isoformat(),
+                "event_type": "INSUFFICIENT_CONTEXT",
+                "status": ProcessingStatus.PENDING_HITL.value,
+                "detail": (
+                    f"Routed to HITL — insufficient context to auto-process: "
+                    f"{', '.join(_insufficient)}. "
+                    f"OCR warnings: {invoice.warnings or 'none'}."
+                ),
+                "reasons": _insufficient,
+            })
+            _ledger_append(job.church_id, LedgerEntry(
+                entry_id=str(uuid.uuid4()),
+                decision_id=f"{job.job_id}:insufficient_context",
+                category=DecisionCategory.ROUTE,
+                timestamp=datetime.utcnow(),
+                authoring_actor={"actor_type": "pipeline", "actor_id": "context_evaluator", "authority_tier": 0},
+                policy_invoked="insufficient_context_guard",
+                evidence_refs=[job.job_id],
+                inference_chain=[
+                    {"input": f"line_items={len(invoice.line_items)}, vendor={invoice.vendor_name!r}, total=${invoice.total_amount}",
+                     "rule": "auto-approve forbidden when context is insufficient",
+                     "output": f"escalate: {', '.join(_insufficient)}"},
+                ],
+                conclusion=(
+                    f"Insufficient context to auto-route: {', '.join(_insufficient)}. "
+                    f"Job parked at PENDING_HITL for human review."
+                ),
+                alternatives=[
+                    {"description": "Auto-approve with empty/low-confidence input",
+                     "rejection_rationale": "Phase 5d guard: rote auto-approve on insufficient context is forbidden"},
+                ],
+                outcome=DecisionOutcome.ESCALATED,
+                metadata={"reasons": _insufficient},
+            ))
+            return
+
         # Step 2: COA load
         ctx: Optional[AccountingContext] = await asyncio.get_event_loop().run_in_executor(
             None, coa_store.load_accounting_context, job.church_id
@@ -163,6 +218,36 @@ async def run_pipeline(job_id: str) -> None:
                         error_message="COA not configured for this church.")
             return
         job.accounting_context = ctx
+
+        # Phase 5d: emit a ContextAssembled event the moment the agent has
+        # the full bundle it needs to decide. This is the canonical "agents
+        # hold full context" record — every downstream DecisionRecorded
+        # event in this job cites this context_event_id.
+        context_event_id: Optional[str] = None
+        try:
+            ce = FinancialEvent(
+                event_type=EventType.CONTEXT_ASSEMBLED,
+                church_id=job.church_id,
+                payload={
+                    "job_id": job.job_id,
+                    "vendor_name": invoice.vendor_name,
+                    "invoice_number": invoice.invoice_number,
+                    "total_amount": str(invoice.total_amount),
+                    "line_items": len(invoice.line_items),
+                    "denomination": str(getattr(ctx, "denomination_type", "")),
+                    "fiscal_year": ctx.fiscal_year,
+                    "fund_count": len(getattr(ctx, "funds", []) or []),
+                    "budget_configured": ctx.budget is not None,
+                    "ocr_warnings": invoice.warnings or [],
+                },
+                correlation_id=job.job_id,
+            )
+            ce.add_tag(TagKind.JOB, job.job_id)
+            ce.add_tag(TagKind.VENDOR, invoice.vendor_name or "")
+            ce.add_tag(TagKind.DENOMINATION, str(getattr(ctx, "denomination_type", "")))
+            context_event_id = str(emit_event(ce))
+        except Exception:
+            context_event_id = None
 
         # Step 3: Classification
         _update_job(job, ProcessingStatus.CLASSIFYING)
@@ -221,6 +306,7 @@ async def run_pipeline(job_id: str) -> None:
             authoring_actor={"actor_type": "pipeline", "actor_id": "fraud_detector", "authority_tier": 0},
             policy_invoked="fraud_detection_skill",
             evidence_refs=[job.job_id],
+            cited_event_ids=[context_event_id] if context_event_id else [],
             inference_chain=[
                 {"input": f"vendor={getattr(invoice, 'vendor_name', '?')}, total=${getattr(invoice, 'total_amount', 0)}", "rule": "multi-signal fraud scoring", "output": f"score={fraud_result.fraud_score:.3f}"},
                 {"input": f"score={fraud_result.fraud_score:.3f}", "rule": "CRITICAL if score ≥ threshold", "output": f"level={fraud_result.fraud_level}"},
@@ -271,6 +357,7 @@ async def run_pipeline(job_id: str) -> None:
                 authoring_actor={"actor_type": "pipeline", "actor_id": "gl_mapper", "authority_tier": 0},
                 policy_invoked="gl_account_mapper",
                 evidence_refs=[job.job_id],
+                cited_event_ids=[context_event_id] if context_event_id else [],
                 inference_chain=gl_inference,
                 conclusion=f"Mapped {len(draft_placeholder.lines)} line(s) to GL accounts.",
                 alternatives=[

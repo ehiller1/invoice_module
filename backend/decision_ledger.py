@@ -41,6 +41,11 @@ class LedgerEntry(BaseModel):
     # Reasoning chain (FRD §14.1)
     policy_invoked: Optional[str] = None  # policy_id or policy name
     evidence_refs: List[str] = []  # pointers to EventCard IDs
+    # Phase 5d: explicit pointers to events in the append-only event log
+    # that this decision relied on. This is the "why we believe what we
+    # believe" thread — every decision must be reconstructable by replaying
+    # the events in cited_event_ids.
+    cited_event_ids: List[str] = []
     inference_chain: List[Dict[str, Any]] = []  # each step: {input, rule, output}
     conclusion: Optional[str] = None  # narrative summary
 
