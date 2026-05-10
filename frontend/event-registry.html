@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Event Registry — Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <template id="page-center-content">
+        <div class="p-6 max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Event Registry</h1>
+                <p class="text-gray-600">Ground truth: every economic event captured with provenance, dimensions, and confidence</p>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                        <select id="filterEventType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">All Events</option>
+                            <option value="invoice_received">Invoice Received</option>
+                            <option value="cash_receipt">Cash Receipt</option>
+                            <option value="payment_made">Payment Made</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">GL Account</label>
+                        <input type="text" id="filterAccount" placeholder="e.g. 6100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Dimension</label>
+                        <select id="filterDimension" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">All Dimensions</option>
+                            <option value="project">Project</option>
+                            <option value="customer">Customer</option>
+                            <option value="function">Function</option>
+                            <option value="geography">Geography</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                        <input type="text" id="filterValue" placeholder="filter value" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button id="btnFilter" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                        Filter
+                    </button>
+                    <button id="btnClear" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-400">
+                        Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Events List -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Economic Events</h2>
+                </div>
+                <div id="eventsList" class="divide-y divide-gray-200">
+                    <div class="p-6 text-center text-gray-500">Loading events...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Detail Modal -->
+        <div id="eventModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                    <h2 id="modalTitle" class="text-xl font-bold text-gray-900">Event Details</h2>
+                    <button onclick="closeEventModal()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <!-- Provenance Section -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Provenance</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Source System</p>
+                                    <p id="provenanceSource" class="text-sm text-gray-900">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Document ID</p>
+                                    <p id="provenanceDocId" class="text-sm text-gray-900">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Confidence</p>
+                                    <p id="provenanceConfidence" class="text-sm text-gray-900">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Document</p>
+                                    <a id="provenanceDocLink" href="#" class="text-sm text-blue-600 hover:text-blue-700 underline">View →</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Economic Substance Section -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Economic Substance</h3>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div id="economicSubstance" class="space-y-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <!-- Dimensions Section -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Semantic Dimensions</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div id="dimensionsList" class="col-span-2 space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Lineage Section -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Agent Lineage</h3>
+                        <div class="space-y-2">
+                            <div id="lineageChart" class="space-y-3"></div>
+                        </div>
+                    </div>
+
+                    <!-- Overall Confidence -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-gray-600 mb-2">Overall Confidence Score</p>
+                        <div class="flex items-center gap-3">
+                            <div id="confidenceBar" class="flex-1 bg-gray-200 rounded-full h-2"></div>
+                            <span id="confidenceText" class="text-lg font-bold text-blue-600">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="eime-bus.js"></script>
+    <script src="eime-shell.js"></script>
+    <script src="eime-chat-rail.js"></script>
+    <script>
+        let currentEvents = [];
+        const CHURCH_ID = 'holy_comforter';
+
+        async function loadEvents() {
+            try {
+                const response = await fetch(`/api/events?church_id=${CHURCH_ID}&limit=50`);
+                const data = await response.json();
+                currentEvents = data.events || [];
+                renderEvents(currentEvents);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('eventsList').innerHTML =
+                    '<div class="p-6 text-center text-red-500">Error loading events</div>';
+            }
+        }
+
+        function renderEvents(events) {
+            const container = document.getElementById('eventsList');
+            if (events.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-gray-500">No events found</div>';
+                return;
+            }
+
+            container.innerHTML = events.map(evt => `
+                <div onclick="showEventDetail('${evt.event_id}')" class="p-4 hover:bg-gray-50 cursor-pointer transition">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="font-semibold text-gray-900">${formatEventType(evt.event_type)}</p>
+                            <p class="text-sm text-gray-600">${new Date(evt.timestamp).toLocaleString()}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-gray-900">$${(evt.economic_substance.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                            <p class="text-xs text-gray-500">Confidence: ${(evt.confidence * 100).toFixed(0)}%</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-2">${evt.economic_substance.description || evt.economic_substance.transaction_type}</p>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="inline-block px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                            Account: ${evt.dimensions.account}
+                        </span>
+                        ${evt.dimensions.project ? `<span class="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Project: ${evt.dimensions.project}</span>` : ''}
+                        ${evt.dimensions.customer ? `<span class="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Customer: ${evt.dimensions.customer}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatEventType(type) {
+            return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+
+        async function showEventDetail(eventId) {
+            try {
+                const response = await fetch(`/api/events/${eventId}`);
+                const event = await response.json();
+
+                document.getElementById('modalTitle').textContent = `Event ${eventId}`;
+
+                // Provenance
+                document.getElementById('provenanceSource').textContent = event.provenance.source_system;
+                document.getElementById('provenanceDocId').textContent = event.provenance.document_id;
+                document.getElementById('provenanceConfidence').textContent = `${(event.provenance.confidence * 100).toFixed(0)}%`;
+
+                // Economic Substance
+                const substanceHtml = Object.entries(event.economic_substance)
+                    .map(([key, value]) => `<div><strong>${key}:</strong> ${value}</div>`)
+                    .join('');
+                document.getElementById('economicSubstance').innerHTML = substanceHtml;
+
+                // Dimensions
+                const dimensionsHtml = Object.entries(event.dimensions)
+                    .filter(([_, v]) => v !== null)
+                    .map(([key, value]) => `<div class="flex justify-between p-2 bg-white rounded border border-gray-200"><span class="font-medium text-gray-700">${key}:</span><span class="text-gray-900">${value}</span></div>`)
+                    .join('');
+                document.getElementById('dimensionsList').innerHTML = dimensionsHtml;
+
+                // Lineage
+                const lineageHtml = event.lineage.map((stage, idx) => `
+                    <div class="flex items-center">
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-900">${stage.stage.charAt(0).toUpperCase() + stage.stage.slice(1)}</p>
+                            <p class="text-xs text-gray-600">${new Date(stage.timestamp).toLocaleString()} • ${stage.agent || 'system'}</p>
+                            ${stage.decision ? `<p class="text-sm text-gray-700 mt-1"><strong>Decision:</strong> ${stage.decision}</p>` : ''}
+                        </div>
+                        <div class="text-green-600 text-2xl ml-4">✓</div>
+                    </div>
+                    ${idx < event.lineage.length - 1 ? '<div class="h-4 border-l-2 border-gray-300 ml-4"></div>' : ''}
+                `).join('');
+                document.getElementById('lineageChart').innerHTML = lineageHtml;
+
+                // Confidence
+                const confidence = event.confidence;
+                document.getElementById('confidenceText').textContent = `${(confidence * 100).toFixed(0)}%`;
+                document.getElementById('confidenceBar').innerHTML = `<div style="width: ${confidence * 100}%" class="bg-blue-600 h-full rounded-full transition"></div>`;
+
+                document.getElementById('eventModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading event detail:', error);
+            }
+        }
+
+        function closeEventModal() {
+            document.getElementById('eventModal').classList.add('hidden');
+        }
+
+        document.getElementById('btnFilter').addEventListener('click', () => {
+            const eventType = document.getElementById('filterEventType').value;
+            const account = document.getElementById('filterAccount').value;
+            const filtered = currentEvents.filter(e => {
+                if (eventType && e.event_type !== eventType) return false;
+                if (account && e.dimensions.account !== account) return false;
+                return true;
+            });
+            renderEvents(filtered);
+        });
+
+        document.getElementById('btnClear').addEventListener('click', () => {
+            document.getElementById('filterEventType').value = '';
+            document.getElementById('filterAccount').value = '';
+            document.getElementById('filterDimension').value = '';
+            document.getElementById('filterValue').value = '';
+            renderEvents(currentEvents);
+        });
+
+        // Initialize on page mount
+        async function onMounted() {
+            await loadEvents();
+            eime.setContext({
+                page: 'event-registry',
+                payload: { churchId: CHURCH_ID }
+            });
+        }
+
+        // Start the shell and load events
+        EIMEShell.mount({
+            onMounted: onMounted,
+            navAttribute: 'data-nav'
+        });
+    </script>
+</body>
+</html>

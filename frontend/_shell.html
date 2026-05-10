@@ -1,146 +1,377 @@
 <!--
   EIME Three-Panel Shell
-  Loaded by eime-shell.js via fetch and injected into the page.
-
-  Layout (>=1024px): [Left Nav 240px] [Center fluid] [Right Chat Rail 360px]
-  Layout (<1024px): collapsible left nav (hamburger) + collapsible chat rail (FAB toggle)
+  Desktop (>=1024px): [Left Nav 240px] [Center fluid] [Right Chat Rail 360px]
+  Mobile  (<1024px):  Bottom tab bar (5 items) + slide-in left nav + bottom-sheet chat
 -->
 <div id="eime-shell-root" class="flex h-full w-full overflow-hidden">
 
-  <!-- ============== LEFT NAV (240px) ============== -->
+  <!-- ============================================================
+       LEFT NAV — 240px, always-on desktop / slide-in mobile
+       z-50 on mobile so it sits above the z-20 bottom tab bar
+  ============================================================ -->
   <aside id="eime-left-nav"
-    class="eime-left-nav w-60 bg-navy-900 flex-col shadow-xl flex-shrink-0
+    class="w-60 bg-navy-900 flex-col shadow-xl flex-shrink-0
            hidden lg:flex
-           fixed lg:relative inset-y-0 left-0 z-40 lg:z-auto">
+           fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto">
+
+    <!-- Brand header -->
     <div class="px-5 py-5 border-b border-navy-700 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center">
+        <div class="w-9 h-9 bg-gold-500 rounded-lg flex items-center justify-center flex-shrink-0">
           <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
         </div>
         <div>
-          <p class="text-white font-semibold text-sm leading-tight">EIME</p>
-          <p class="text-slate-400 text-xs">Invoice Mapping Engine</p>
+          <p class="text-white font-semibold text-sm leading-tight">Books</p>
+          <p class="text-slate-400 text-xs">Church Finance</p>
         </div>
       </div>
-      <button id="eime-nav-close" class="lg:hidden text-slate-400 hover:text-white" onclick="EIMEShell.toggleNav(false)">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <button id="eime-nav-close" class="lg:hidden text-slate-400 hover:text-white p-1" onclick="EIMEShell.toggleNav(false)">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
       </button>
     </div>
 
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      <a data-nav="invoices" href="/index.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-        Invoices
+    <!-- ── Navigation ── -->
+    <nav class="flex-1 px-3 py-3 overflow-y-auto">
+
+      <!-- Today — standalone hero item -->
+      <a data-nav="today" href="/dashboard.html"
+        class="eime-nav-link mb-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        Today
       </a>
-      <a data-nav="jobs" href="/jobs.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        Journal Entries
-        <span id="eime-hitl-badge" class="hidden ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5"></span>
+
+      <!-- ── FOUNDATION ───────────────────────────────── -->
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">Foundation</p>
+
+      <a data-nav="event-registry" href="/event-registry.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Event Registry
       </a>
-      <a data-nav="jes" href="/jes.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        JE Workflow
+
+      <a data-nav="decision-ledger" href="/decision-ledger.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.998 10-10.747S17.5 6.253 12 6.253z"/>
+        </svg>
+        Decision Ledger
       </a>
-      <a data-nav="treasurer" href="/treasurer-queue.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        Treasurer Queue
+
+      <a data-nav="operations-council" href="/operations-council.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3zm0 0c1.11 0 2.08.402 2.599 1M12 8v-3m0 3c-1.11 0-2.08.402-2.599 1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Operations Council
       </a>
-      <a data-nav="cabinet" href="/cabinet.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-        Personal Cabinet
+
+      <!-- ── WORKFLOW ─────────────────────────────────── -->
+      <p class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">Workflow</p>
+
+      <a data-nav="invoices" href="/index.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        Upload Invoice
       </a>
-      <a data-nav="reconciliation" href="/reconciliation.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+
+      <a data-nav="jobs" href="/jobs.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        Review Queue
+        <span data-badge="hitl"
+          class="hidden ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-semibold min-w-[1.25rem] text-center leading-none"></span>
+      </a>
+
+      <a data-nav="jes" href="/jes.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Post Entries
+      </a>
+
+      <!-- ── ACTION ──────────────────────────────────── -->
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">Action</p>
+
+      <a data-nav="inbox" href="/inbox.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+        </svg>
+        Inbox
+        <span data-badge="inbox"
+          class="hidden ml-auto bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 font-semibold min-w-[1.25rem] text-center leading-none"></span>
+      </a>
+
+      <a data-nav="reconciliation" href="/reconciliation.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+        </svg>
         Reconciliation
       </a>
-      <a data-nav="payments" href="/payments.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+
+      <!-- ── RECORDS ──────────────────────────────────── -->
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">Records</p>
+
+      <a data-nav="payments" href="/payments.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
         Payments
       </a>
-      <a data-nav="budget" href="/budget.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+
+      <a data-nav="budget" href="/budget.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
         Budget
       </a>
-      <a data-nav="vendors" href="/vendors.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+
+      <a data-nav="vendors" href="/vendors.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
         Vendors
       </a>
-      <a data-nav="audit" href="/audit.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+
+      <a data-nav="audit" href="/audit.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+        </svg>
         Audit Trail
       </a>
-      <a data-nav="kb" href="/knowledge-base.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        Knowledge Base
-      </a>
-      <a data-nav="benchmark" href="/federated-benchmark.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        Peer Benchmarking
-      </a>
-      <a data-nav="browser-setup" href="/browser-setup.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
-        Browser Plug-in
-      </a>
-      <a data-nav="settings" href="/coa.html" class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        Settings (CoA)
-      </a>
+
+      <!-- ── ADMIN (collapsible) ──────────────────────── -->
+      <div class="mt-4 pt-3 border-t border-navy-800">
+        <button id="eime-more-btn" onclick="EIMEShell.toggleAdminNav()"
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-300 hover:bg-navy-800 transition-colors text-left">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/>
+          </svg>
+          Admin
+          <span id="eime-more-arrow" class="ml-auto">▾</span>
+        </button>
+
+        <div id="eime-admin-section" class="hidden flex-col gap-0.5 mt-0.5">
+          <a data-nav="treasurer" href="/treasurer-queue.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+            Treasurer Queue
+          </a>
+          <a data-nav="benchmark" href="/federated-benchmark.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            Peer Reports
+          </a>
+          <a data-nav="kb" href="/knowledge-base.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            Knowledge Base
+          </a>
+          <a data-nav="settings" href="/settings.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Settings
+          </a>
+          <a data-nav="cabinet" href="/cabinet.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+            </svg>
+            My Settings
+          </a>
+          <a data-nav="browser-setup" href="/browser-setup.html"
+            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Browser Plug-in
+          </a>
+        </div>
+      </div>
+
     </nav>
 
+    <!-- Church status -->
     <div class="px-3 py-4 border-t border-navy-700">
       <div class="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
-        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-        <span class="text-slate-300 text-xs" id="eime-church-name-label">Loading…</span>
+        <div class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+        <span class="text-slate-300 text-xs truncate" id="eime-church-name-label">Loading…</span>
       </div>
     </div>
   </aside>
 
-  <!-- mobile nav backdrop -->
-  <div id="eime-nav-backdrop" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden" onclick="EIMEShell.toggleNav(false)"></div>
+  <!-- Mobile nav backdrop (above tab bar z-20, below nav z-50) -->
+  <div id="eime-nav-backdrop"
+    class="hidden fixed inset-0 bg-black/40 z-40 lg:hidden"
+    onclick="EIMEShell.toggleNav(false)"></div>
 
-  <!-- ============== CENTER PANEL ============== -->
+  <!-- ============================================================
+       CENTER PANEL
+  ============================================================ -->
   <main id="eime-center-wrap" class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
     <!-- Mobile top bar -->
-    <div class="lg:hidden bg-navy-900 text-white px-2 py-2 flex items-center justify-between flex-shrink-0">
-      <button onclick="EIMEShell.toggleNav(true)" class="text-white min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Open menu">
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <div class="lg:hidden bg-navy-900 text-white px-3 py-2 flex items-center justify-between flex-shrink-0">
+      <button onclick="EIMEShell.toggleNav(true)"
+        class="text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+        aria-label="Open menu">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
       </button>
-      <p class="text-sm font-semibold">EIME</p>
-      <button onclick="EIMEShell.toggleChat(true)" class="text-white min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Open chat">
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+      <p class="text-sm font-semibold">Books</p>
+      <button onclick="EIMEShell.toggleChat(true)"
+        class="text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+        aria-label="Open chat">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
       </button>
     </div>
 
-    <div id="eime-center" class="flex-1 overflow-auto">
-      <!-- Page content injected here -->
+    <!-- Content — bottom padding reserves space for mobile tab bar -->
+    <div id="eime-center" class="flex-1 overflow-auto pb-14 lg:pb-0">
+      <!-- Page content injected here by eime-shell.js -->
     </div>
   </main>
 
-  <!-- ============== RIGHT CHAT RAIL (360px desktop, bottom-sheet mobile) ============== -->
+  <!-- ============================================================
+       RIGHT CHAT RAIL — 360px desktop / bottom-sheet mobile
+  ============================================================ -->
   <aside id="eime-chat-rail"
-    class="eime-chat-rail bg-white border-l border-slate-200 flex-shrink-0
+    class="bg-white border-l border-slate-200 flex-shrink-0
            hidden lg:flex flex-col shadow-xl lg:shadow-none
            lg:w-[360px] lg:relative lg:inset-y-0 lg:right-0
            fixed inset-x-0 bottom-0 z-40 max-h-[80vh] rounded-t-2xl lg:rounded-none
            lg:max-h-none w-full">
-    <!-- mobile-only close handle/button -->
-    <button id="eime-chat-close" class="lg:hidden self-end m-2 text-slate-500 hover:text-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center" onclick="EIMEShell.toggleChat(false)" aria-label="Close chat">
-      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    <button id="eime-chat-close"
+      class="lg:hidden self-end m-2 text-slate-500 hover:text-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center"
+      onclick="EIMEShell.toggleChat(false)" aria-label="Close chat">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
     </button>
     <!-- chat rail injected by eime-chat-rail.js -->
   </aside>
 
-  <!-- mobile chat FAB toggle -->
+  <!-- Mobile chat FAB — raised above the tab bar -->
   <button id="eime-chat-fab"
-    class="lg:hidden fixed bottom-5 right-5 z-30 bg-navy-900 hover:bg-navy-800 text-white rounded-full w-14 h-14 shadow-lg flex items-center justify-center"
+    class="lg:hidden fixed bottom-[4.5rem] right-4 z-30 bg-navy-900 hover:bg-navy-800 text-white rounded-full w-12 h-12 shadow-lg flex items-center justify-center"
     onclick="EIMEShell.toggleChat(true)">
-    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+    </svg>
   </button>
 
-  <!-- mobile chat backdrop -->
-  <div id="eime-chat-backdrop" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden" onclick="EIMEShell.toggleChat(false)"></div>
+  <!-- Mobile chat backdrop -->
+  <div id="eime-chat-backdrop"
+    class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden"
+    onclick="EIMEShell.toggleChat(false)"></div>
+
+  <!-- ============================================================
+       MOBILE BOTTOM TAB BAR
+       z-20: always above content, below backdrops (z-30+) and nav (z-50)
+  ============================================================ -->
+  <nav id="eime-bottom-tabs"
+    class="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-navy-900 border-t border-navy-700 flex h-14">
+
+    <a href="/dashboard.html" data-nav="today"
+      class="eime-mobile-tab flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+      </svg>
+      <span class="text-[10px] font-medium">Today</span>
+    </a>
+
+    <a href="/inbox.html" data-nav="inbox"
+      class="eime-mobile-tab flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white transition-colors relative">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+      </svg>
+      <span data-badge="inbox"
+        class="hidden absolute top-1.5 left-[calc(50%+8px)] bg-amber-500 text-white text-[9px] rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 font-semibold leading-none"></span>
+      <span class="text-[10px] font-medium">Inbox</span>
+    </a>
+
+    <a href="/jobs.html" data-nav="jobs"
+      class="eime-mobile-tab flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white transition-colors relative">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+      </svg>
+      <span data-badge="hitl"
+        class="hidden absolute top-1.5 left-[calc(50%+8px)] bg-red-500 text-white text-[9px] rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5 font-semibold leading-none"></span>
+      <span class="text-[10px] font-medium">Review</span>
+    </a>
+
+    <a href="/jes.html" data-nav="jes"
+      class="eime-mobile-tab flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <span class="text-[10px] font-medium">Post</span>
+    </a>
+
+    <button onclick="EIMEShell.toggleNav(true)"
+      class="flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+      <span class="text-[10px] font-medium">More</span>
+    </button>
+  </nav>
 
 </div>

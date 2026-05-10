@@ -34,6 +34,15 @@ from .models import (
     DocumentType, Fund, FundCategory, HITLDecisions, HITLLineDecision,
     ProcessingStatus, RestrictionClass,
 )
+# NOTE: Phase 1 DB-store migration (Imports & Basic Wiring).
+# - `tools.coa_store` retained at module level: db.coa_store does not yet
+#   expose `ensure_seed` or `semantic_search`. Endpoints that only use
+#   load/save/list_churches/upsert/delete are routed through `db.coa_store`
+#   via inline imports. Bulk migration of these calls is a later phase.
+# - `tools.approval_audit` retained: no db equivalent yet (the eventual
+#   db.approval_audit_store change happens inside approval_audit.py, not here).
+# - `tools.approval_chain_resolver` retained for now; new code paths use
+#   `db.approval_store`.
 from .tools import coa_store
 from .tools.spreadsheet_parser import parse_spreadsheet
 from .tools import approval_chain_resolver, approval_audit
@@ -41,6 +50,22 @@ from .integrations.email import tokens as email_tokens
 from . import flow
 from . import scheduler as approval_scheduler
 from . import setup_wizard as _setup_wizard
+
+# Phase 1: DB-backed stores. Importing these makes the symbols available for
+# call-site swaps performed in this and subsequent phases.
+from . import db
+from .db import (
+    coa_store as db_coa_store,
+    journal_entry_store,
+    payment_store,
+    plaid_store as db_plaid_store,
+    vendor_store as db_vendor_store,
+    approval_store,
+    bank_txn_store,
+    recon_store,
+    processing_job_store,
+    decision_ledger_store,
+)
 
 UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -869,33 +894,23 @@ async def manual_create_je(body: Dict[str, Any]) -> JSONResponse:
     # Force DRAFT status — manual JEs always enter the approval chain at DRAFT.
     je.status = JEStatus.DRAFT
 
-    _persist_je(je.church_id, je.model_dump())
+    # Persist via the DB-backed journal_entry_store (replaces JSONL append).
+    journal_entry_store.create_journal_entry(je.church_id, je)
+    saved = journal_entry_store.get_journal_entry(je.entry_id)
 
     return _json({
         "ok": True,
         "entry_id": je.entry_id,
         "status": je.status.value if hasattr(je.status, "value") else str(je.status),
-        "journal_entry": je.model_dump(),
+        "journal_entry": saved.model_dump() if saved is not None else je.model_dump(),
     })
 
 
 @app.get("/api/churches/{church_id}/jes/manual")
-async def list_manual_jes(church_id: str) -> JSONResponse:
-    """List manually-created JEs for a church."""
-    path = _jes_path(church_id)
-    if not path.exists():
-        return _json([])
-    out: List[Dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                out.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return _json(out)
+async def list_manual_jes(church_id: str, status: Optional[str] = None) -> JSONResponse:
+    """List manually-created JEs for a church (DB-backed)."""
+    entries = journal_entry_store.list_journal_entries(church_id, status=status)
+    return _json([e.model_dump() for e in entries])
 
 
 # ===== FR-09: Knowledge Base endpoints =====
@@ -1284,81 +1299,98 @@ async def list_approval_audit(
                   "events": rows})
 
 
+@app.get("/api/churches/{church_id}/decision-ledger")
+async def get_decision_ledger(
+    church_id: str,
+    category: Optional[str] = None,
+    job_id: Optional[str] = None,
+    limit: int = 100,
+) -> JSONResponse:
+    """Return the structured decision ledger for a church.
+
+    Each entry records why the system made a classification, mapping, fraud,
+    or approval-routing decision — the 'why does the system believe what it
+    believes' audit trail per FRD §14.1.
+
+    Query params:
+      category  — filter by DecisionCategory (recognize, code, route, approve, override, disavow)
+      job_id    — filter to entries for a specific processing job
+      limit     — max entries returned (default 100, most recent first)
+    """
+    ledger = flow.get_ledger(church_id)
+    entries = list(reversed(ledger.entries))  # most recent first
+
+    if category:
+        entries = [e for e in entries if e.category.value == category.lower()]
+    if job_id:
+        entries = [e for e in entries if e.decision_id.startswith(job_id)]
+
+    entries = entries[:limit]
+    return _json({
+        "church_id": church_id,
+        "total": len(ledger.entries),
+        "returned": len(entries),
+        "entries": [e.model_dump(mode="json") for e in entries],
+    })
+
+
 # ===== FR-06.4 / FR-06.5: JE state machine + ACS Realm posting =====
 
 def _find_journal_entry(je_id: str):
-    """Find a JE by ID across processing jobs and manual JE files.
+    """Find a JE by ID — DB-backed via journal_entry_store.
 
-    Returns (JournalEntry, church_id) or (None, None).
+    Falls back to processing-job in-memory JEs (which may not yet be
+    persisted to the journal_entries table). Returns (JournalEntry,
+    church_id) or (None, None).
     """
-    from .models.schemas import JournalEntry as _JE
-    # Check processing jobs first
-    for job in flow.list_jobs():
-        if job.journal_entry and job.journal_entry.entry_id == je_id:
-            return job.journal_entry, job.church_id
+    je = journal_entry_store.get_journal_entry(je_id)
+    if je is not None:
+        return je, je.church_id
 
-    # Check manual JE files
-    for f in JE_DATA_DIR.glob("jes_*.jsonl"):
-        cid = f.stem.replace("jes_", "")
-        try:
-            content = f.read_text()
-        except Exception:
-            continue
-        for line in content.splitlines():
-            if not line.strip():
-                continue
-            try:
-                je_data = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if je_data.get("entry_id") == je_id:
-                try:
-                    return _JE(**je_data), cid
-                except Exception:
-                    continue
+    # Fallback: processing-job JEs not yet promoted to the DB store.
+    try:
+        for job in flow.list_jobs():
+            if job.journal_entry and job.journal_entry.entry_id == je_id:
+                return job.journal_entry, job.church_id
+    except Exception:
+        pass
     return None, None
 
 
 def _update_je_in_store(je: Any, church_id: str) -> None:
-    """Update an existing JE in its source (processing job or manual JE file).
+    """Update an existing JE — DB-backed via journal_entry_store.
 
-    Note: distinct from `_persist_je(church_id, je_dict)` which appends a new
-    entry. This one finds-and-replaces by entry_id.
+    If the JE exists in the journal_entries table, we update it there
+    atomically (with optimistic locking inside the store). If it only
+    lives on a processing job, mutate the job's in-memory copy.
     """
     je_data = je.model_dump() if hasattr(je, "model_dump") else dict(je)
 
-    # If JE lives on a processing job, mutate in-place there.
-    for job in flow.list_jobs():
-        if job.journal_entry and job.journal_entry.entry_id == je.entry_id:
-            job.journal_entry = je
-            return
-
-    # Otherwise find/replace in jes_{church_id}.jsonl.
-    f = _jes_path(church_id)
-    if not f.exists():
-        JE_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        f.write_text(json.dumps(je_data, default=str) + "\n")
+    # If the JE is in the DB store, update it there.
+    if journal_entry_store.get_journal_entry(je.entry_id) is not None:
+        # Strip fields the store handles internally (id/version/timestamps).
+        updates = {
+            k: v for k, v in je_data.items()
+            if k not in {"entry_id", "version", "created_at", "updated_at", "lines"}
+        }
+        journal_entry_store.update_journal_entry(je.entry_id, updates)
         return
 
-    lines = f.read_text().splitlines()
-    out_lines: List[str] = []
-    found = False
-    for ln in lines:
-        if not ln.strip():
-            continue
-        try:
-            data = json.loads(ln)
-        except json.JSONDecodeError:
-            out_lines.append(ln)
-            continue
-        if data.get("entry_id") == je.entry_id:
-            out_lines.append(json.dumps(je_data, default=str))
-            found = True
-        else:
-            out_lines.append(ln)
-    if not found:
-        out_lines.append(json.dumps(je_data, default=str))
-    f.write_text("\n".join(out_lines) + "\n")
+    # Otherwise mutate the in-memory processing-job copy.
+    try:
+        for job in flow.list_jobs():
+            if job.journal_entry and job.journal_entry.entry_id == je.entry_id:
+                job.journal_entry = je
+                return
+    except Exception:
+        pass
+
+    # Last resort: insert into the DB store (manual JEs that haven't been
+    # persisted yet land here).
+    try:
+        journal_entry_store.create_journal_entry(church_id, je)
+    except Exception:
+        pass
 
 
 @app.post("/api/jes/{je_id}/post")
@@ -1480,53 +1512,66 @@ def transition_je(je_id: str, body: Dict[str, Any]) -> JSONResponse:
 def list_jes(
     church_id: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ) -> JSONResponse:
-    """List journal entries with optional filtering (FR-06.4)."""
-    jes: List[Dict[str, Any]] = []
+    """List journal entries with optional filtering (FR-06.4) — DB-backed."""
+    from datetime import date as _date
 
-    # Read from jes_{church_id}.jsonl files
-    if church_id:
-        je_files = [_jes_path(church_id)]
-    else:
-        je_files = list(JE_DATA_DIR.glob("jes_*.jsonl"))
-
-    for f in je_files:
-        if not f.exists():
-            continue
-        cid = f.stem.replace("jes_", "")
+    def _parse_date(s: Optional[str]) -> Optional[_date]:
+        if not s:
+            return None
         try:
-            content = f.read_text()
+            return _date.fromisoformat(s)
+        except ValueError:
+            return None
+
+    df = _parse_date(date_from)
+    dt = _parse_date(date_to)
+
+    # Determine target church set.
+    if church_id:
+        church_ids = [church_id]
+    else:
+        try:
+            from .db import coa_store as _coa_store
+            church_ids = [c["church_id"] for c in _coa_store.list_churches()]
+        except Exception:
+            church_ids = []
+
+    jes: List[Dict[str, Any]] = []
+    for cid in church_ids:
+        try:
+            entries = journal_entry_store.list_journal_entries(
+                cid, status=status, date_from=df, date_to=dt
+            )
         except Exception:
             continue
-        for line in content.splitlines():
-            if not line.strip():
-                continue
-            try:
-                je_data = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if status and je_data.get("status") != status:
-                continue
-            jes.append({**je_data, "church_id": je_data.get("church_id", cid)})
+        for e in entries:
+            jes.append(e.model_dump())
 
-    # Also include JEs from ProcessingJobs
-    for job in flow.list_jobs():
-        if church_id and job.church_id != church_id:
-            continue
-        if job.journal_entry:
-            je_obj = job.journal_entry
-            je_dict = (
-                je_obj.model_dump()
-                if hasattr(je_obj, "model_dump")
-                else dict(je_obj)
-            )
-            if status and je_dict.get("status") != status:
-                continue
-            jes.append({
-                **je_dict,
-                "church_id": job.church_id,
-                "job_id": job.job_id,
-            })
+    # Merge in JEs that live only on processing jobs (not yet promoted).
+    if church_id:
+        try:
+            for job in flow.list_jobs(church_id):
+                if job.journal_entry:
+                    je_obj = job.journal_entry
+                    je_dict = (
+                        je_obj.model_dump()
+                        if hasattr(je_obj, "model_dump")
+                        else dict(je_obj)
+                    )
+                    if status and je_dict.get("status") != status:
+                        continue
+                    if any(j.get("entry_id") == je_dict.get("entry_id") for j in jes):
+                        continue
+                    jes.append({
+                        **je_dict,
+                        "church_id": job.church_id,
+                        "job_id": job.job_id,
+                    })
+        except Exception:
+            pass
 
     return _json(jes)
 
@@ -1566,27 +1611,11 @@ def _load_payments(church_id: str) -> List[Dict[str, Any]]:
 
 
 def _find_payment(payment_id: str):
-    """Return (payment_dict, church_id) or (None, None)."""
-    for f in PAYMENT_DATA_DIR.glob("payments_*.jsonl"):
-        cid = f.stem.replace("payments_", "")
-        try:
-            content = f.read_text()
-        except Exception:
-            continue
-        # Walk backwards to get the latest record for this payment_id.
-        latest = None
-        for line in content.splitlines():
-            if not line.strip():
-                continue
-            try:
-                data = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if data.get("payment_id") == payment_id:
-                latest = data
-        if latest is not None:
-            return latest, cid
-    return None, None
+    """Return (payment_dict, church_id) or (None, None) — DB-backed."""
+    inst = payment_store.get_payment(payment_id)
+    if inst is None:
+        return None, None
+    return inst.model_dump(), inst.church_id
 
 
 def _vendor_total_amount(je) -> Decimal:
@@ -1611,7 +1640,7 @@ async def create_payment_for_je(je_id: str, body: Dict[str, Any]) -> JSONRespons
         PaymentInstruction, PaymentMethod, PaymentStatus,
         ACHRecord, CheckRecord, CreditCardMemo,
     )
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     from .tools.payment_recommender import recommend_payment_method
 
     je, church_id = _find_journal_entry(je_id)
@@ -1689,7 +1718,7 @@ async def create_payment_for_je(je_id: str, body: Dict[str, Any]) -> JSONRespons
         updated_at=now,
     )
 
-    _persist_payment(church_id, inst.model_dump())
+    payment_store.create_payment(church_id, inst)
 
     # Audit
     try:
@@ -1749,7 +1778,11 @@ async def approve_payment(
     inst.approved_by = approver
     inst.updated_at = datetime.utcnow()
 
-    _persist_payment(church_id, inst.model_dump())
+    payment_store.update_payment(payment_id, {
+        "status": PaymentStatus.APPROVED,
+        "approved_by": approver,
+        "updated_at": inst.updated_at,
+    })
 
     try:
         approval_audit.append_event(church_id, {
@@ -1810,33 +1843,23 @@ async def download_check_pdf(payment_id: str):
 
 @app.get("/api/churches/{church_id}/payments")
 async def list_payments(church_id: str, status: Optional[str] = None) -> JSONResponse:
-    """List all payments for a church, optionally filtered by status."""
-    from .models.schemas import PaymentInstruction
-    payments = _load_payments(church_id)
-    # Dedup by payment_id keeping latest
-    by_id: Dict[str, Dict[str, Any]] = {}
-    for p in payments:
-        pid = p.get("payment_id")
-        if pid:
-            by_id[pid] = p
-    out = list(by_id.values())
-    if status:
-        out = [p for p in out if p.get("status") == status]
-    return _json(out)
+    """List all payments for a church, optionally filtered by status (DB-backed)."""
+    payments = payment_store.list_payments(church_id, status=status)
+    return _json([p.model_dump() for p in payments])
 
 
 # ---- Vendor CRUD endpoints ----
 
 @app.get("/api/churches/{church_id}/vendors")
 async def list_vendors(church_id: str) -> JSONResponse:
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     return _json([v.model_dump() for v in vendor_store.load_vendors(church_id)])
 
 
 @app.post("/api/churches/{church_id}/vendors")
 async def create_vendor(church_id: str, body: Dict[str, Any]) -> JSONResponse:
     from .models.schemas import Vendor
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     body = dict(body or {})
     body["church_id"] = church_id
     if not body.get("vendor_id"):
@@ -1851,7 +1874,7 @@ async def create_vendor(church_id: str, body: Dict[str, Any]) -> JSONResponse:
 
 @app.get("/api/churches/{church_id}/vendors/{vendor_id}")
 async def get_vendor(church_id: str, vendor_id: str) -> JSONResponse:
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     for v in vendor_store.load_vendors(church_id):
         if v.vendor_id == vendor_id:
             return _json(v.model_dump())
@@ -1861,7 +1884,7 @@ async def get_vendor(church_id: str, vendor_id: str) -> JSONResponse:
 @app.put("/api/churches/{church_id}/vendors/{vendor_id}")
 async def update_vendor(church_id: str, vendor_id: str, body: Dict[str, Any]) -> JSONResponse:
     from .models.schemas import Vendor
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     body = dict(body or {})
     body["vendor_id"] = vendor_id
     body["church_id"] = church_id
@@ -1875,7 +1898,7 @@ async def update_vendor(church_id: str, vendor_id: str, body: Dict[str, Any]) ->
 
 @app.delete("/api/churches/{church_id}/vendors/{vendor_id}")
 async def delete_vendor(church_id: str, vendor_id: str) -> JSONResponse:
-    from .tools import vendor_store
+    from .db import vendor_store  # Phase 1: was `from .tools import vendor_store`
     vendors = vendor_store.load_vendors(church_id)
     remaining = [v for v in vendors if v.vendor_id != vendor_id]
     if len(remaining) == len(vendors):
@@ -2230,7 +2253,7 @@ async def plaid_complete_auth(
 ) -> JSONResponse:
     """Exchange the public_token, fetch + store the accounts."""
     from .integrations import plaid_client
-    from .tools import plaid_store
+    from .db import plaid_store  # Phase 1: was `from .tools import plaid_store`
     from .models.schemas import PlaidAccount
 
     try:
@@ -2276,7 +2299,7 @@ async def plaid_complete_auth(
 
 @app.get("/api/churches/{church_id}/plaid/accounts")
 async def list_plaid_accounts(church_id: str) -> JSONResponse:
-    from .tools import plaid_store
+    from .db import plaid_store  # Phase 1: was `from .tools import plaid_store`
     rows = plaid_store.load_plaid_accounts(church_id)
     return _json([
         {
@@ -2321,28 +2344,34 @@ async def delete_plaid_account_endpoint(
     actual = get_caller_role(request)
     if not has_role(actual, "TREASURER_ADMIN"):
         raise HTTPException(403, f"Forbidden: role '{actual or 'none'}' lacks TREASURER_ADMIN")
-    from .tools import plaid_store
-    rows = plaid_store.delete_plaid_account(church_id, account_id)
-    return _json({"ok": True, "count": len(rows)})
+    from .db import plaid_store  # Phase 1: was `from .tools import plaid_store`
+    # NOTE: db.plaid_store.delete_plaid_account returns bool, not list. Wrap so
+    # the existing response shape is preserved.
+    ok = plaid_store.delete_plaid_account(church_id, account_id)
+    return _json({"ok": bool(ok), "count": 1 if ok else 0})
 
 
 @app.post("/api/churches/{church_id}/plaid/sync-transactions")
 async def sync_plaid_transactions(
     church_id: str,
-    body: PlaidSyncBody,
+    body: Optional[PlaidSyncBody] = None,
+    account_id: Optional[str] = None,
 ) -> JSONResponse:
-    from .tools import plaid_store
+    from .db import plaid_store  # Phase 1: was `from .tools import plaid_store`
     from datetime import date as _date, timedelta as _td
+
+    effective_account = (body.account_id if body else None) or account_id or ""
+    days_back = (body.days_back if body else None) or 60
 
     try:
         new_txns = plaid_store.fetch_and_store_transactions(
-            church_id, body.account_id, days_back=body.days_back,
+            church_id, effective_account, days_back=days_back,
         )
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
 
     end = _date.today()
-    start = end - _td(days=body.days_back)
+    start = end - _td(days=days_back)
     return _json({
         "transactions_synced": len(new_txns),
         "date_range": f"{start.isoformat()} to {end.isoformat()}",
@@ -2356,7 +2385,7 @@ async def list_plaid_transactions(
     from_: Optional[str] = None,
     to: Optional[str] = None,
 ) -> JSONResponse:
-    from .tools import plaid_store
+    from .db import plaid_store  # Phase 1: was `from .tools import plaid_store`
     from datetime import date as _date
 
     df = _date.fromisoformat(from_) if from_ else None
@@ -2364,6 +2393,7 @@ async def list_plaid_transactions(
     rows = plaid_store.load_plaid_transactions(
         church_id, account_id=account_id, date_from=df, date_to=dt,
     )
+    matches = _load_recon_matches(church_id)
     return _json([
         {
             "txn_id": t.txn_id,
@@ -2373,6 +2403,9 @@ async def list_plaid_transactions(
             "amount": t.amount,
             "category": t.category,
             "merchant_name": t.merchant_name,
+            "matched": t.txn_id in matches,
+            "matched_je_id": matches.get(t.txn_id, {}).get("je_id"),
+            "matched_at": matches.get(t.txn_id, {}).get("matched_at"),
         }
         for t in rows
     ])
@@ -2395,23 +2428,94 @@ async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
     return _json({"ok": True})
 
 
+def _recon_matches_path(church_id: str) -> Path:
+    return Path(__file__).resolve().parent / "data" / f"recon_matches_{church_id}.json"
+
+
+def _load_recon_matches(church_id: str) -> Dict[str, Any]:
+    p = _recon_matches_path(church_id)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return {}
+
+
+def _save_recon_matches(church_id: str, matches: Dict[str, Any]) -> None:
+    p = _recon_matches_path(church_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(matches, default=str))
+
+
 @app.post("/api/churches/{church_id}/plaid/auto-match")
 async def plaid_auto_match(church_id: str, account_id: Optional[str] = None) -> JSONResponse:
     """Auto-match Plaid transactions to journal entries using fuzzy matching.
 
-    Compares bank transactions to JEs using amount (within $0.01) and date (within 3 days).
-    Returns count of matched and exception transactions.
+    Algorithm: for each unmatched Plaid transaction, find a JE whose net cash
+    amount is within $0.01 and whose entry_date is within 3 calendar days.
+    One-to-one: a JE can only match one transaction.
     """
-    # Stub: returns success with counts
-    # Full implementation would:
-    # 1. Load Plaid transactions for account_id
-    # 2. Load JEs for the period
-    # 3. Fuzzy match by amount/date
-    # 4. Mark matched transactions
+    from .db import plaid_store, recon_store  # Phase 1: was `from .tools import plaid_store`
+    from .db.connection import execute_query
+
+    txns = plaid_store.load_plaid_transactions(church_id, account_id=account_id)
+
+    # Resolve church PK and pre-load existing matches so we only iterate
+    # the genuinely unmatched plaid transactions. Existing matches are
+    # tracked by recon_matches (SQL) - no JSONL fallback.
+    existing_matches = recon_store.load_matches(church_id)
+    matched_txn_ids: set = set(existing_matches.keys())
+
+    # Build a txn_id -> plaid_transactions.id (PK) map in a single query
+    # so save_match can be called with the integer FK.
+    church_pk = recon_store._resolve_church_pk(church_id)
+    pk_rows = execute_query(
+        """
+        SELECT pt.id AS pk, pt.txn_id AS txn_id
+          FROM plaid_transactions pt
+         WHERE pt.church_id = %s
+        """,
+        (church_pk,),
+    ) or []
+    txn_pk_by_external: Dict[str, int] = {r["txn_id"]: int(r["pk"]) for r in pk_rows}
+
+    newly_matched = 0
+    for txn in txns:
+        tid = txn.txn_id
+        if tid in matched_txn_ids:
+            continue  # already matched
+
+        candidates = recon_store.find_matching_entries(church_id, txn)
+        if not candidates:
+            continue
+
+        best_je = candidates[0]  # Already sorted by (amount_diff, days_diff)
+        plaid_pk = txn_pk_by_external.get(tid)
+        if plaid_pk is None:
+            # Defensive: txn returned by load_plaid_transactions but missing
+            # from PK lookup (race / cache). Skip rather than crash.
+            continue
+
+        recon_store.save_match(
+            church_id=church_id,
+            plaid_txn_id=plaid_pk,
+            journal_entry_id=int(best_je["je_id"]),
+            amount_diff=best_je.get("amount_diff"),
+            days_diff=int(best_je["days_diff"]) if best_je.get("days_diff") is not None else None,
+        )
+        matched_txn_ids.add(tid)
+        newly_matched += 1
+
+    total_matched = sum(1 for t in txns if t.txn_id in matched_txn_ids)
+    exceptions = len(txns) - total_matched
+
     return _json({
-        "matched": 0,
-        "exceptions": 0,
-        "message": "Auto-match algorithm running (full implementation in Phase 4)"
+        "matched": total_matched,
+        "newly_matched": newly_matched,
+        "exceptions": exceptions,
+        "total": len(txns),
+        "ran_at": datetime.utcnow().isoformat(),
     })
 
 
@@ -2421,18 +2525,31 @@ async def upload_bank_statement(church_id: str, file: UploadFile = File(...), ac
 
     Parses statement format and imports transactions into the reconciliation workflow.
     """
-    # Stub: returns success with transaction count
-    # Full implementation would:
-    # 1. Detect file format (CSV, OFX, QFX)
-    # 2. Parse transactions
-    # 3. Insert into reconciliation queue
-    # 4. Return imported transaction count
+    from .tools.bank_statement_parser import parse_statement
+
     filename = file.filename or "statement"
+    file_bytes = await file.read()
+
+    try:
+        transactions = parse_statement(file_bytes, filename)
+    except Exception as exc:
+        return _json({"error": f"Failed to parse bank statement: {exc}", "transactions_parsed": 0}, status_code=400)
+
+    txn_dicts = [t.model_dump() if hasattr(t, "model_dump") else vars(t) for t in transactions]
+
+    # Persist parsed transactions for this church
+    data_dir = Path(__file__).resolve().parent / "data"
+    data_dir.mkdir(exist_ok=True)
+    txn_file = data_dir / f"bank_txns_{church_id}.jsonl"
+    with txn_file.open("a") as fh:
+        for txn in txn_dicts:
+            fh.write(json.dumps(txn, default=str) + "\n")
+
     return _json({
-        "transactions_parsed": 0,
+        "transactions_parsed": len(transactions),
         "account_id": account_id,
         "filename": filename,
-        "message": "Bank statement parser coming soon (Phase 4)"
+        "transactions": txn_dicts[:50],  # preview first 50
     })
 
 
@@ -3484,6 +3601,394 @@ async def acs_install_status() -> JSONResponse:
         "finished_at": _acs_install_state["finished_at"],
         "returncode": _acs_install_state["returncode"],
         "error": _acs_install_state["error"],
+    })
+
+
+# ===== NEW: Event Registry, Operations Council, Reconciliation, Compliance APIs =====
+# Phase 1 stub endpoints for the event-centric accounting UI
+
+@app.get("/api/events")
+async def list_events(
+    church_id: str = "holy_comforter",
+    filters: Optional[str] = None,  # JSON string of filter conditions
+    limit: int = 50,
+    offset: int = 0
+) -> JSONResponse:
+    """List economic events with full fidelity (provenance, dimensions, confidence).
+
+    Mock data for Phase 1. Production will query event substrate.
+    Filters: account, project, customer, geography, esG_category, segment, capitalization_eligibility, tax_treatment
+    """
+    events = [
+        {
+            "event_id": "evt_001",
+            "timestamp": "2026-05-01T14:30:00Z",
+            "event_type": "invoice_received",
+            "source": "vendor_portal",
+            "provenance": {
+                "source_system": "vendor_portal",
+                "document_id": "INV-2026-0451",
+                "confidence": 0.98
+            },
+            "economic_substance": {
+                "transaction_type": "expense",
+                "amount": 4200.00,
+                "vendor": "ABC Cleaning Services",
+                "description": "Monthly cleaning services"
+            },
+            "dimensions": {
+                "account": "6100",
+                "project": "facility_maintenance",
+                "customer": None,
+                "function": "operations",
+                "geography": "US-MA",
+                "esg_category": None,
+                "segment": "operations",
+                "capitalization_eligible": False,
+                "tax_treatment": "deductible"
+            },
+            "confidence": 0.95,
+            "lineage": [
+                {"stage": "perception", "timestamp": "2026-05-01T14:30:00Z", "status": "complete"},
+                {"stage": "recognition", "timestamp": "2026-05-01T14:35:00Z", "status": "complete"},
+                {"stage": "coding", "timestamp": "2026-05-01T14:36:00Z", "status": "complete"},
+                {"stage": "accrual", "timestamp": "2026-05-01T14:37:00Z", "status": "complete"}
+            ]
+        },
+        {
+            "event_id": "evt_002",
+            "timestamp": "2026-05-02T09:15:00Z",
+            "event_type": "cash_receipt",
+            "source": "bank_feed",
+            "provenance": {
+                "source_system": "plaid",
+                "feed_id": "txn_98765",
+                "confidence": 1.0
+            },
+            "economic_substance": {
+                "transaction_type": "revenue",
+                "amount": 15000.00,
+                "customer": "First Community Outreach",
+                "description": "Donation - unrestricted"
+            },
+            "dimensions": {
+                "account": "1010",
+                "project": None,
+                "customer": "First Community Outreach",
+                "function": "fundraising",
+                "geography": "US-MA",
+                "esg_category": "community_support",
+                "segment": "donations",
+                "capitalization_eligible": False,
+                "tax_treatment": "tax_exempt"
+            },
+            "confidence": 1.0,
+            "lineage": [
+                {"stage": "perception", "timestamp": "2026-05-02T09:15:00Z", "status": "complete"},
+                {"stage": "recognition", "timestamp": "2026-05-02T09:16:00Z", "status": "complete"},
+                {"stage": "coding", "timestamp": "2026-05-02T09:17:00Z", "status": "complete"},
+                {"stage": "accrual", "timestamp": "2026-05-02T09:18:00Z", "status": "complete"}
+            ]
+        }
+    ]
+    return _json({"church_id": church_id, "total": len(events), "events": events, "offset": offset, "limit": limit})
+
+
+@app.get("/api/events/{event_id}")
+async def get_event(event_id: str) -> JSONResponse:
+    """Get full details of a single economic event."""
+    return _json({
+        "event_id": event_id,
+        "timestamp": "2026-05-01T14:30:00Z",
+        "event_type": "invoice_received",
+        "source": "vendor_portal",
+        "provenance": {
+            "source_system": "vendor_portal",
+            "document_id": "INV-2026-0451",
+            "document_url": "/api/events/evt_001/document",
+            "confidence": 0.98
+        },
+        "economic_substance": {
+            "transaction_type": "expense",
+            "amount": 4200.00,
+            "vendor": "ABC Cleaning Services",
+            "description": "Monthly cleaning services"
+        },
+        "dimensions": {
+            "account": "6100",
+            "project": "facility_maintenance",
+            "customer": None,
+            "function": "operations",
+            "geography": "US-MA",
+            "esg_category": None,
+            "segment": "operations",
+            "capitalization_eligible": False,
+            "tax_treatment": "deductible"
+        },
+        "confidence": 0.95,
+        "lineage": [
+            {"stage": "perception", "timestamp": "2026-05-01T14:30:00Z", "status": "complete", "agent": "pdf_extractor"},
+            {"stage": "recognition", "timestamp": "2026-05-01T14:35:00Z", "status": "complete", "agent": "expense_recognizer", "decision": "recognize_immediately"},
+            {"stage": "coding", "timestamp": "2026-05-01T14:36:00Z", "status": "complete", "agent": "coa_classifier", "decision": "6100 (Facility Maintenance)"},
+            {"stage": "accrual", "timestamp": "2026-05-01T14:37:00Z", "status": "complete", "agent": "accrual_estimator", "decision": "no_accrual_needed"}
+        ]
+    })
+
+
+@app.get("/api/dimensions")
+async def list_dimensions() -> JSONResponse:
+    """Get all available semantic dimensions for event tagging."""
+    return _json({
+        "dimensions": [
+            {
+                "name": "account",
+                "description": "Chart of accounts dimension",
+                "type": "categorical",
+                "values": ["1010", "1020", "2000", "3000", "4000", "5000", "6000", "6100", "7000"]
+            },
+            {
+                "name": "project",
+                "description": "Project/ministry dimension",
+                "type": "categorical",
+                "values": ["facility_maintenance", "outreach_program", "youth_ministry", None]
+            },
+            {
+                "name": "customer",
+                "description": "Customer/counterparty dimension",
+                "type": "categorical",
+                "values": ["First Community Outreach", "ABC Cleaning Services", "XYZ Vendor", None]
+            },
+            {
+                "name": "function",
+                "description": "Business function dimension",
+                "type": "categorical",
+                "values": ["operations", "fundraising", "program_delivery", "administrative"]
+            },
+            {
+                "name": "geography",
+                "description": "Geographic dimension",
+                "type": "categorical",
+                "values": ["US-MA", "US-CT", "US-NY", "US-National"]
+            },
+            {
+                "name": "esg_category",
+                "description": "ESG classification",
+                "type": "categorical",
+                "values": ["community_support", "environmental", "social_justice", "governance", None]
+            },
+            {
+                "name": "segment",
+                "description": "Business segment",
+                "type": "categorical",
+                "values": ["donations", "operations", "programs", "fundraising", None]
+            },
+            {
+                "name": "capitalization_eligible",
+                "description": "Can this be capitalized as an asset?",
+                "type": "boolean"
+            },
+            {
+                "name": "tax_treatment",
+                "description": "Tax treatment classification",
+                "type": "categorical",
+                "values": ["deductible", "tax_exempt", "non_deductible", None]
+            }
+        ]
+    })
+
+
+@app.get("/api/operations-council")
+async def get_operations_council(church_id: str = "holy_comforter") -> JSONResponse:
+    """Unified judgment surface showing exceptions, policy drifts, and questions."""
+    return _json({
+        "church_id": church_id,
+        "exceptions": [
+            {
+                "exception_id": "exc_001",
+                "type": "ambiguous_revenue_recognition",
+                "severity": "high",
+                "description": "Contract revenue recognition timing ambiguous between milestone and time-based",
+                "event_id": "evt_002",
+                "agent_belief": "milestone_based (72% confidence)",
+                "alternatives": [
+                    {"option": "milestone_based", "confidence": 0.72, "rationale": "Contract specifies deliverables"},
+                    {"option": "time_based", "confidence": 0.20, "rationale": "Services span 12 months"},
+                    {"option": "hybrid", "confidence": 0.08, "rationale": "Blend both approaches"}
+                ],
+                "evidence_gaps": ["Missing project timeline", "No deliverable definitions in contract"],
+                "recommended_action": "Review contract with program director"
+            }
+        ],
+        "policy_drifts": [
+            {
+                "drift_id": "drift_001",
+                "type": "coding_pattern_change",
+                "description": "Facility maintenance expenses: 15 coded to 6100, 3 coded to 5000 this month (vs. normally 100% to 6100)",
+                "affected_transactions": 3,
+                "detected_at": "2026-05-02T10:00:00Z",
+                "current_pattern": "6100 (80%), 5000 (20%)",
+                "historical_pattern": "6100 (100%)",
+                "controller_action_needed": "Confirm: should we standardize on 6100, or is 5000 correct for some subset?"
+            }
+        ],
+        "questions_for_firm": [
+            {
+                "question_id": "q_001",
+                "asker": "external_auditor",
+                "question": "Margin by delivery channel for 2026 YTD",
+                "status": "pending",
+                "requested_at": "2026-04-30T14:00:00Z",
+                "projected_ready": "2026-05-03T16:00:00Z"
+            },
+            {
+                "question_id": "q_002",
+                "asker": "board",
+                "question": "Cash position projection for 90-day horizon under three hiring scenarios",
+                "status": "pending",
+                "requested_at": "2026-05-01T09:00:00Z",
+                "projected_ready": "2026-05-05T14:00:00Z"
+            }
+        ],
+        "live_accruals": {
+            "unbilled_services": {"amount": 340000, "confidence_low": 325000, "confidence_high": 355000},
+            "warranty_reserves": {"amount": 25000, "confidence_low": 20000, "confidence_high": 30000},
+            "bad_debt_reserve": {"amount": 8500, "confidence_low": 5000, "confidence_high": 12000}
+        },
+        "compliance_trajectory": {
+            "debt_covenant": {
+                "name": "Total Debt < $5M",
+                "current_position": 3200000,
+                "threshold": 5000000,
+                "trajectory_p_breach_6m": 0.08,
+                "status": "green",
+                "recovery_levers": [
+                    {"lever": "Reduce capital spend by $200K", "impact": "-$200K", "timeline": "Q2"},
+                    {"lever": "Accelerate receivables 15 days", "impact": "+$150K", "timeline": "Q2"}
+                ]
+            }
+        }
+    })
+
+
+@app.get("/api/reconciliation/status")
+async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONResponse:
+    """Real-time reconciliation status across all sub-ledgers."""
+    return _json({
+        "church_id": church_id,
+        "as_of": datetime.now().isoformat(),
+        "cash": {
+            "expected": 245000,
+            "actual": 244987,
+            "difference": -13,
+            "status": "reconciled",
+            "exceptions": []
+        },
+        "ar": {
+            "expected": 450000,
+            "actual": 448500,
+            "difference": -1500,
+            "aging": {"current": 400000, "30_days": 35000, "60_days": 13500},
+            "exceptions": [
+                {"customer": "XYZ Org", "amount": 2000, "days_outstanding": 75, "type": "pattern_anomaly", "reason": "Payment pattern shifted from 30 days to 60+ days"}
+            ]
+        },
+        "ap": {
+            "expected": 120000,
+            "actual": 125000,
+            "difference": 5000,
+            "aging": {"current": 80000, "30_days": 40000, "60_days": 5000},
+            "exceptions": [
+                {"vendor": "ABC Cleaning", "amount": 5000, "variance_pct": 8.2, "type": "vendor_pricing_drift", "reason": "Unit price increased from $45 to $53/unit without contract update"}
+            ]
+        },
+        "payroll": {
+            "expected": 85000,
+            "actual": 85000,
+            "difference": 0,
+            "status": "reconciled",
+            "exceptions": []
+        },
+        "intercompany": {
+            "expected": 0,
+            "actual": 0,
+            "difference": 0,
+            "status": "reconciled",
+            "exceptions": []
+        }
+    })
+
+
+@app.get("/api/compliance/status")
+async def get_compliance_status(church_id: str = "holy_comforter") -> JSONResponse:
+    """Live compliance position: covenants, GAAP, tax, policies, materiality."""
+    return _json({
+        "church_id": church_id,
+        "as_of": datetime.now().isoformat(),
+        "covenants": [
+            {
+                "name": "Total Debt < $5M",
+                "current_position": 3200000,
+                "threshold": 5000000,
+                "trajectory_6m": 3450000,
+                "p_breach_6m": 0.08,
+                "status": "green",
+                "recovery_levers": [
+                    {"action": "Reduce capital spend by $200K", "impact": "-$200K", "timeline": "Q2"},
+                    {"action": "Accelerate receivables 15 days", "impact": "+$150K", "timeline": "Q2"}
+                ]
+            }
+        ],
+        "gaap_conformance": {
+            "status": "compliant",
+            "violations": [],
+            "last_check": "2026-05-02T10:00:00Z"
+        },
+        "tax_position": {
+            "status": "compliant",
+            "audit_risk": "low",
+            "materiality_threshold": 50000,
+            "uncertain_positions": []
+        },
+        "policies": {
+            "active_policies": 15,
+            "violations": 0,
+            "drift_alerts": 1
+        },
+        "materiality": {
+            "audit_materiality": 100000,
+            "performance_materiality": 75000,
+            "consumed_ytd": 12500,
+            "remaining": 62500,
+            "status": "green"
+        }
+    })
+
+
+@app.post("/api/policies/{policy_id}")
+async def update_policy(policy_id: str, body: Dict[str, Any]) -> JSONResponse:
+    """Update a policy that agents enforce."""
+    return _json({"policy_id": policy_id, "status": "updated", "message": "Policy updated successfully"})
+
+
+@app.post("/api/scenarios/project")
+async def project_scenario(church_id: str = "holy_comforter", body: Optional[Dict[str, Any]] = None) -> JSONResponse:
+    """Project what-if scenario impact on covenant, margin, cash position."""
+    scenario = body or {}
+    return _json({
+        "scenario_id": "scn_001",
+        "church_id": church_id,
+        "assumptions": scenario,
+        "impact": {
+            "covenant_position": 3450000,
+            "p_breach": 0.12,
+            "covenant_status": "yellow",
+            "margin_impact": -25000,
+            "cash_impact": -150000
+        },
+        "levers": [
+            {"lever": "Reduce spending", "impact": "+$200K", "feasibility": "high"},
+            {"lever": "Accelerate receivables", "impact": "+$150K", "feasibility": "medium"}
+        ]
     })
 
 
