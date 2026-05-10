@@ -439,16 +439,70 @@ async def run_pipeline(job_id: str) -> None:
         raise
 
 
+def _evaluate_context_for_routing(job: ProcessingJob, context_event_id: Optional[str] = None) -> tuple[bool, List[str]]:
+    """Phase 5d: Evaluate context signals to determine if routing is necessary.
+
+    Returns: (should_route, signals) where should_route=True means the item needs
+    human approval, and signals is a list of reasons (empty if no signals raised).
+
+    The vision says routing should fire only on genuine signals:
+    - Policy conflict (e.g., fund restriction violation)
+    - Budget overage (account is over budget)
+    - Critical signals from risk/fraud assessment
+    - Missing contract or pricing history
+
+    Otherwise, even if an approval chain is configured, the rote approval is skipped.
+    """
+    signals: List[str] = []
+
+    # Signal 1: Policy conflict from risk assessment
+    if job.risk_assessment and job.risk_assessment.get("risk_level") in ["CRITICAL", "HIGH"]:
+        signals.append(f"Risk signal: {job.risk_assessment.get('risk_level')}")
+
+    # Signal 2: Policy conflict from fraud assessment
+    if job.fraud_assessment and job.fraud_assessment.get("fraud_level") in ["CRITICAL", "HIGH"]:
+        signals.append(f"Fraud signal: {job.fraud_assessment.get('fraud_level')}")
+
+    # Signal 3: Budget overage
+    if job.budget_check:
+        for bc in job.budget_check:
+            if bc.ytd_actual and bc.annual_budget:
+                ytd = Decimal(str(bc.ytd_actual or 0))
+                annual = Decimal(str(bc.annual_budget or 0))
+                if annual > 0 and ytd >= annual:
+                    signals.append(f"Budget OVER for {bc.account_number}")
+
+    # Signal 4: Escalation reasons from review
+    if job.reviewed_allocations and job.reviewed_allocations.escalation_items:
+        signals.append(f"Manual escalation: {len(job.reviewed_allocations.escalation_items)} items")
+
+    # If any signal raised, route to human approval
+    should_route = len(signals) > 0
+    return should_route, signals
+
+
 async def _maybe_request_budget_owner_approval(
     job: ProcessingJob,
     reviewed: ReviewedAllocations,
 ) -> bool:
-    """FR-05.2: scan draft allocations, find a configured approval chain.
+    """FR-05.2: Context-aware approval routing.
 
-    If a chain matches, mint approval tokens, email the budget owner, set the
-    job to PENDING_BUDGET_OWNER, and return True. Otherwise return False.
+    Phase 5d vision: routing fires only on genuine signals (policy conflict,
+    budget overage, risk/fraud, manual escalation). If no signals, skip
+    approval even if a chain is configured — 80% of rote approvals disappear.
+
+    If context evaluation says routing is necessary, scan draft allocations,
+    find a configured approval chain, mint approval tokens, email the budget
+    owner, set the job to PENDING_BUDGET_OWNER, and return True.
+    Otherwise return False.
     """
     if not job.draft_allocations or not job.invoice_document:
+        return False
+
+    # Phase 5d: Evaluate context signals first
+    should_route, routing_signals = _evaluate_context_for_routing(job)
+    if not should_route:
+        # No signals raised; skip approval and auto-post
         return False
 
     chain = None
@@ -550,6 +604,7 @@ async def _maybe_request_budget_owner_approval(
         "chain_id": chain.chain_id,
         "approver_email": chain.primary_approver_email,
         "matched_gl": matched_gl.account_number,
+        "routing_signals": routing_signals,  # Phase 5d: context signals that triggered routing
     })
 
     # Decision ledger — approval chain resolution (APPROVE membrane)
