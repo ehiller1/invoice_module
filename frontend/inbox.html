@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Inbox — Books</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+</head>
+<body>
+
+<template id="page-center-content">
+<div class="max-w-4xl mx-auto p-6">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-slate-900 mb-1">Inbox</h1>
+    <p class="text-slate-600">Items waiting for your review and decisions</p>
+  </div>
+
+  <!-- Continuity banner (last reconciled) -->
+  <div id="inbox-continuity-banner" class="hidden mb-4 flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+    <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    <span id="inbox-continuity-text"></span>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="border-b border-slate-200 mb-6">
+    <div class="flex gap-0">
+      <button data-tab="exceptions" onclick="switchTab('exceptions')" class="inbox-tab active-tab px-5 py-3 text-sm font-medium border-b-2 border-navy-600 text-navy-700 whitespace-nowrap">
+        Exceptions <span id="badge-exceptions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full">0</span>
+      </button>
+      <button data-tab="questions" onclick="switchTab('questions')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+        Questions <span id="badge-questions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+      </button>
+      <button data-tab="recommendations" onclick="switchTab('recommendations')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+        Suggestions <span id="badge-recommendations" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+      </button>
+      <button data-tab="policies" onclick="switchTab('policies')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+        Policies <span id="badge-policies" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab panels -->
+  <div id="panel-exceptions">
+    <div id="list-exceptions" class="space-y-3">
+      <p class="text-slate-400 text-center py-12 text-sm">Loading…</p>
+    </div>
+  </div>
+
+  <div id="panel-questions" class="hidden">
+    <div id="list-questions" class="space-y-3">
+      <p class="text-slate-400 text-center py-12 text-sm">Loading…</p>
+    </div>
+  </div>
+
+  <div id="panel-recommendations" class="hidden">
+    <div id="list-recommendations" class="space-y-3">
+      <p class="text-slate-400 text-center py-12 text-sm">Loading…</p>
+    </div>
+  </div>
+
+  <div id="panel-policies" class="hidden">
+    <div id="list-policies" class="space-y-3">
+      <p class="text-slate-400 text-center py-12 text-sm">Loading…</p>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+const API = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
+const CHURCH = 'holy_comforter';
+let activeTab = 'exceptions';
+
+EIMEShell.mount({
+  activeNav: 'inbox',
+  centerContent: document.getElementById('page-center-content').innerHTML,
+  onMounted() {
+    window.eime && window.eime.setContext({ page: 'inbox', payload: { church_id: CHURCH } });
+    loadContinuityBanner();
+    loadAll();
+  }
+});
+
+function loadContinuityBanner() {
+  try {
+    const raw = localStorage.getItem('eime_last_reconciled');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s || !s.savedAt) return;
+    const d = new Date(s.savedAt);
+    const ago = _timeAgo(d);
+    const balanced = s.variance === 0 || Math.abs(s.variance) < 0.01;
+    const banner = document.getElementById('inbox-continuity-banner');
+    const text = document.getElementById('inbox-continuity-text');
+    if (!banner || !text) return;
+    const period = s.periodEnd ? _formatMonth(s.periodEnd) : 'last period';
+    const acct = s.account ? ` · ${s.account}` : '';
+    const status = balanced ? 'Balanced ✓' : `$${Math.abs(s.variance || 0).toFixed(2)} variance`;
+    text.textContent = `Last reconciled ${ago}: ${period}${acct} · ${status}`;
+    if (!balanced) {
+      banner.classList.remove('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+      banner.classList.add('bg-amber-50', 'border-amber-200', 'text-amber-800');
+      banner.querySelector('svg').classList.remove('text-emerald-600');
+      banner.querySelector('svg').classList.add('text-amber-600');
+    }
+    banner.classList.remove('hidden');
+  } catch(e) {}
+}
+
+function _timeAgo(d) {
+  const secs = Math.round((Date.now() - d.getTime()) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.round(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.round(secs/3600)}h ago`;
+  return `${Math.round(secs/86400)}d ago`;
+}
+
+function _formatMonth(isoDate) {
+  try {
+    const [y, m] = isoDate.split('-');
+    return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } catch(e) { return isoDate; }
+}
+
+async function loadAll() {
+  const [exRes, qRes, recRes, polRes] = await Promise.allSettled([
+    fetch(`${API}/api/churches/${CHURCH}/exceptions`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${API}/api/churches/${CHURCH}/questions`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${API}/api/churches/${CHURCH}/recommendations`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${API}/api/churches/${CHURCH}/policies`).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+
+  const exceptions = exRes.value || [];
+  const questions = qRes.value || [];
+  const recommendations = recRes.value || [];
+  const policies = polRes.value || [];
+
+  renderExceptions(Array.isArray(exceptions) ? exceptions : (exceptions.exceptions || []));
+  renderQuestions(Array.isArray(questions) ? questions : (questions.questions || []));
+  renderRecommendations(Array.isArray(recommendations) ? recommendations : (recommendations.recommendations || []));
+  renderPolicies(Array.isArray(policies) ? policies : (policies.policies || []));
+}
+
+// ── Exceptions ──────────────────────────────────────────────────────────────
+
+function renderExceptions(items) {
+  const open = items.filter(e => (e.state || e.status) === 'OPEN');
+  setBadge('exceptions', open.length, 'orange');
+  const el = document.getElementById('list-exceptions');
+  if (open.length === 0) {
+    el.innerHTML = emptyState('No open exceptions', 'All flagged items have been resolved.');
+    return;
+  }
+  el.innerHTML = open.map(e => `
+    <div class="bg-white border border-slate-200 rounded-lg p-4 hover:border-orange-300 transition-colors">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            ${priorityPill(e.priority)}
+            <span class="text-xs text-slate-400">${_relDate(e.created_at)}</span>
+          </div>
+          <p class="font-medium text-slate-900 text-sm">${esc(e.summary || e.description || 'Exception')}</p>
+          ${e.details?.reason ? `<p class="text-sm text-slate-500 mt-1 truncate">${esc(e.details.reason)}</p>` : ''}
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button onclick="resolveException('${e.exception_id}')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Mark Resolved</button>
+          <a href="/exceptions-queue.html" class="px-3 py-1.5 text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 rounded-lg transition-colors">View</a>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function resolveException(id) {
+  try {
+    await fetch(`${API}/api/exceptions/${id}/resolve`, { method: 'POST' });
+  } catch(e) {}
+  loadAll();
+}
+
+// ── Questions ────────────────────────────────────────────────────────────────
+
+function renderQuestions(items) {
+  const open = items.filter(q => (q.state || q.status) === 'OPEN');
+  setBadge('questions', open.length, 'blue');
+  const el = document.getElementById('list-questions');
+  if (open.length === 0) {
+    el.innerHTML = emptyState('No open questions', 'The AI has no pending questions for you.');
+    return;
+  }
+  el.innerHTML = open.map(q => `
+    <div class="bg-white border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded">Question</span>
+            <span class="text-xs text-slate-400">${_relDate(q.created_at)}</span>
+          </div>
+          <p class="font-medium text-slate-900 text-sm">${esc(q.question || q.summary || 'Question')}</p>
+          ${q.context ? `<p class="text-sm text-slate-500 mt-1">${esc(q.context)}</p>` : ''}
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <a href="/questions-queue.html" class="px-3 py-1.5 text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 rounded-lg transition-colors">Answer</a>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Recommendations ──────────────────────────────────────────────────────────
+
+function renderRecommendations(items) {
+  const pending = items.filter(r => !r.selected_option);
+  setBadge('recommendations', pending.length, 'purple');
+  const el = document.getElementById('list-recommendations');
+  if (pending.length === 0) {
+    el.innerHTML = emptyState('No pending suggestions', 'All AI suggestions have been reviewed.');
+    return;
+  }
+  el.innerHTML = pending.map(r => `
+    <div class="bg-white border border-slate-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-800 rounded">Suggestion</span>
+            <span class="text-xs text-slate-400">${_relDate(r.created_at)}</span>
+          </div>
+          <p class="font-medium text-slate-900 text-sm">${esc(r.summary || r.description || 'Recommendation')}</p>
+          ${r.rationale ? `<p class="text-sm text-slate-500 mt-1 line-clamp-2">${esc(r.rationale)}</p>` : ''}
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button onclick="acceptRec('${r.recommendation_id}')" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors">Accept</button>
+          <button onclick="declineRec('${r.recommendation_id}')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Decline</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function acceptRec(id) {
+  try { await fetch(`${API}/api/recommendations/${id}/accept`, { method: 'POST' }); } catch(e) {}
+  loadAll();
+}
+
+async function declineRec(id) {
+  try { await fetch(`${API}/api/recommendations/${id}/decline`, { method: 'POST' }); } catch(e) {}
+  loadAll();
+}
+
+// ── Policies ─────────────────────────────────────────────────────────────────
+
+function renderPolicies(items) {
+  const pending = items.filter(p => !p.my_vote);
+  setBadge('policies', pending.length, 'slate');
+  const el = document.getElementById('list-policies');
+  if (pending.length === 0) {
+    el.innerHTML = emptyState('No policies need a vote', 'All active policies have been reviewed.');
+    return;
+  }
+  el.innerHTML = pending.map(p => `
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded">Policy</span>
+            <span class="text-xs text-slate-400">${_relDate(p.created_at)}</span>
+          </div>
+          <p class="font-medium text-slate-900 text-sm">${esc(p.title || p.summary || 'Policy')}</p>
+          ${p.description ? `<p class="text-sm text-slate-500 mt-1 line-clamp-2">${esc(p.description)}</p>` : ''}
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button onclick="votePolicy('${p.policy_id}', 'approve')" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg">Approve</button>
+          <button onclick="votePolicy('${p.policy_id}', 'reject')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-700 rounded-lg">Reject</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function votePolicy(id, vote) {
+  try { await fetch(`${API}/api/policies/${id}/vote`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({vote}) }); } catch(e) {}
+  loadAll();
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.inbox-tab').forEach(btn => {
+    const isActive = btn.getAttribute('data-tab') === tab;
+    btn.classList.toggle('active-tab', isActive);
+    btn.classList.toggle('border-navy-600', isActive);
+    btn.classList.toggle('text-navy-700', isActive);
+    btn.classList.toggle('border-transparent', !isActive);
+    btn.classList.toggle('text-slate-600', !isActive);
+  });
+  ['exceptions', 'questions', 'recommendations', 'policies'].forEach(t => {
+    const panel = document.getElementById(`panel-${t}`);
+    if (panel) panel.classList.toggle('hidden', t !== tab);
+  });
+}
+
+function setBadge(tab, count, color) {
+  const el = document.getElementById(`badge-${tab}`);
+  if (!el) return;
+  el.textContent = count;
+  const colorMap = {
+    orange: 'bg-orange-100 text-orange-800',
+    blue: 'bg-blue-100 text-blue-800',
+    purple: 'bg-purple-100 text-purple-800',
+    slate: 'bg-slate-100 text-slate-600',
+  };
+  el.className = `ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold rounded-full ${colorMap[color] || colorMap.slate}`;
+}
+
+function priorityPill(p) {
+  if (!p) return '';
+  const map = { HIGH: 'bg-red-100 text-red-800', NORMAL: 'bg-yellow-100 text-yellow-800', LOW: 'bg-slate-100 text-slate-600' };
+  return `<span class="inline-block px-2 py-0.5 text-xs font-semibold rounded ${map[p] || map.NORMAL}">${p}</span>`;
+}
+
+function emptyState(title, sub) {
+  return `<div class="text-center py-16">
+    <svg class="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <p class="font-medium text-slate-700">${title}</p>
+    <p class="text-sm text-slate-400 mt-1">${sub}</p>
+  </div>`;
+}
+
+function _relDate(iso) {
+  if (!iso) return '';
+  const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.round(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.round(secs/3600)}h ago`;
+  return `${Math.round(secs/86400)}d ago`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

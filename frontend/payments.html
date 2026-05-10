@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Payments — EIME</title>
+  <title>Payments — Books</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -16,11 +16,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
 <body class="h-full bg-slate-50 font-sans">
-<div id="eime-shell-mount" class="h-full"></div>
 <script src="/eime-bus.js"></script>
 <script src="/eime-shell.js"></script>
 <script src="/eime-chat-rail.js"></script>
-<template id="payments-page">
+<script>
+(async () => {
+  const centerContent = `
   <div class="p-4 lg:p-8 max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-semibold text-navy-900">Payments</h1>
@@ -48,109 +49,107 @@
     <div id="payments-list" class="bg-white rounded-lg shadow-sm divide-y divide-slate-100">
       <p class="p-6 text-slate-500">Loading…</p>
     </div>
-  </div>
-</template>
+  </div>`;
 
-<script>
-(async () => {
-  await EIMEShell.mount('eime-shell-mount');
-  const center = document.getElementById('eime-center');
-  const tpl = document.getElementById('payments-page');
-  center.appendChild(tpl.content.cloneNode(true));
+  await EIMEShell.mount({
+    activeNav: 'payments',
+    centerContent,
+    onMounted: () => {
+      let activeTab = 'PENDING_APPROVAL';
+      let allPayments = [];
 
-  let activeTab = 'PENDING_APPROVAL';
-  let allPayments = [];
-
-  window.eime.setContext({
-    page: 'payments',
-    payload: { church_id: 'holy_comforter' }
-  });
-
-  async function loadPayments() {
-    const churchId = (window.EIMEBus && EIMEBus.getChurch && EIMEBus.getChurch()) || 'default';
-    try {
-      const res = await fetch(`/api/churches/${churchId}/payments`);
-      allPayments = await res.json();
-    } catch (e) {
-      allPayments = [];
-    }
-    render();
-  }
-
-  function render() {
-    // Update tab counts
-    const counts = { PENDING_APPROVAL: 0, APPROVED: 0, SENT: 0, FAILED: 0 };
-    allPayments.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      const t = btn.dataset.tab;
-      btn.classList.toggle('bg-white', t === activeTab);
-      btn.classList.toggle('text-navy-900', t === activeTab);
-      btn.classList.toggle('border-b-2', t === activeTab);
-      btn.classList.toggle('border-gold-500', t === activeTab);
-      btn.classList.toggle('bg-slate-100', t !== activeTab);
-      btn.classList.toggle('text-slate-600', t !== activeTab);
-      const span = btn.querySelector('.tab-count');
-      if (span) span.textContent = `(${counts[t] || 0})`;
-    });
-
-    const list = document.getElementById('payments-list');
-    const filtered = allPayments.filter(p => p.status === activeTab);
-    if (filtered.length === 0) {
-      list.innerHTML = `<p class="p-6 text-slate-500">No ${activeTab.toLowerCase().replace('_',' ')} payments.</p>`;
-      return;
-    }
-    list.innerHTML = filtered.map(p => `
-      <div class="p-4 flex flex-col lg:flex-row lg:items-center gap-3">
-        <div class="flex-1 min-w-0">
-          <p class="font-medium text-navy-900">${p.payment_id}</p>
-          <p class="text-sm text-slate-600">JE: ${p.je_id || '—'} · ${p.method} · $${p.amount}</p>
-        </div>
-        <div class="flex gap-2 flex-wrap">
-          ${actionsFor(p)}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function actionsFor(p) {
-    const buttons = [];
-    if (p.status === 'PENDING_APPROVAL') {
-      buttons.push(`<button class="approve-btn px-3 py-2 bg-green-600 text-white rounded text-sm min-h-[44px]" data-pid="${p.payment_id}">Approve</button>`);
-    }
-    if (p.status === 'APPROVED' || p.status === 'SENT') {
-      if (p.method === 'ACH') {
-        buttons.push(`<a class="px-3 py-2 bg-navy-900 text-white rounded text-sm min-h-[44px] inline-flex items-center" href="/api/payments/${p.payment_id}/ach-file">Download NACHA</a>`);
-      } else if (p.method === 'CHECK') {
-        buttons.push(`<a class="px-3 py-2 bg-navy-900 text-white rounded text-sm min-h-[44px] inline-flex items-center" href="/api/payments/${p.payment_id}/check-pdf">Download Check PDF</a>`);
-      }
-    }
-    return buttons.join('') || '<span class="text-xs text-slate-400">—</span>';
-  }
-
-  document.addEventListener('click', async (e) => {
-    const tab = e.target.closest('.tab-btn');
-    if (tab) { activeTab = tab.dataset.tab; render(); return; }
-    if (e.target.id === 'refresh-btn') { loadPayments(); return; }
-    const ap = e.target.closest('.approve-btn');
-    if (ap) {
-      const pid = ap.dataset.pid;
-      const email = prompt('Approver email:');
-      if (!email) return;
-      const res = await fetch(`/api/payments/${pid}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Role': 'TREASURER_ADMIN',
-          'X-User-Email': email,
-        },
-        body: JSON.stringify({ approver_email: email }),
+      window.eime.setContext({
+        page: 'payments',
+        payload: { church_id: 'holy_comforter' }
       });
-      if (!res.ok) { alert('Approve failed: ' + (await res.text())); return; }
+
+      async function loadPayments() {
+        const churchId = (window.EIMEBus && EIMEBus.getChurch && EIMEBus.getChurch()) || 'default';
+        try {
+          const res = await fetch(`/api/churches/${churchId}/payments`);
+          allPayments = await res.json();
+        } catch (e) {
+          allPayments = [];
+        }
+        render();
+      }
+
+      function render() {
+        // Update tab counts
+        const counts = { PENDING_APPROVAL: 0, APPROVED: 0, SENT: 0, FAILED: 0 };
+        allPayments.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          const t = btn.dataset.tab;
+          btn.classList.toggle('bg-white', t === activeTab);
+          btn.classList.toggle('text-navy-900', t === activeTab);
+          btn.classList.toggle('border-b-2', t === activeTab);
+          btn.classList.toggle('border-gold-500', t === activeTab);
+          btn.classList.toggle('bg-slate-100', t !== activeTab);
+          btn.classList.toggle('text-slate-600', t !== activeTab);
+          const span = btn.querySelector('.tab-count');
+          if (span) span.textContent = `(${counts[t] || 0})`;
+        });
+
+        const list = document.getElementById('payments-list');
+        const filtered = allPayments.filter(p => p.status === activeTab);
+        if (filtered.length === 0) {
+          list.innerHTML = `<p class="p-6 text-slate-500">No ${activeTab.toLowerCase().replace('_',' ')} payments.</p>`;
+          return;
+        }
+        list.innerHTML = filtered.map(p => `
+          <div class="p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-navy-900">${p.payment_id}</p>
+              <p class="text-sm text-slate-600">JE: ${p.je_id || '—'} · ${p.method} · $${p.amount}</p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+              ${actionsFor(p)}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function actionsFor(p) {
+        const buttons = [];
+        if (p.status === 'PENDING_APPROVAL') {
+          buttons.push(`<button class="approve-btn px-3 py-2 bg-green-600 text-white rounded text-sm min-h-[44px]" data-pid="${p.payment_id}">Approve</button>`);
+        }
+        if (p.status === 'APPROVED' || p.status === 'SENT') {
+          if (p.method === 'ACH') {
+            buttons.push(`<a class="px-3 py-2 bg-navy-900 text-white rounded text-sm min-h-[44px] inline-flex items-center" href="/api/payments/${p.payment_id}/ach-file">Download NACHA</a>`);
+          } else if (p.method === 'CHECK') {
+            buttons.push(`<a class="px-3 py-2 bg-navy-900 text-white rounded text-sm min-h-[44px] inline-flex items-center" href="/api/payments/${p.payment_id}/check-pdf">Download Check PDF</a>`);
+          }
+        }
+        return buttons.join('') || '<span class="text-xs text-slate-400">—</span>';
+      }
+
+      document.addEventListener('click', async (e) => {
+        const tab = e.target.closest('.tab-btn');
+        if (tab) { activeTab = tab.dataset.tab; render(); return; }
+        if (e.target.id === 'refresh-btn') { loadPayments(); return; }
+        const ap = e.target.closest('.approve-btn');
+        if (ap) {
+          const pid = ap.dataset.pid;
+          const email = prompt('Approver email:');
+          if (!email) return;
+          const res = await fetch(`/api/payments/${pid}/approve`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Role': 'TREASURER_ADMIN',
+              'X-User-Email': email,
+            },
+            body: JSON.stringify({ approver_email: email }),
+          });
+          if (!res.ok) { alert('Approve failed: ' + (await res.text())); return; }
+          loadPayments();
+        }
+      });
+
       loadPayments();
     }
   });
-
-  loadPayments();
 })();
 </script>
 </body>

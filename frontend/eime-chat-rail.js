@@ -14,6 +14,28 @@
   let contextRef = { page: null, payload: null };
   let messages = []; // {role:'user'|'assistant'|'system', text:string, meta?:object}
 
+  function getPlaceholder(page) {
+    const map = {
+      invoices: 'Ask about this invoice…',
+      reconciliation: 'Ask why a transaction didn\'t match…',
+      jobs: 'Ask about invoice coding…',
+      payments: 'Ask about a payment…',
+      budget: 'Ask about budget variances…',
+      jes: 'Ask about this journal entry…',
+      vendors: 'Ask about a vendor…',
+      audit: 'Ask about an audit event…',
+    };
+    return map[page] || 'Ask about your books…';
+  }
+
+  function applyPlaceholder() {
+    const input = document.getElementById('eime-chat-input');
+    if (input) {
+      const page = (contextRef && contextRef.page) || null;
+      input.placeholder = getPlaceholder(page);
+    }
+  }
+
   function init(opts) {
     if (opts && opts.api) API = opts.api;
     if (opts && opts.containerId) containerId = opts.containerId;
@@ -23,10 +45,12 @@
         contextRef = ctx || {};
         const ctxLabel = document.getElementById('eime-chat-context');
         if (ctxLabel) ctxLabel.textContent = describeContext(contextRef);
+        applyPlaceholder();
       });
       // seed with current context
       contextRef = window.eime.getContext() || {};
     }
+    applyPlaceholder();
   }
 
   function describeContext(ctx) {

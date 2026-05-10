@@ -13,15 +13,15 @@
 <div class="max-w-7xl mx-auto p-6">
   <h1 class="text-2xl font-bold mb-4">Journal Entries</h1>
 
-  <div class="border-b mb-4 flex items-center justify-between">
-    <nav class="flex gap-4">
-      <button class="je-tab" data-state="DRAFT">Drafts</button>
-      <button class="je-tab" data-state="OPEN">Open</button>
-      <button class="je-tab" data-state="PENDING_TREASURER">Pending Treasurer</button>
-      <button class="je-tab" data-state="APPROVED">Approved</button>
-      <button class="je-tab" data-state="POSTED">Posted</button>
-      <button class="je-tab" data-state="REJECTED">Rejected</button>
-      <button class="je-tab" data-state="RECURRING">Recurring</button>
+  <div class="border-b mb-4 flex items-center justify-between gap-4">
+    <nav class="flex gap-4 overflow-x-auto flex-1 min-w-0">
+      <button class="je-tab flex-shrink-0" data-state="DRAFT">Drafts <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="OPEN">Open <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="PENDING_TREASURER">Pending Treasurer <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="APPROVED">Approved <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="POSTED">Posted <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="REJECTED">Rejected <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="RECURRING">Recurring <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
     </nav>
     <div class="flex gap-2">
       <input id="csv-file-input" type="file" accept=".csv" class="hidden" />
@@ -124,7 +124,7 @@ EIMEShell.mount({
 
 function setupTabs() {
   document.querySelectorAll('.je-tab').forEach(tab => {
-    tab.className = 'je-tab px-3 py-2 text-sm font-medium border-b-2 border-transparent';
+    tab.className = 'je-tab flex-shrink-0 px-3 py-2 text-sm font-medium border-b-2 border-transparent';
     tab.addEventListener('click', () => {
       document.querySelectorAll('.je-tab').forEach(t => t.classList.remove('border-blue-500', 'text-blue-600'));
       tab.classList.add('border-blue-500', 'text-blue-600');

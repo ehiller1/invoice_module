@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }}
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script>
+(async () => {
+  const centerContent = `
+  <div class="max-w-5xl mx-auto p-6">
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold text-navy-900 mb-1">Settings</h1>
+      <p class="text-slate-500">Configure your books and approval workflows</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Bank Accounts -->
+      <a href="/settings/plaid-linking.html" class="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-navy-700 transition-all block">
+        <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        </div>
+        <h2 class="text-base font-semibold text-navy-900 mb-1">Bank Accounts</h2>
+        <p class="text-sm text-slate-500">Connect your church's bank account via Plaid</p>
+      </a>
+
+      <!-- Chart of Accounts -->
+      <a href="/coa.html" class="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-navy-700 transition-all block">
+        <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        </div>
+        <h2 class="text-base font-semibold text-navy-900 mb-1">Chart of Accounts</h2>
+        <p class="text-sm text-slate-500">Manage the GL account structure</p>
+      </a>
+
+      <!-- Approval Chains -->
+      <a href="/settings/approval-chains.html" class="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-navy-700 transition-all block">
+        <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+        <h2 class="text-base font-semibold text-navy-900 mb-1">Approval Chains</h2>
+        <p class="text-sm text-slate-500">Configure multi-step approval workflows</p>
+      </a>
+
+      <!-- Budgetary Authority -->
+      <a href="/settings/authorities.html" class="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-navy-700 transition-all block">
+        <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <h2 class="text-base font-semibold text-navy-900 mb-1">Budgetary Authority</h2>
+        <p class="text-sm text-slate-500">Define who can approve what amounts</p>
+      </a>
+
+      <!-- AI Model -->
+      <a href="/settings/model-config.html" class="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-navy-700 transition-all block">
+        <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+        <div class="flex items-center gap-2 mb-1">
+          <h2 class="text-base font-semibold text-navy-900">AI Model</h2>
+          <span class="text-xs bg-slate-200 text-slate-600 rounded px-1.5 py-0.5">Advanced</span>
+        </div>
+        <p class="text-sm text-slate-500">Configure the AI engine</p>
+      </a>
+    </div>
+  </div>`;
+
+  await EIMEShell.mount({
+    activeNav: 'settings',
+    centerContent,
+    onMounted: () => {
+      window.eime.setContext({
+        page: 'settings',
+        payload: {}
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>

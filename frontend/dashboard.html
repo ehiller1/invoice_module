@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Today — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399' },
+          gold: { 500: '#c9a227', 400: '#d4ad3a', 300: '#e0c46a' },
+        },
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+      }}
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script>
+(async () => {
+  const centerContent = `
+  <div class="max-w-6xl mx-auto p-6">
+    <!-- Greeting -->
+    <div class="mb-8">
+      <h1 id="greeting" class="text-3xl font-bold text-navy-900 mb-1">Good day</h1>
+      <p id="today-date" class="text-slate-500"></p>
+    </div>
+
+    <!-- Summary tiles -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <a href="/jobs.html" data-tile="invoices_review" class="dash-tile bg-white border border-slate-200 rounded-lg p-5 transition-all hover:shadow-md hover:border-navy-700 block">
+        <p class="text-xs text-slate-500 font-semibold uppercase mb-2">Invoices to Review</p>
+        <p class="dash-tile-num text-3xl font-bold text-slate-300" data-num>—</p>
+        <p class="dash-tile-sub text-xs text-slate-500 mt-1 hidden"></p>
+      </a>
+      <a href="/exceptions-queue.html" data-tile="exceptions" class="dash-tile bg-white border border-slate-200 rounded-lg p-5 transition-all hover:shadow-md hover:border-navy-700 block">
+        <p class="text-xs text-slate-500 font-semibold uppercase mb-2">Items Flagged</p>
+        <p class="dash-tile-num text-3xl font-bold text-slate-300" data-num>—</p>
+        <p class="dash-tile-sub text-xs text-slate-500 mt-1 hidden"></p>
+      </a>
+      <a href="/jes.html" data-tile="jes" class="dash-tile bg-white border border-slate-200 rounded-lg p-5 transition-all hover:shadow-md hover:border-navy-700 block">
+        <p class="text-xs text-slate-500 font-semibold uppercase mb-2">JEs to Approve</p>
+        <p class="dash-tile-num text-3xl font-bold text-slate-300" data-num>—</p>
+        <p class="dash-tile-sub text-xs text-slate-500 mt-1 hidden"></p>
+      </a>
+      <a href="/questions-queue.html" data-tile="questions" class="dash-tile bg-white border border-slate-200 rounded-lg p-5 transition-all hover:shadow-md hover:border-navy-700 block">
+        <p class="text-xs text-slate-500 font-semibold uppercase mb-2">Questions for You</p>
+        <p class="dash-tile-num text-3xl font-bold text-slate-300" data-num>—</p>
+        <p class="dash-tile-sub text-xs text-slate-500 mt-1 hidden"></p>
+      </a>
+    </div>
+
+    <!-- Reconciliation card -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <p class="text-xs text-slate-500 font-semibold uppercase mb-1">Reconciliation</p>
+        <p id="recon-status" class="text-slate-700 text-sm">No reconciliation data yet</p>
+      </div>
+      <a href="/reconciliation.html" class="px-4 py-2 bg-navy-900 text-white rounded-lg text-sm hover:bg-navy-800 self-start sm:self-auto">Reconcile Now →</a>
+    </div>
+
+    <!-- Month close card -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <p id="month-close-text" class="text-sm font-semibold text-slate-700">Month close</p>
+        <p id="month-close-pct" class="text-xs text-slate-500">—</p>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-2">
+        <div id="month-close-bar" class="bg-gold-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5">
+      <p class="text-xs text-slate-500 font-semibold uppercase mb-3">Recent Activity</p>
+      <ul id="recent-activity" class="divide-y divide-slate-100">
+        <li class="py-2 text-sm text-slate-400">Loading…</li>
+      </ul>
+    </div>
+  </div>`;
+
+  await EIMEShell.mount({
+    activeNav: 'today',
+    centerContent,
+    onMounted: () => {
+      const API = window.EIME_API || 'http://localhost:8000';
+      const CHURCH_ID = (window.EIMEBus && EIMEBus.getChurch && EIMEBus.getChurch()) || 'holy_comforter';
+
+      window.eime.setContext({
+        page: 'today',
+        payload: { church_id: CHURCH_ID }
+      });
+
+      // Greeting
+      const hour = new Date().getHours();
+      const partOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+      const churchName = (window.EIMEBus && EIMEBus.getChurchName && EIMEBus.getChurchName()) || 'Friend';
+      document.getElementById('greeting').textContent = `Good ${partOfDay}, ${churchName}`;
+      document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+
+      // Helper: set tile value
+      function setTile(key, value) {
+        const tile = document.querySelector(`[data-tile="${key}"]`);
+        if (!tile) return;
+        const numEl = tile.querySelector('[data-num]');
+        const subEl = tile.querySelector('.dash-tile-sub');
+        if (value === null || value === undefined) {
+          numEl.textContent = '—';
+          numEl.classList.remove('text-navy-900', 'text-slate-400');
+          numEl.classList.add('text-slate-300');
+          subEl.classList.add('hidden');
+        } else if (value === 0) {
+          numEl.textContent = '0';
+          numEl.classList.remove('text-navy-900', 'text-slate-300');
+          numEl.classList.add('text-slate-400');
+          subEl.textContent = '(all clear)';
+          subEl.classList.remove('hidden');
+        } else {
+          numEl.textContent = String(value);
+          numEl.classList.remove('text-slate-300', 'text-slate-400');
+          numEl.classList.add('text-navy-900');
+          subEl.classList.add('hidden');
+        }
+      }
+
+      // Fetch helpers (graceful fail → null)
+      async function safeFetch(url) {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return null;
+          return await r.json();
+        } catch (e) { return null; }
+      }
+
+      function arrCount(data, key) {
+        if (!data) return null;
+        if (Array.isArray(data)) return data.length;
+        if (key && Array.isArray(data[key])) return data[key].length;
+        if (typeof data.count === 'number') return data.count;
+        return null;
+      }
+
+      async function loadTiles() {
+        // Invoices to Review
+        const jobs = await safeFetch(`${API}/api/jobs?status=pending`);
+        setTile('invoices_review', arrCount(jobs, 'jobs'));
+
+        // Items Flagged
+        const exc = await safeFetch(`${API}/api/churches/${CHURCH_ID}/exceptions?status=open`);
+        setTile('exceptions', arrCount(exc, 'exceptions'));
+
+        // JEs to Approve
+        const jes = await safeFetch(`${API}/api/journal-entries?status=pending`);
+        setTile('jes', arrCount(jes, 'journal_entries'));
+
+        // Questions for You
+        const q = await safeFetch(`${API}/api/churches/${CHURCH_ID}/questions?status=open`);
+        let qCount = null;
+        if (q && Array.isArray(q.questions)) {
+          qCount = q.questions.filter(x => x.state === 'OPEN').length;
+        } else {
+          qCount = arrCount(q, 'questions');
+        }
+        setTile('questions', qCount);
+      }
+
+      async function loadReconciliation() {
+        const data = await safeFetch(`${API}/api/churches/${CHURCH_ID}/reconciliations/latest`);
+        const el = document.getElementById('recon-status');
+        if (!data) {
+          el.textContent = 'Last reconciled: — · No data yet';
+          return;
+        }
+        const date = data.reconciled_at ? new Date(data.reconciled_at).toLocaleDateString() : '—';
+        const account = data.account_name || data.account_id || 'Bank account';
+        const result = (typeof data.variance === 'number' && Math.abs(data.variance) < 0.01)
+          ? 'Balanced ✓'
+          : (typeof data.variance === 'number' ? `$${Math.abs(data.variance).toFixed(2)} variance` : '—');
+        el.textContent = `Last reconciled: ${date} · ${account} · ${result}`;
+      }
+
+      async function loadMonthClose() {
+        const today = new Date();
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const daysLeft = Math.max(0, lastDay.getDate() - today.getDate());
+        const monthName = today.toLocaleString('en-US', { month: 'long' });
+        document.getElementById('month-close-text').textContent =
+          `${monthName} closes in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+
+        const data = await safeFetch(`${API}/api/churches/${CHURCH_ID}/month-close-progress`);
+        let pct = 0;
+        if (data && typeof data.percent_coded === 'number') pct = Math.round(data.percent_coded);
+        else if (data && typeof data.coded === 'number' && typeof data.total === 'number' && data.total > 0) {
+          pct = Math.round((data.coded / data.total) * 100);
+        }
+        document.getElementById('month-close-pct').textContent = data ? `${pct}% coded` : '—';
+        document.getElementById('month-close-bar').style.width = `${pct}%`;
+      }
+
+      async function loadRecentActivity() {
+        const ul = document.getElementById('recent-activity');
+        const data = await safeFetch(`${API}/api/churches/${CHURCH_ID}/audit-log?limit=5`);
+        let items = [];
+        if (data) {
+          if (Array.isArray(data)) items = data;
+          else if (Array.isArray(data.events)) items = data.events;
+          else if (Array.isArray(data.audit_log)) items = data.audit_log;
+        }
+        if (items.length === 0) {
+          ul.innerHTML = '<li class="py-2 text-sm text-slate-400">No recent activity</li>';
+          return;
+        }
+        ul.innerHTML = items.slice(0, 5).map(ev => {
+          const ts = ev.timestamp || ev.created_at || ev.ts;
+          const when = ts ? new Date(ts).toLocaleString() : '';
+          const action = ev.action || ev.event_type || 'event';
+          const actor = ev.actor || ev.user || ev.actor_email || '';
+          const desc = ev.description || ev.summary || '';
+          return `
+            <li class="py-2 flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm text-slate-700 truncate">${action}${desc ? ' — ' + desc : ''}</p>
+                <p class="text-xs text-slate-400">${actor}</p>
+              </div>
+              <p class="text-xs text-slate-400 flex-shrink-0">${when}</p>
+            </li>
+          `;
+        }).join('');
+      }
+
+      loadTiles();
+      loadReconciliation();
+      loadMonthClose();
+      loadRecentActivity();
+    }
+  });
+})();
+</script>
+</body>
+</html>

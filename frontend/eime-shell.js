@@ -24,7 +24,6 @@
     const activeNav = opts.activeNav || 'invoices';
     const centerContent = opts.centerContent || '';
 
-    // Tailwind, fonts, and global colors must already be loaded by the host page.
     // Fetch shell html
     let shellHtml;
     try {
@@ -40,7 +39,7 @@
     document.body.classList.add('h-full', 'bg-slate-50', 'font-sans', 'overflow-hidden');
     document.documentElement.classList.add('h-full');
 
-    // Ensure responsive.css is loaded (Phase 3.9)
+    // Ensure responsive.css is loaded
     if (!document.querySelector('link[data-eime-responsive]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -53,7 +52,7 @@
     const centerEl = document.getElementById('eime-center');
     if (centerEl) centerEl.innerHTML = centerContent;
 
-    // Highlight active nav link
+    // Highlight active sidebar nav link
     document.querySelectorAll('.eime-nav-link').forEach((a) => {
       const isActive = a.getAttribute('data-nav') === activeNav;
       if (isActive) {
@@ -62,14 +61,22 @@
       }
     });
 
-    // Initialize the chat rail (script must be loaded by host page)
+    // Highlight active mobile tab
+    document.querySelectorAll('.eime-mobile-tab[data-nav]').forEach((tab) => {
+      if (tab.getAttribute('data-nav') === activeNav) {
+        tab.classList.remove('text-slate-400');
+        tab.classList.add('text-white');
+      }
+    });
+
+    // Initialize the chat rail
     if (window.EIMEChatRail && typeof window.EIMEChatRail.init === 'function') {
       window.EIMEChatRail.init({ containerId: 'eime-chat-rail', api: API });
     } else {
       console.warn('EIMEShell: EIMEChatRail not loaded');
     }
 
-    // Subscribe to NAVIGATE action for chat-driven page navigation (FR-10.2)
+    // Subscribe to NAVIGATE action for chat-driven page navigation
     if (window.eime && typeof window.eime.subscribeAction === 'function') {
       window.eime.subscribeAction('NAVIGATE', (payload) => {
         if (payload && payload.url) {
@@ -78,18 +85,29 @@
       });
     }
 
-    // Load church for the badge
+    // Load church name badge
     loadChurchBadge();
 
-    // Poll HITL count for nav badge
+    // Poll HITL count — updates all [data-badge="hitl"] elements
     refreshHitlBadge();
     setInterval(refreshHitlBadge, 15000);
+
+    // Poll inbox count — updates all [data-badge="inbox"] elements
+    refreshInboxBadge();
+    setInterval(refreshInboxBadge, 15000);
+
+    // Restore admin nav collapsed state from localStorage
+    try {
+      if (localStorage.getItem('eime_admin_nav') === '1') {
+        toggleAdminNav(true);
+      }
+    } catch(e) {}
 
     // Wire mobile breakpoint listeners
     window.addEventListener('resize', _adjustToBreakpoint);
     _adjustToBreakpoint();
 
-    // Swipe-down to dismiss the mobile chat bottom-sheet (Phase 3.9)
+    // Swipe-down to dismiss the mobile chat bottom-sheet
     _wireChatSwipeDismiss();
 
     // Close drawers on Escape
@@ -106,7 +124,6 @@
   }
 
   function _adjustToBreakpoint() {
-    // On large screens always show nav and chat; hide backdrops
     const isLg = window.innerWidth >= 1024;
     const nav = document.getElementById('eime-left-nav');
     const chat = document.getElementById('eime-chat-rail');
@@ -171,7 +188,6 @@
       if (window.innerWidth >= 1024) return;
       const dy = e.changedTouches[0].clientY - touchStartY;
       const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
-      // Only treat as swipe-down if vertical >> horizontal and >50px
       if (dy > 50 && dx < 60) {
         toggleChat(false);
       }
@@ -194,12 +210,48 @@
       const r = await fetch(`${API}/api/jobs`);
       const jobs = await r.json();
       const cnt = jobs.filter((j) => j.status === 'PENDING_HITL').length;
-      const badge = document.getElementById('eime-hitl-badge');
-      if (!badge) return;
-      if (cnt > 0) { badge.textContent = cnt; badge.classList.remove('hidden'); }
-      else badge.classList.add('hidden');
+      document.querySelectorAll('[data-badge="hitl"]').forEach((el) => {
+        if (cnt > 0) { el.textContent = cnt; el.classList.remove('hidden'); }
+        else el.classList.add('hidden');
+      });
     } catch (e) { /* offline */ }
   }
 
-  window.EIMEShell = { mount, toggleNav, toggleChat };
+  function toggleAdminNav(forceShow) {
+    const section = document.getElementById('eime-admin-section');
+    const arrow = document.getElementById('eime-more-arrow');
+    if (!section) return;
+    const show = forceShow !== undefined ? forceShow : section.classList.contains('hidden');
+    if (show) {
+      section.classList.remove('hidden');
+      section.classList.add('flex');
+      if (arrow) arrow.textContent = '▴';
+      try { localStorage.setItem('eime_admin_nav', '1'); } catch(e) {}
+    } else {
+      section.classList.remove('flex');
+      section.classList.add('hidden');
+      if (arrow) arrow.textContent = '▾';
+      try { localStorage.setItem('eime_admin_nav', '0'); } catch(e) {}
+    }
+  }
+
+  async function refreshInboxBadge() {
+    try {
+      const API_BASE = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
+      const church = 'holy_comforter';
+      const [exRes, qRes] = await Promise.all([
+        fetch(`${API_BASE}/api/churches/${church}/exceptions`).catch(() => null),
+        fetch(`${API_BASE}/api/churches/${church}/questions`).catch(() => null),
+      ]);
+      let count = 0;
+      if (exRes && exRes.ok) { const d = await exRes.json(); count += (d || []).filter(e => e.status === 'OPEN').length; }
+      if (qRes && qRes.ok) { const d = await qRes.json(); count += (d || []).filter(q => q.status === 'OPEN').length; }
+      document.querySelectorAll('[data-badge="inbox"]').forEach((el) => {
+        if (count > 0) { el.textContent = count; el.classList.remove('hidden'); }
+        else el.classList.add('hidden');
+      });
+    } catch(e) { /* offline */ }
+  }
+
+  window.EIMEShell = { mount, toggleNav, toggleChat, toggleAdminNav };
 })();
