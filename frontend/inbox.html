@@ -159,6 +159,24 @@ async function loadAll() {
 
 // ── Exceptions ──────────────────────────────────────────────────────────────
 
+/**
+ * Phase 6: Render a RouteReason badge with color coding for reason types.
+ */
+function reasonBadge(reason) {
+  if (!reason) return '';
+  const reasonConfig = {
+    'INSUFFICIENT_CONTEXT': { color: 'bg-blue-100 text-blue-800', label: 'Needs Info' },
+    'CRITICAL_SIGNAL': { color: 'bg-red-100 text-red-800', label: 'Critical' },
+    'BUDGET_OVER': { color: 'bg-orange-100 text-orange-800', label: 'Budget Over' },
+    'RESTRICTION_VIOLATED': { color: 'bg-purple-100 text-purple-800', label: 'Restriction' },
+    'POSTING_BLOCKED': { color: 'bg-red-100 text-red-800', label: 'Posting Failed' },
+    'REVIEWER_ESCALATION': { color: 'bg-amber-100 text-amber-800', label: 'Escalated' },
+    'UNMATCHED_BANK_ITEM': { color: 'bg-slate-100 text-slate-800', label: 'Unmatched' }
+  };
+  const cfg = reasonConfig[reason] || { color: 'bg-slate-100 text-slate-800', label: reason };
+  return `<span class="inline-block px-2 py-0.5 text-xs font-semibold ${cfg.color} rounded">${cfg.label}</span>`;
+}
+
 function renderExceptions(items) {
   const open = items.filter(e => (e.state || e.status) === 'OPEN');
   setBadge('exceptions', open.length, 'orange');
@@ -173,10 +191,11 @@ function renderExceptions(items) {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             ${priorityPill(e.priority)}
+            ${e.details?.reason ? reasonBadge(e.details.reason) : ''}
             <span class="text-xs text-slate-400">${_relDate(e.created_at)}</span>
           </div>
           <p class="font-medium text-slate-900 text-sm">${esc(e.summary || e.description || 'Exception')}</p>
-          ${e.details?.reason ? `<p class="text-sm text-slate-500 mt-1 truncate">${esc(e.details.reason)}</p>` : ''}
+          ${e.details?.reason && e.details?.reason_detail ? `<p class="text-sm text-slate-500 mt-1 truncate">${esc(e.details.reason_detail)}</p>` : ''}
         </div>
         <div class="flex gap-2 flex-shrink-0">
           <button onclick="resolveException('${e.exception_id}')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Mark Resolved</button>
