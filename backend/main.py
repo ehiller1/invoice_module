@@ -1482,6 +1482,12 @@ async def post_je_to_acs(je_id: str, request: Request, body: Optional[Dict[str, 
             object.__setattr__(je, "acs_reference", result.acs_reference)
         except Exception:
             pass
+        # Mark if posted via mock mode so operators know
+        if result.mock:
+            try:
+                object.__setattr__(je, "posted_via_mock", True)
+            except Exception:
+                pass
         _update_je_in_store(je, church_id)
 
         # Phase 6: Emit TransactionPosted-into-ACS event (audit trail)
@@ -1497,6 +1503,7 @@ async def post_je_to_acs(je_id: str, request: Request, body: Optional[Dict[str, 
                     "acs_reference": result.acs_reference,
                     "posted_at": datetime.utcnow().isoformat(),
                     "system": "acs_realm",
+                    "via_mock": result.mock,  # Explicit flag for mock posts
                 },
             )
             post_event.add_tag(TagKind.ENTRY, je.entry_id)
@@ -3628,7 +3635,8 @@ async def acs_test_connection(body: Dict[str, Any]) -> JSONResponse:
         from .integrations.acs_realm.playwright_runner import PlaywrightSession  # type: ignore
         import time
         t0 = time.time()
-        with PlaywrightSession(base_url=base_url, username=username, password=password) as session:
+        test_creds = {"base_url": base_url, "username": username, "password": password}
+        with PlaywrightSession(church_id, creds=test_creds) as session:
             # Just verify login worked
             page = session.page
             success = page is not None

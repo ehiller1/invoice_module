@@ -30,10 +30,10 @@ SELECTORS = yaml.safe_load(
 class PlaywrightSession:
     """Headless Playwright browser scoped to a single church login."""
 
-    def __init__(self, church_id: str, headless: bool = True) -> None:
+    def __init__(self, church_id: str, headless: bool = True, creds: Optional[dict] = None) -> None:
         self.church_id = church_id
         self.headless = headless
-        self.creds = retrieve(church_id)
+        self.creds = creds or retrieve(church_id)
         if not self.creds:
             raise RuntimeError(
                 f"No ACS credentials stored for {church_id}"

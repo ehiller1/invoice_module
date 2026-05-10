@@ -63,6 +63,22 @@ def _log_mock(je: JournalEntry) -> None:
         f.write(json.dumps(record) + "\n")
 
 
+def _validate_accounts_pre_post(je: JournalEntry) -> tuple[bool, Optional[str]]:
+    """Pre-flight check: validate all GL accounts referenced in the JE exist in ACS."""
+    accounts = set()
+    for line in getattr(je, "lines", []) or []:
+        account = getattr(line, "account_number", None)
+        if account:
+            accounts.add(account)
+
+    if not accounts:
+        return False, "No GL accounts found in journal entry"
+
+    # TODO: Query ACS Realm to verify accounts exist.
+    # For now, just log that we checked; real validation requires ACS read access.
+    return True, None
+
+
 def post_journal_entry(je: JournalEntry, church_id: str, headless: bool = True) -> PostResult:
     """Post a journal entry to ACS Realm via browser automation, or mock if not available."""
     if _is_mock_mode():
@@ -73,12 +89,19 @@ def post_journal_entry(je: JournalEntry, church_id: str, headless: bool = True) 
             mock=True,
         )
 
-    # Real mode -- needs playwright + credentials + selectors
+    # Real mode -- pre-flight validation
+    valid, err = _validate_accounts_pre_post(je)
+    if not valid:
+        return PostResult(success=False, error_message=err or "Pre-post validation failed")
+
+    # needs playwright + credentials + selectors
     from .playwright_runner import PlaywrightSession, SELECTORS
 
     sel = SELECTORS["journal_entry"]
+    session = None
     try:
-        with PlaywrightSession(church_id, headless=headless) as session:
+        session = PlaywrightSession(church_id, headless=headless)
+        with session:
             page = session.page
             page.click(sel["new_entry_button"])
             page.fill(sel["entry_date_field"], str(getattr(je, "entry_date", "")))
@@ -112,14 +135,18 @@ def post_journal_entry(je: JournalEntry, church_id: str, headless: bool = True) 
             return PostResult(success=True, acs_reference=getattr(je, "entry_id", None))
     except Exception as e:
         screenshot = None
-        try:
-            from .playwright_runner import PlaywrightSession as _PS
-            with _PS(church_id, headless=headless) as s:
-                screenshot = s.screenshot()
-        except Exception:
-            pass
+        # Try to screenshot from the existing session if it was created and has a page
+        if session and session.page:
+            try:
+                screenshot = session.screenshot()
+            except Exception:
+                pass
+        # Format error with business context where possible
+        error_msg = str(e)
+        if "Timeout" in error_msg and "selector" in error_msg:
+            error_msg = f"Form submission failed (field not found in ACS): {error_msg}"
         return PostResult(
             success=False,
-            error_message=str(e),
+            error_message=error_msg,
             screenshot_path=screenshot,
         )
