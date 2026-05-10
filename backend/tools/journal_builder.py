@@ -102,14 +102,21 @@ def build_journal_entry(
     balanced = total_debits == total_credits
 
     # Step 7: status
+    # Phase 5d: the legacy 'PENDING_APPROVAL' name does not exist on the
+    # JEStatus enum — `_missing_` maps it to OPEN at parse time. Calling
+    # `JEStatus.PENDING_APPROVAL` raises AttributeError, which the pipeline's
+    # broad except wraps into `status: ERROR / error_message: "PENDING_APPROVAL"`.
+    # This is the exact root cause of Flow 2's status-semantics bug. We use
+    # OPEN (the canonical value) directly so a routed-but-not-yet-approved
+    # JE has a real terminal state, not an error.
     has_hitl = hitl_decisions is not None
     if not balanced:
         status = JEStatus.DRAFT
         warnings.append("CRITICAL: Journal entry does not balance — manual review required.")
     elif has_hitl:
-        status = JEStatus.PENDING_APPROVAL
+        status = JEStatus.OPEN
     elif reviewed.overall_verdict == OverallVerdict.APPROVED:
-        status = JEStatus.PENDING_APPROVAL
+        status = JEStatus.OPEN
     else:
         status = JEStatus.DRAFT
 

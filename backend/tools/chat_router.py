@@ -62,6 +62,12 @@ _CREATE_JE_PATTERNS = [
     r"\bmake\s+(?:a\s+)?j\.?\s*e\.?\b",
     r"\brecord\s+(?:a\s+)?journal\s+entry\b",
     r"\bbook\s+(?:a\s+)?journal\s+entry\b",
+    # Phase 5b: catch "draft a JE …" — this was the Flow 3 phrasing-A miss
+    # that fell through to QA and produced hallucinated GL accounts.
+    r"\bdraft\s+(?:a\s+|me\s+a\s+)?journal\s+entry\b",
+    r"\bdraft\s+(?:a\s+|me\s+a\s+)?j\.?\s*e\.?\b",
+    r"\bdraft\s+(?:me\s+)?(?:an?\s+)?entry\s+(?:for|to)\b",
+    r"\bpost\s+(?:a\s+|the\s+)?(?:journal\s+)?entry\b",
     r"\btransfer\s+\$?\d",
     r"\brecord\s+a\s+transfer\b",
     r"\bmake\s+an?\s+entry\s+(?:for|to)\b",
@@ -202,29 +208,20 @@ def _resolve_account(church_id: str, hint: str,
     return results[0]
 
 
-def build_manual_je_draft(
+def _build_je_from_slots(
     church_id: str,
-    question: str,
-    ctx: Optional[Any] = None,
+    slots: Dict[str, Any],
+    ctx: Optional[Any],
+    original_question: str,
 ) -> Dict[str, Any]:
-    """Extract slots from the question, resolve accounts, return a draft JE.
+    """Resolve account hints and build a JournalEntry draft from pre-extracted slots.
 
-    Returns a dict suitable as a chat reply payload:
-        {
-            "type": "manual_je_draft",
-            "je_draft": {... JournalEntry .model_dump() ...},
-            "confirmation_required": True,
-            "summary": "Created draft JE: ...",
-            "errors": [...]   # populated when extraction fails
-        }
+    Separated from slot extraction so the unified LLM path in route_question can
+    feed slots directly without triggering a second LLM call.
     """
-    from ..models.schemas import (
-        JournalEntry, JournalEntryLine, JEStatus, RestrictionClass,
-    )
+    from ..models.schemas import JournalEntry, JournalEntryLine, JEStatus
 
     errors: List[str] = []
-    slots = _extract_je_slots_with_claude(question, ctx)
-
     amount = slots.get("amount")
     if amount is None or float(amount) <= 0:
         errors.append("Could not determine the amount from your request.")
@@ -235,7 +232,7 @@ def build_manual_je_draft(
     if not to_hint:
         errors.append("Could not determine the destination (debit) account.")
 
-    # Resolve fund hint to fund_id list (best-effort).
+    # Resolve fund hint → fund_id filter (best-effort)
     fund_filter: Optional[List[str]] = None
     fund_hint = slots.get("fund_hint")
     if fund_hint and ctx is not None:
@@ -250,12 +247,26 @@ def build_manual_je_draft(
         except Exception:
             fund_filter = None
 
-    debit_acct = _resolve_account(church_id, to_hint, fund_filter=fund_filter)
-    credit_acct = _resolve_account(church_id, from_hint, fund_filter=fund_filter)
+    # Phase 5b: ground every account reference against the seeded CoA before
+    # falling through to semantic search. A purely-numeric hint that doesn't
+    # exist in the seeded CoA is a hard error — never silently substitute.
+    from ..events.coa_grounding import ground_je_slot
 
-    if to_hint and debit_acct is None:
+    debit_acct, debit_err = ground_je_slot(ctx, to_hint, fund_filter=fund_filter)
+    credit_acct, credit_err = ground_je_slot(ctx, from_hint, fund_filter=fund_filter)
+
+    if debit_acct is None and not debit_err:
+        debit_acct = _resolve_account(church_id, to_hint, fund_filter=fund_filter)
+    if credit_acct is None and not credit_err:
+        credit_acct = _resolve_account(church_id, from_hint, fund_filter=fund_filter)
+
+    if debit_err:
+        errors.append(debit_err)
+    elif to_hint and debit_acct is None:
         errors.append(f"Could not find a GL account matching {to_hint!r}.")
-    if from_hint and credit_acct is None:
+    if credit_err:
+        errors.append(credit_err)
+    elif from_hint and credit_acct is None:
         errors.append(f"Could not find a GL account matching {from_hint!r}.")
 
     if errors or amount is None or debit_acct is None or credit_acct is None:
@@ -263,9 +274,7 @@ def build_manual_je_draft(
             "type": "manual_je_draft",
             "je_draft": None,
             "confirmation_required": False,
-            "summary": (
-                "Could not draft a manual journal entry from that request."
-            ),
+            "summary": "Could not draft a manual journal entry from that request.",
             "errors": errors,
         }
 
@@ -273,7 +282,7 @@ def build_manual_je_draft(
     today = date.today()
     fiscal_year = getattr(ctx, "fiscal_year", today.year) if ctx else today.year
     period = f"{today.year}-{today.month:02d}"
-    memo = (slots.get("memo") or question.strip())[:140]
+    memo = (slots.get("memo") or original_question.strip())[:140]
 
     debit_line = JournalEntryLine(
         sequence=1,
@@ -319,6 +328,36 @@ def build_manual_je_draft(
         f"Credit {credit_line.account_name} ${amount_dec:,.2f}"
     )
 
+    # Phase 5b: emit a ClassificationProposed event so the slot resolution
+    # is auditable in the event log. This is *proposed*, not posted —
+    # TransactionPosted only fires after the user confirms the draft.
+    try:
+        from ..events.emitter import emit_event
+        from ..events.schemas import EventType, FinancialEvent, TagKind
+        ev = FinancialEvent(
+            event_type=EventType.CLASSIFICATION_PROPOSED,
+            church_id=church_id,
+            payload={
+                "draft_entry_id": entry_id,
+                "amount": str(amount_dec),
+                "from_account_hint": from_hint,
+                "to_account_hint": to_hint,
+                "resolved_debit": debit_line.account_number,
+                "resolved_credit": credit_line.account_number,
+                "memo": memo,
+                "source": "chat_router",
+            },
+            correlation_id=entry_id,
+        )
+        ev.add_tag(TagKind.ACCOUNT, debit_line.account_number)
+        ev.add_tag(TagKind.ACCOUNT, credit_line.account_number)
+        if debit_line.fund_id:
+            ev.add_tag(TagKind.FUND, debit_line.fund_id)
+        emit_event(ev)
+    except Exception:
+        # Event emission must never break the user-facing draft flow.
+        pass
+
     return {
         "type": "manual_je_draft",
         "je_draft": json.loads(je.model_dump_json()),
@@ -326,6 +365,26 @@ def build_manual_je_draft(
         "summary": summary,
         "errors": [],
     }
+
+
+def build_manual_je_draft(
+    church_id: str,
+    question: str,
+    ctx: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Extract slots from the question via LLM, then resolve accounts and build a draft JE.
+
+    Returns a dict suitable as a chat reply payload:
+        {
+            "type": "manual_je_draft",
+            "je_draft": {... JournalEntry .model_dump() ...},
+            "confirmation_required": True,
+            "summary": "Created draft JE: ...",
+            "errors": [...]
+        }
+    """
+    slots = _extract_je_slots_with_claude(question, ctx)
+    return _build_je_from_slots(church_id, slots, ctx, question)
 
 
 # ---------------------------------------------------------------------------
@@ -493,12 +552,22 @@ async def route_question(
     job: Optional[Any] = None,
     church_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Route a user question through intent classification, then answer.
+    """Route a user question via a single LLM call.
 
-    Steps:
-      1. Classify intent — manual JE intents short-circuit to slot extraction.
-      2. Pull KB hits (canon + per-church) for general QA.
-      3. Call Claude with the augmented system prompt.
+    One Claude call handles everything: intent classification, JE slot extraction
+    (when the user wants to create a journal entry), and QA answers (otherwise).
+    The LLM is always grounded in the seeded chart of accounts so both
+    "Draft a JE for me" and "Create a journal entry:" reach the same code path
+    and produce the same structured draft.
+
+    The response always has the shape:
+        {
+          "intent": "CREATE_MANUAL_JE" | "QA",
+          "answer": str,
+          "je_draft": dict | None,          # present only for JE intents
+          "confirmation_required": bool,
+          ...
+        }
     """
     # Effective church_id: explicit > job's church_id
     effective_church = church_id
@@ -506,19 +575,19 @@ async def route_question(
         ctx_obj = getattr(job, "accounting_context", None)
         effective_church = getattr(ctx_obj, "church_id", None) if ctx_obj else None
 
-    intent = classify_intent(question)
+    # Load CoA context (needed for JE resolution and for grounding QA answers)
+    ctx: Optional[Any] = None
+    if job is not None:
+        ctx = getattr(job, "accounting_context", None)
+    if ctx is None and effective_church:
+        try:
+            from . import coa_store
+            ctx = coa_store.load_accounting_context(effective_church)
+        except Exception:
+            ctx = None
 
-    # Manual JE branch — no QA call required.
-    if intent == INTENT_CREATE_MANUAL_JE:
-        ctx = None
-        if job is not None:
-            ctx = getattr(job, "accounting_context", None)
-        if ctx is None and effective_church:
-            try:
-                from . import coa_store
-                ctx = coa_store.load_accounting_context(effective_church)
-            except Exception:
-                ctx = None
+    # Fast regex path: unambiguous create-JE phrasing → skip classification LLM call
+    if classify_intent(question) == INTENT_CREATE_MANUAL_JE:
         draft = build_manual_je_draft(
             church_id=effective_church or "",
             question=question,
@@ -526,7 +595,7 @@ async def route_question(
         )
         return {
             "answer": draft["summary"],
-            "intent": intent,
+            "intent": INTENT_CREATE_MANUAL_JE,
             "type": draft["type"],
             "je_draft": draft.get("je_draft"),
             "confirmation_required": draft.get("confirmation_required", False),
@@ -535,16 +604,16 @@ async def route_question(
             "model": None,
         }
 
-    # General QA branch.
+    # ------------------------------------------------------------------ #
+    # Unified LLM call — classifies intent AND either extracts JE slots   #
+    # or answers the question, all in one round-trip.                     #
+    # ------------------------------------------------------------------ #
     api_key = os.environ.get("ANTHROPIC_API_KEY")
 
-    # KB hits for citations (canon + church). Always attempted; safe to no-op.
     kb_hits: List[Any] = []
     try:
         from . import knowledge_base
-        kb_hits = knowledge_base.kb_search(
-            question, church_id=effective_church, k=3,
-        )
+        kb_hits = knowledge_base.kb_search(question, church_id=effective_church, k=3)
     except Exception:
         kb_hits = []
 
@@ -554,7 +623,7 @@ async def route_question(
                 "The Agent Q&A interface requires an ANTHROPIC_API_KEY environment variable. "
                 "Set it and restart the server to enable conversational agent interrogation."
             ),
-            "intent": intent,
+            "intent": INTENT_QA,
             "skills_consulted": [],
             "kb_citations": [getattr(h, "citation", "") for h in kb_hits],
             "model": None,
@@ -565,12 +634,52 @@ async def route_question(
     except ImportError:
         return {
             "answer": "The anthropic package is not installed. Run: uv pip install anthropic",
-            "intent": intent,
+            "intent": INTENT_QA,
             "skills_consulted": [],
             "model": None,
         }
 
-    system = _build_system_prompt(job, kb_hits=kb_hits)
+    # Build a CoA snippet so the LLM uses real GL account names/numbers
+    coa_lines = ""
+    if ctx is not None:
+        try:
+            accounts = getattr(ctx, "chart_of_accounts", []) or []
+            coa_lines = "\n".join(
+                f"{a.account_number} {a.account_name}" for a in accounts[:80]
+            )
+        except Exception:
+            coa_lines = ""
+
+    system = (
+        "You are the EIME Agent — an expert church accountant specialising in "
+        "nonprofit fund accounting (GAAP ASC 958).\n\n"
+        "Respond with VALID JSON ONLY — no prose, no markdown fences.\n\n"
+        "## Decision\n"
+        "Decide whether the user wants to CREATE a journal entry or is asking a QUESTION.\n\n"
+        "CREATE signals: draft, create, make, record, book, write up, post, journalize, "
+        "transfer $X from Y to Z — anything that asks the system to produce a journal entry.\n\n"
+        "## If CREATE — return:\n"
+        '{"intent":"CREATE_MANUAL_JE","je_slots":{'
+        '"from_account_hint":"<credit account description>",'
+        '"to_account_hint":"<debit account description>",'
+        '"amount":<number>,'
+        '"fund_hint":<string or null>,'
+        '"memo":"<short memo>"}}\n\n'
+        "## If QUESTION — return:\n"
+        '{"intent":"QA","answer":"<your answer>"}\n\n'
+    )
+    if coa_lines:
+        system += (
+            "## Chart of accounts (use EXACT account names and numbers for JEs):\n"
+            + coa_lines + "\n\n"
+        )
+    if kb_hits:
+        system += "## Relevant reference material:\n"
+        for h in kb_hits:
+            cite = getattr(h, "citation", "") or "Reference"
+            text = (getattr(h, "text", "") or "")[:400]
+            system += f"- [{cite}] {text}\n"
+
     user_context = _build_user_context(question, job)
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -580,20 +689,91 @@ async def route_question(
         system=system,
         messages=[{"role": "user", "content": user_context}],
     )
+    raw = msg.content[0].text if msg.content else "{}"
 
-    answer = msg.content[0].text if msg.content else "(no response)"
+    # Parse structured response
+    try:
+        m = re.search(r"\{.*\}", raw, re.S)
+        data: Dict[str, Any] = json.loads(m.group(0)) if m else {}
+    except Exception:
+        data = {}
+
+    llm_intent = data.get("intent", INTENT_QA)
+    usage = {"input_tokens": msg.usage.input_tokens, "output_tokens": msg.usage.output_tokens}
 
     registry = get_registry()
-    skills_consulted = [s for s in ["agent_qa_interface", "line_item_classifier",
-                                     "gl_account_mapper", "fraud_detector", "risk_assessor"]
-                        if registry.get(s)]
+    skills_consulted = [
+        s for s in ["agent_qa_interface", "line_item_classifier",
+                     "gl_account_mapper", "fraud_detector", "risk_assessor"]
+        if registry.get(s)
+    ]
+
+    if llm_intent == INTENT_CREATE_MANUAL_JE:
+        # Use slots from the LLM response directly — no second LLM call needed
+        je_slots = data.get("je_slots") or {}
+        draft = _build_je_from_slots(
+            church_id=effective_church or "",
+            slots=je_slots,
+            ctx=ctx,
+            original_question=question,
+        )
+        return {
+            "answer": draft["summary"],
+            "intent": INTENT_CREATE_MANUAL_JE,
+            "type": draft["type"],
+            "je_draft": draft.get("je_draft"),
+            "confirmation_required": draft.get("confirmation_required", False),
+            "errors": draft.get("errors", []),
+            "skills_consulted": ["journal_entry_builder"],
+            "model": "claude-haiku-4-5-20251001",
+            **usage,
+        }
+
+    # QA response — answer field from the LLM, or fall back to raw text
+    answer = data.get("answer") or raw
+
+    # Phase 5b: validate every GL account reference in the answer against
+    # the seeded CoA. Hallucinated numbers (Flow 3: "5100 = Utilities" when
+    # 5100 is Clergy Salary) get flagged and an explicit correction is
+    # appended so the user is never silently misled.
+    grounding_problems: List[Dict[str, Any]] = []
+    if ctx is not None and answer:
+        try:
+            from ..events.coa_grounding import validate_text_grounding
+            ok, grounding_problems = validate_text_grounding(ctx, answer)
+            if not ok and grounding_problems:
+                fixes: List[str] = []
+                for p in grounding_problems:
+                    if p["issue"] == "missing":
+                        fixes.append(
+                            f"⚠ GL account {p['reference']} is not in this "
+                            f"church's chart of accounts."
+                        )
+                    elif p["issue"] == "label_mismatch":
+                        fix = (
+                            f"⚠ GL account {p['reference']} is "
+                            f"'{p['actual_label']}' in this church's CoA, "
+                            f"not '{p['claimed_label']}'."
+                        )
+                        if p.get("suggestion"):
+                            sug = p["suggestion"]
+                            fix += (
+                                f" If you meant '{p['claimed_label']}', "
+                                f"the correct number is "
+                                f"{sug['account_number']} ({sug['account_name']})."
+                            )
+                        fixes.append(fix)
+                if fixes:
+                    answer = answer.rstrip() + "\n\n" + "\n".join(fixes)
+        except Exception:
+            grounding_problems = []
 
     return {
         "answer": answer,
-        "intent": intent,
+        "intent": INTENT_QA,
         "skills_consulted": skills_consulted,
         "kb_citations": [getattr(h, "citation", "") for h in kb_hits],
+        "grounding_problems": grounding_problems,
         "model": "claude-haiku-4-5-20251001",
-        "input_tokens": msg.usage.input_tokens,
-        "output_tokens": msg.usage.output_tokens,
+        **usage,
     }

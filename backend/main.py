@@ -2450,72 +2450,35 @@ def _save_recon_matches(church_id: str, matches: Dict[str, Any]) -> None:
 
 @app.post("/api/churches/{church_id}/plaid/auto-match")
 async def plaid_auto_match(church_id: str, account_id: Optional[str] = None) -> JSONResponse:
-    """Auto-match Plaid transactions to journal entries using fuzzy matching.
+    """[DEPRECATED — kept for back-compat]
 
-    Algorithm: for each unmatched Plaid transaction, find a JE whose net cash
-    amount is within $0.01 and whose entry_date is within 3 calendar days.
-    One-to-one: a JE can only match one transaction.
+    The structural matcher now runs automatically inside Plaid sync, so a
+    manual "Auto-Match" call is no longer required. This endpoint forwards
+    to the same matcher used by sync; clients should migrate to
+    `/api/churches/{church_id}/exceptions` to surface unmatched items
+    instead of triggering a match cycle.
     """
-    from .db import plaid_store, recon_store  # Phase 1: was `from .tools import plaid_store`
-    from .db.connection import execute_query
+    from .events import structural_match
+    report = structural_match.run_for_church(church_id, account_id=account_id)
+    report["deprecated"] = True
+    report["replacement"] = f"/api/churches/{church_id}/exceptions"
+    return _json(report)
 
-    txns = plaid_store.load_plaid_transactions(church_id, account_id=account_id)
 
-    # Resolve church PK and pre-load existing matches so we only iterate
-    # the genuinely unmatched plaid transactions. Existing matches are
-    # tracked by recon_matches (SQL) - no JSONL fallback.
-    existing_matches = recon_store.load_matches(church_id)
-    matched_txn_ids: set = set(existing_matches.keys())
+@app.get("/api/churches/{church_id}/exceptions")
+async def list_exceptions(church_id: str) -> JSONResponse:
+    """Canonical inbox: items the structural matcher could not pair.
 
-    # Build a txn_id -> plaid_transactions.id (PK) map in a single query
-    # so save_match can be called with the integer FK.
-    church_pk = recon_store._resolve_church_pk(church_id)
-    pk_rows = execute_query(
-        """
-        SELECT pt.id AS pk, pt.txn_id AS txn_id
-          FROM plaid_transactions pt
-         WHERE pt.church_id = %s
-        """,
-        (church_pk,),
-    ) or []
-    txn_pk_by_external: Dict[str, int] = {r["txn_id"]: int(r["pk"]) for r in pk_rows}
-
-    newly_matched = 0
-    for txn in txns:
-        tid = txn.txn_id
-        if tid in matched_txn_ids:
-            continue  # already matched
-
-        candidates = recon_store.find_matching_entries(church_id, txn)
-        if not candidates:
-            continue
-
-        best_je = candidates[0]  # Already sorted by (amount_diff, days_diff)
-        plaid_pk = txn_pk_by_external.get(tid)
-        if plaid_pk is None:
-            # Defensive: txn returned by load_plaid_transactions but missing
-            # from PK lookup (race / cache). Skip rather than crash.
-            continue
-
-        recon_store.save_match(
-            church_id=church_id,
-            plaid_txn_id=plaid_pk,
-            journal_entry_id=int(best_je["je_id"]),
-            amount_diff=best_je.get("amount_diff"),
-            days_diff=int(best_je["days_diff"]) if best_je.get("days_diff") is not None else None,
-        )
-        matched_txn_ids.add(tid)
-        newly_matched += 1
-
-    total_matched = sum(1 for t in txns if t.txn_id in matched_txn_ids)
-    exceptions = len(txns) - total_matched
-
+    Phase 5c surface. The reconciliation destination page is deprecated;
+    callers should use this endpoint to render the exceptions inbox.
+    """
+    from .events import structural_match
+    items = structural_match.list_exceptions(church_id)
     return _json({
-        "matched": total_matched,
-        "newly_matched": newly_matched,
-        "exceptions": exceptions,
-        "total": len(txns),
-        "ran_at": datetime.utcnow().isoformat(),
+        "church_id": church_id,
+        "exceptions": items,
+        "count": len(items),
+        "as_of": datetime.utcnow().isoformat(),
     })
 
 

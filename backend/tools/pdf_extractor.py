@@ -41,7 +41,13 @@ def _parse_date(s: str) -> Optional[date]:
 
 
 def extract_text(pdf_path: str) -> str:
-    """Extract text from a PDF. Falls back to pypdf if pdfplumber yields nothing."""
+    """Extract text from a PDF.
+
+    Strategy (in order):
+      1. pdfplumber  — best for native-text PDFs (tables, columns)
+      2. pypdf       — fallback for simple text-layer PDFs
+      3. pytesseract — OCR fallback for scanned/image-only PDFs
+    """
     text_parts: List[str] = []
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -57,6 +63,58 @@ def extract_text(pdf_path: str) -> str:
             text = "\n".join((p.extract_text() or "") for p in reader.pages)
         except Exception:
             text = ""
+
+    # HTML fallback: file saved as .pdf but is actually HTML (e.g. browser-printed
+    # invoices that were captured as raw HTML instead of rendered PDF).
+    if not text.strip():
+        try:
+            raw = Path(pdf_path).read_bytes()
+            if raw.lstrip()[:15].lower().startswith((b"<!doc", b"<html")):
+                from html.parser import HTMLParser
+
+                class _TextCollector(HTMLParser):
+                    def __init__(self) -> None:
+                        super().__init__()
+                        self._parts: List[str] = []
+                        self._skip = False
+
+                    def handle_starttag(self, tag: str, attrs: Any) -> None:
+                        if tag in ("script", "style"):
+                            self._skip = True
+
+                    def handle_endtag(self, tag: str) -> None:
+                        if tag in ("script", "style"):
+                            self._skip = False
+
+                    def handle_data(self, data: str) -> None:
+                        if not self._skip and data.strip():
+                            self._parts.append(data.strip())
+
+                    def get_text(self) -> str:
+                        return "\n".join(self._parts)
+
+                collector = _TextCollector()
+                collector.feed(raw.decode("utf-8", errors="replace"))
+                text = collector.get_text()
+        except Exception:
+            text = ""
+
+    # OCR fallback: when all text extractors return nothing the PDF is likely a
+    # scanned image.  Use pdfplumber's page renderer + pytesseract.
+    if not text.strip():
+        try:
+            import pytesseract  # type: ignore
+
+            ocr_parts: List[str] = []
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    # render at 200 dpi — good balance of speed vs accuracy
+                    img = page.to_image(resolution=200).original
+                    ocr_parts.append(pytesseract.image_to_string(img))
+            text = "\n".join(ocr_parts).strip()
+        except Exception:
+            text = ""
+
     return text
 
 
@@ -186,7 +244,7 @@ def extract_invoice(pdf_path: str, document_type: DocumentType) -> InvoiceDocume
     text = extract_text(pdf_path)
     warnings: List[str] = []
     if not text.strip():
-        warnings.append("PDF appears to be a scanned image; OCR fallback not configured in this build.")
+        warnings.append("PDF text could not be extracted (scanned image PDF with no OCR output).")
         text = "Unknown vendor\nInvoice 0\nTotal $0.00"
 
     vendor = _extract_vendor(text)

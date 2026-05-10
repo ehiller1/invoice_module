@@ -33,23 +33,51 @@ from .tools.approval_chain_resolver import find_chain_for_gl
 from .tools.approval_audit import append_event as append_approval_event
 from .integrations.email import tokens as email_tokens
 from .integrations.email.smtp_sender import send_email
+from .decision_ledger import DecisionLedger, DecisionCategory, DecisionOutcome, LedgerEntry
+from .db import processing_job_store, decision_ledger_store
 
-# In-memory job store (replace with Redis/DB for production)
-_jobs: Dict[str, ProcessingJob] = {}
+
+def get_ledger(church_id: str) -> DecisionLedger:
+    """Return the decision ledger for a church (loaded from DB)."""
+    entries = decision_ledger_store.get_ledger(church_id)
+    return DecisionLedger(church_id=church_id, entries=entries)
+
+
+def _ledger_append(church_id: str, entry: LedgerEntry) -> None:
+    """Append an entry to the church's decision ledger (fire-and-forget safe)."""
+    try:
+        decision_ledger_store.append_entry(church_id, entry)
+    except Exception:
+        pass  # ledger must never crash the pipeline
 
 
 def get_job(job_id: str) -> Optional[ProcessingJob]:
-    return _jobs.get(job_id)
+    """Load a processing job from the database."""
+    return processing_job_store.get_job(job_id)
 
 
 def list_jobs(church_id: Optional[str] = None) -> List[ProcessingJob]:
-    jobs = list(_jobs.values())
-    if church_id:
-        jobs = [j for j in jobs if j.church_id == church_id]
-    return sorted(jobs, key=lambda j: j.created_at, reverse=True)
+    """List processing jobs (DB-backed). `church_id` is required."""
+    if not church_id:
+        raise ValueError("church_id required for list_jobs")
+    return processing_job_store.list_jobs(church_id)
+
+
+def _persist_job(job: ProcessingJob) -> None:
+    """Write the full job state back to the database (upsert).
+
+    The pipeline mutates `job` heavily in place. Calling this after each
+    state transition keeps the DB row in sync with local state.
+    """
+    try:
+        processing_job_store.create_job(job.church_id, job)
+    except Exception:
+        # Persistence must not crash the pipeline — surface via logs only.
+        pass
 
 
 def _update_job(job: ProcessingJob, status: ProcessingStatus, **kwargs: Any) -> None:
+    """Update a job's status (and arbitrary fields) and persist to DB."""
     job.status = status
     job.updated_at = datetime.utcnow()
     for k, v in kwargs.items():
@@ -59,10 +87,12 @@ def _update_job(job: ProcessingJob, status: ProcessingStatus, **kwargs: Any) -> 
         "status": status.value,
         "detail": kwargs.get("error_message") or str(status.value),
     })
+    _persist_job(job)
 
 
 def create_job(church_id: str, filename: str, pdf_path: str,
                document_type: DocumentType) -> ProcessingJob:
+    """Create a new processing job and persist it."""
     now = datetime.utcnow()
     job = ProcessingJob(
         job_id=str(uuid.uuid4()),
@@ -74,13 +104,13 @@ def create_job(church_id: str, filename: str, pdf_path: str,
         created_at=now,
         updated_at=now,
     )
-    _jobs[job.job_id] = job
+    processing_job_store.create_job(church_id, job)
     return job
 
 
 async def run_pipeline(job_id: str) -> None:
     """Async pipeline runner — extract → denomination → classify → risk → fraud → map → review → (hitl?) → build."""
-    job = _jobs.get(job_id)
+    job = processing_job_store.get_job(job_id)
     if not job:
         return
 
@@ -97,6 +127,32 @@ async def run_pipeline(job_id: str) -> None:
             "status": "EXTRACTING",
             "detail": f"Extracted {len(invoice.line_items)} line items from {job.filename}",
         })
+
+        # Decision ledger — extraction confidence (RECOGNIZE membrane)
+        _ledger_append(job.church_id, LedgerEntry(
+            entry_id=str(uuid.uuid4()),
+            decision_id=f"{job.job_id}:extraction",
+            category=DecisionCategory.RECOGNIZE,
+            timestamp=datetime.utcnow(),
+            authoring_actor={"actor_type": "pipeline", "actor_id": "pdf_extractor", "authority_tier": 0},
+            policy_invoked="pdf_extraction_skill",
+            evidence_refs=[job.job_id],
+            inference_chain=[
+                {"input": job.filename, "rule": "pdfplumber → pypdf → pytesseract OCR", "output": f"{len(invoice.line_items)} line items extracted"},
+                {"input": f"warnings={invoice.warnings}", "rule": "requires_manual_review if ≥3 required fields missing", "output": f"requires_manual_review={invoice.requires_manual_review}"},
+            ],
+            conclusion=(
+                f"Extracted {len(invoice.line_items)} line item(s) from {invoice.document_type} "
+                f"for vendor '{invoice.vendor_name}', total ${invoice.total_amount}. "
+                f"Warnings: {invoice.warnings or 'none'}."
+            ),
+            alternatives=[
+                {"description": "Manual data entry", "rejection_rationale": "Auto-extraction attempted first; manual review flagged if confidence low"},
+            ],
+            outcome=DecisionOutcome.ACCEPTED if not invoice.requires_manual_review else DecisionOutcome.ESCALATED,
+            metadata={"line_items": len(invoice.line_items), "total_amount": str(invoice.total_amount), "warnings": invoice.warnings},
+        ))
+        _persist_job(job)
 
         # Step 2: COA load
         ctx: Optional[AccountingContext] = await asyncio.get_event_loop().run_in_executor(
@@ -150,6 +206,35 @@ async def run_pipeline(job_id: str) -> None:
             "status": "CLASSIFYING",
             "detail": f"Fraud assessment: {fraud_result.fraud_level} (score={fraud_result.fraud_score:.3f}) — {fraud_result.recommended_action}",
         })
+        _persist_job(job)
+
+        # Decision ledger — fraud assessment (ROUTE membrane)
+        fraud_outcome = (
+            DecisionOutcome.ESCALATED if fraud_result.fraud_level == "CRITICAL"
+            else DecisionOutcome.ACCEPTED
+        )
+        _ledger_append(job.church_id, LedgerEntry(
+            entry_id=str(uuid.uuid4()),
+            decision_id=f"{job.job_id}:fraud",
+            category=DecisionCategory.ROUTE,
+            timestamp=datetime.utcnow(),
+            authoring_actor={"actor_type": "pipeline", "actor_id": "fraud_detector", "authority_tier": 0},
+            policy_invoked="fraud_detection_skill",
+            evidence_refs=[job.job_id],
+            inference_chain=[
+                {"input": f"vendor={getattr(invoice, 'vendor_name', '?')}, total=${getattr(invoice, 'total_amount', 0)}", "rule": "multi-signal fraud scoring", "output": f"score={fraud_result.fraud_score:.3f}"},
+                {"input": f"score={fraud_result.fraud_score:.3f}", "rule": "CRITICAL if score ≥ threshold", "output": f"level={fraud_result.fraud_level}"},
+            ],
+            conclusion=(
+                f"Fraud level: {fraud_result.fraud_level} (score={fraud_result.fraud_score:.3f}). "
+                f"Recommended action: {fraud_result.recommended_action}."
+            ),
+            alternatives=[
+                {"description": "Continue pipeline without fraud check", "rejection_rationale": "Policy requires fraud screening on all invoices"},
+            ],
+            outcome=fraud_outcome,
+            metadata={"fraud_level": fraud_result.fraud_level, "fraud_score": fraud_result.fraud_score, "signals": [s.get("signal_id") for s in fraud_result.to_dict().get("signals", [])]},
+        ))
 
         # Escalate to HITL immediately if CRITICAL fraud
         if fraud_result.fraud_level == "CRITICAL":
@@ -167,6 +252,33 @@ async def run_pipeline(job_id: str) -> None:
         _update_job(job, ProcessingStatus.MAPPING)
         await asyncio.sleep(0)
         job.draft_allocations = draft_placeholder
+
+        # Decision ledger — GL mapper choice (CODE membrane)
+        if draft_placeholder and draft_placeholder.lines:
+            gl_inference: List[Dict[str, Any]] = []
+            for dl in draft_placeholder.lines:
+                for p in dl.postings:
+                    gl_inference.append({
+                        "input": getattr(dl, "line_id", "?"),
+                        "rule": "semantic GL matching via coa_store",
+                        "output": f"{p.account_number} {p.account_name} ({p.fund_name})",
+                    })
+            _ledger_append(job.church_id, LedgerEntry(
+                entry_id=str(uuid.uuid4()),
+                decision_id=f"{job.job_id}:gl_mapping",
+                category=DecisionCategory.CODE,
+                timestamp=datetime.utcnow(),
+                authoring_actor={"actor_type": "pipeline", "actor_id": "gl_mapper", "authority_tier": 0},
+                policy_invoked="gl_account_mapper",
+                evidence_refs=[job.job_id],
+                inference_chain=gl_inference,
+                conclusion=f"Mapped {len(draft_placeholder.lines)} line(s) to GL accounts.",
+                alternatives=[
+                    {"description": "Manual GL selection", "rejection_rationale": "Automated mapping applied; HITL escalated if reviewer verdict is REJECT"},
+                ],
+                outcome=DecisionOutcome.ACCEPTED,
+                metadata={"lines_mapped": len(draft_placeholder.lines)},
+            ))
 
         # Step 7: Allocation review
         _update_job(job, ProcessingStatus.REVIEWING)
@@ -352,6 +464,31 @@ async def _maybe_request_budget_owner_approval(
         "approver_email": chain.primary_approver_email,
         "matched_gl": matched_gl.account_number,
     })
+
+    # Decision ledger — approval chain resolution (APPROVE membrane)
+    _ledger_append(job.church_id, LedgerEntry(
+        entry_id=str(uuid.uuid4()),
+        decision_id=f"{job.job_id}:approval_routing",
+        category=DecisionCategory.APPROVE,
+        timestamp=datetime.utcnow(),
+        authoring_actor={"actor_type": "pipeline", "actor_id": "approval_chain_resolver", "authority_tier": 0},
+        policy_invoked="approval_chain_resolver",
+        evidence_refs=[job.job_id, chain.chain_id],
+        inference_chain=[
+            {"input": f"GL={matched_gl.account_number}", "rule": "exact → range → wildcard pattern match on ApprovalChain.gl_pattern", "output": f"chain={chain.chain_id}"},
+            {"input": f"chain={chain.chain_id}", "rule": "primary_approver lookup", "output": f"approver={chain.primary_approver_email}"},
+        ],
+        conclusion=(
+            f"Routed to approval chain '{chain.chain_id}' "
+            f"(approver: {chain.primary_approver_email}) "
+            f"based on GL account {matched_gl.account_number} {matched_gl.account_name}."
+        ),
+        alternatives=[
+            {"description": "Auto-approve without human review", "rejection_rationale": "Approval chain configured; budget-owner sign-off required by policy"},
+        ],
+        outcome=DecisionOutcome.DELEGATED,
+        metadata={"chain_id": chain.chain_id, "approver_email": chain.primary_approver_email, "gl_account": matched_gl.account_number},
+    ))
     try:
         append_approval_event(job.church_id, {
             "job_id": job.job_id,
@@ -371,7 +508,7 @@ async def _maybe_request_budget_owner_approval(
 
 async def continue_after_treasurer(job_id: str) -> None:
     """FR-05.3: resume `_build_and_emit` after treasurer approves."""
-    job = _jobs.get(job_id)
+    job = processing_job_store.get_job(job_id)
     if not job:
         return
     if job.status != ProcessingStatus.TREASURER_APPROVED:
@@ -383,7 +520,7 @@ async def continue_after_treasurer(job_id: str) -> None:
 
 async def submit_hitl_decisions(job_id: str, decisions: HITLDecisions) -> None:
     """Resume the pipeline after HITL review gate."""
-    job = _jobs.get(job_id)
+    job = processing_job_store.get_job(job_id)
     if not job or job.status != ProcessingStatus.PENDING_HITL:
         return
     job.hitl_decisions = decisions
@@ -485,16 +622,22 @@ async def _build_and_emit(
     ):
         try:
             updates: Dict[str, Decimal] = {}
+            loop = asyncio.get_event_loop()
             for jl in job.journal_entry.lines:
                 debit = Decimal(jl.debit or Decimal("0"))
                 if debit > Decimal("0"):
-                    current = ctx.ytd_actuals.get(jl.account_number, Decimal("0"))
-                    new_total = Decimal(current) + debit
+                    # Atomic increment with optimistic locking — prevents lost
+                    # updates when concurrent invoices touch the same account.
+                    new_total = await loop.run_in_executor(
+                        None,
+                        coa_store.update_ytd_actual,
+                        job.church_id,
+                        jl.account_number,
+                        ctx.fiscal_year,
+                        debit,
+                    )
                     ctx.ytd_actuals[jl.account_number] = new_total
                     updates[jl.account_number] = new_total
-            await asyncio.get_event_loop().run_in_executor(
-                None, coa_store.save_accounting_context, ctx
-            )
             job.audit_log.append({
                 "ts": datetime.utcnow().isoformat(),
                 "status": "EMITTED",
@@ -510,3 +653,6 @@ async def _build_and_emit(
                 "step": "ytd_update_failed",
                 "detail": f"YTD persistence failed: {exc}",
             })
+
+    # Persist final mutations (journal_entry, audit_log appends after EMITTED).
+    _persist_job(job)
