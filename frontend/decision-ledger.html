@@ -108,6 +108,14 @@
                         <div id="evidence" class="space-y-2"></div>
                     </div>
 
+                    <!-- Citation Chain (Phase 6) -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Citation Chain</h3>
+                        <div id="citationChain" class="space-y-2 text-sm">
+                            <p class="text-gray-500">Events this decision cited as evidence</p>
+                        </div>
+                    </div>
+
                     <!-- Confidence & Alternatives -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -252,6 +260,21 @@
                 : '<div class="text-gray-500">No evidence recorded</div>';
             document.getElementById('evidence').innerHTML = evidenceHtml;
 
+            // Citation Chain (Phase 6)
+            const citedEventIds = decision.cited_event_ids || decision.evidence_refs || [];
+            const citationHtml = citedEventIds.length > 0
+                ? citedEventIds.map(eventId => `
+                    <div class="bg-white p-3 rounded border border-blue-200 hover:bg-blue-50 cursor-pointer transition"
+                         onclick="showEventDetail('${eventId}')">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono text-sm text-blue-600">${eventId.substring(0, 8)}...</span>
+                            <span class="text-xs text-gray-500">Click to view event</span>
+                        </div>
+                    </div>
+                `).join('')
+                : '<div class="text-gray-500">No events cited</div>';
+            document.getElementById('citationChain').innerHTML = citationHtml;
+
             // Confidence
             const confidence = decision.confidence || 0;
             document.getElementById('confidenceScore').textContent = `${(confidence * 100).toFixed(0)}%`;
@@ -291,6 +314,35 @@
 
         function closeDecisionModal() {
             document.getElementById('decisionModal').classList.add('hidden');
+        }
+
+        async function showEventDetail(eventId) {
+            try {
+                const response = await fetch(`/api/churches/${CHURCH_ID}/events/${eventId}`);
+                if (!response.ok) {
+                    alert(`Event ${eventId} not found`);
+                    return;
+                }
+                const event = await response.json();
+
+                // Show event in an alert for now (Phase 6: minimal implementation)
+                const eventInfo = `
+Event ID: ${event.event_id || eventId}
+Type: ${event.event_type || '—'}
+Occurred: ${new Date(event.occurred_at).toLocaleString()}
+Actor: ${event.actor || 'system'}
+
+Payload:
+${JSON.stringify(event.payload, null, 2)}
+
+Tags: ${(event.tags || []).map(t => `${t.tag_kind}=${t.tag_value}`).join(', ') || 'none'}
+                `.trim();
+
+                alert(eventInfo);
+            } catch (error) {
+                console.error('Error loading event:', error);
+                alert(`Failed to load event ${eventId}`);
+            }
         }
 
         document.getElementById('btnFilter').addEventListener('click', () => {

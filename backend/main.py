@@ -1334,6 +1334,48 @@ async def get_decision_ledger(
     })
 
 
+@app.get("/api/churches/{church_id}/events/{event_id}")
+async def get_event(church_id: str, event_id: str) -> JSONResponse:
+    """Phase 6: Fetch a specific event by ID for citation chain rendering.
+
+    Returns the event with all tags and payload data.
+    """
+    try:
+        from .db import connection
+        row = connection.execute_query(
+            "SELECT * FROM events WHERE church_id = %s AND event_id = %s",
+            (church_id, event_id),
+            fetch_one=True
+        )
+        if not row:
+            raise HTTPException(404, f"Event not found: {event_id}")
+
+        # Load tags for this event
+        tag_rows = connection.execute_query(
+            "SELECT tag_kind, tag_value FROM event_tags WHERE event_id = %s",
+            (event_id,)
+        ) or []
+
+        return _json({
+            "event_id": row.get("event_id"),
+            "event_type": row.get("event_type"),
+            "church_id": row.get("church_id"),
+            "occurred_at": row.get("occurred_at"),
+            "actor": row.get("actor"),
+            "confidence": float(row.get("confidence") or 0),
+            "payload": row.get("payload") or {},
+            "caused_by": row.get("caused_by") or [],
+            "correlation_id": row.get("correlation_id"),
+            "tags": [
+                {"tag_kind": t.get("tag_kind"), "tag_value": t.get("tag_value")}
+                for t in tag_rows
+            ],
+        })
+    except Exception as e:
+        logger.error(f"Error fetching event {event_id}: {e}")
+        raise HTTPException(500, f"Error fetching event: {e}")
+
+
 # ===== FR-06.4 / FR-06.5: JE state machine + ACS Realm posting =====
 
 def _find_journal_entry(je_id: str):
@@ -3979,7 +4021,7 @@ async def find_similar_events(
         # Get tags of the query event
         query_tags = connection.execute_query(
             "SELECT tag_kind, tag_value FROM event_tags WHERE event_id = %s",
-            (event_uuid,)
+            (str(event_uuid),)
         ) or []
 
         if not query_tags:
@@ -3993,8 +4035,8 @@ async def find_similar_events(
             FROM events e
             JOIN event_tags et ON e.event_id = et.event_id
             WHERE e.church_id = %s
-            AND e.event_id != %s
-            AND et.tag_kind = ANY(%s)
+            AND e.event_id != %s::uuid
+            AND et.tag_kind = ANY(%s::text[])
             GROUP BY e.event_id, e.event_type, e.occurred_at, e.confidence, e.payload
             ORDER BY matching_tags DESC, e.occurred_at DESC
             LIMIT %s
@@ -4002,7 +4044,7 @@ async def find_similar_events(
 
         similar = connection.execute_query(
             similar_sql,
-            (church_pk, event_uuid, tag_kinds, limit)
+            (church_pk, str(event_uuid), tag_kinds, limit)
         ) or []
 
         similar_events = []
@@ -4338,53 +4380,44 @@ async def get_reconciliation_exceptions(
 
         church_pk = church_pk.get("id")
 
-        # Query unmatched bank items (no correlation_id or low confidence)
+        # Query low-confidence events
         exceptions_sql = """
             SELECT
-                'UNMATCHED_BANK_ITEM' as exception_type,
                 e.event_id,
                 e.event_type,
                 e.occurred_at,
                 e.confidence,
                 e.payload,
-                'No matching JE found' as reason
+                e.correlation_id
             FROM events e
             WHERE e.church_id = %s
-            AND e.event_type = 'BankItemObserved'
-            AND (e.confidence < 0.70 OR e.correlation_id IS NULL)
-
-            UNION
-
-            SELECT
-                'LOW_CONFIDENCE' as exception_type,
-                e.event_id,
-                e.event_type,
-                e.occurred_at,
-                e.confidence,
-                e.payload,
-                'Confidence below 70%' as reason
-            FROM events e
-            WHERE e.church_id = %s
-            AND e.confidence < 0.70
-
-            ORDER BY occurred_at DESC
+            AND (e.confidence < 0.70 OR (e.event_type = 'BankItemObserved' AND e.correlation_id IS NULL))
+            ORDER BY e.occurred_at DESC
             LIMIT %s OFFSET %s
         """
 
         exceptions = connection.execute_query(
             exceptions_sql,
-            (church_pk, church_pk, limit, offset)
+            (church_pk, limit, offset)
         ) or []
 
         exception_list = []
         for exc in exceptions:
+            # Determine exception type
+            if exc.get("event_type") == "BankItemObserved" and not exc.get("correlation_id"):
+                exception_type = "UNMATCHED_BANK_ITEM"
+                reason = "No matching JE found"
+            else:
+                exception_type = "LOW_CONFIDENCE"
+                reason = "Confidence below 70%"
+
             exception_list.append({
                 "exception_id": str(exc.get("event_id")),
-                "exception_type": exc.get("exception_type"),
+                "exception_type": exception_type,
                 "event_type": exc.get("event_type"),
                 "timestamp": exc.get("occurred_at").isoformat() if exc.get("occurred_at") else None,
                 "confidence": float(exc.get("confidence") or 1.0),
-                "reason": exc.get("reason"),
+                "reason": reason,
                 "details": exc.get("payload"),
                 "status": "pending_review"
             })
