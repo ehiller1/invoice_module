@@ -1483,6 +1483,28 @@ async def post_je_to_acs(je_id: str, request: Request, body: Optional[Dict[str, 
         except Exception:
             pass
         _update_je_in_store(je, church_id)
+
+        # Phase 6: Emit TransactionPosted-into-ACS event (audit trail)
+        try:
+            from .events.schemas import EventType, FinancialEvent, TagKind
+            from .events.emitter import emit_event
+
+            post_event = FinancialEvent(
+                event_type=EventType.TRANSACTION_POSTED,
+                church_id=church_id,
+                payload={
+                    "je_id": je.entry_id,
+                    "acs_reference": result.acs_reference,
+                    "posted_at": datetime.utcnow().isoformat(),
+                    "system": "acs_realm",
+                },
+            )
+            post_event.add_tag(TagKind.ENTRY, je.entry_id)
+            post_event.add_tag(TagKind.DOCUMENT, "acs_realm_post")
+            emit_event(post_event)
+        except Exception:
+            pass  # Non-fatal: event emission failure doesn't block posting
+
         return _json({
             "status": "POSTED",
             "acs_reference": result.acs_reference,
@@ -1498,6 +1520,28 @@ async def post_je_to_acs(je_id: str, request: Request, body: Optional[Dict[str, 
         except Exception:
             pass
         _update_je_in_store(je, church_id)
+
+        # Phase 6: Emit PostingBlocked event (audit trail)
+        try:
+            from .events.schemas import EventType, FinancialEvent, TagKind
+            from .events.emitter import emit_event
+
+            block_event = FinancialEvent(
+                event_type=EventType.POSTING_BLOCKED,
+                church_id=church_id,
+                payload={
+                    "je_id": je.entry_id,
+                    "reason": result.error_message,
+                    "system": "acs_realm",
+                    "failed_at": datetime.utcnow().isoformat(),
+                },
+            )
+            block_event.add_tag(TagKind.ENTRY, je.entry_id)
+            block_event.add_tag(TagKind.DOCUMENT, "acs_realm_post")
+            emit_event(block_event)
+        except Exception:
+            pass  # Non-fatal: event emission failure doesn't affect error response
+
         raise HTTPException(500, f"Posting failed: {result.error_message}")
 
 
