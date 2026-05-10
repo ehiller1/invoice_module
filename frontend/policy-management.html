@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Policy Management — Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <template id="page-center-content">
+        <div class="p-6 max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Policy Management</h1>
+                <p class="text-gray-600">Define, version, and enforce policies that agents use to classify and route transactions. Detect and resolve coding pattern drift in real-time.</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <div class="flex gap-4 overflow-x-auto">
+                    <button onclick="switchPolicyTab('active')" id="tabPolicyActive" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm whitespace-nowrap">
+                        Active Policies
+                    </button>
+                    <button onclick="switchPolicyTab('drift')" id="tabPolicyDrift" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Drift Alerts
+                    </button>
+                    <button onclick="switchPolicyTab('history')" id="tabPolicyHistory" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Version History
+                    </button>
+                    <button onclick="switchPolicyTab('create')" id="tabPolicyCreate" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
+                        Create Policy
+                    </button>
+                </div>
+            </div>
+
+            <!-- ACTIVE POLICIES Tab -->
+            <div id="tabContentActive" class="space-y-4">
+                <div id="activePoliciesList"></div>
+            </div>
+
+            <!-- DRIFT ALERTS Tab -->
+            <div id="tabContentDrift" class="hidden space-y-4">
+                <div id="driftAlertsList"></div>
+            </div>
+
+            <!-- HISTORY Tab -->
+            <div id="tabContentHistory" class="hidden space-y-4">
+                <div id="historyList"></div>
+            </div>
+
+            <!-- CREATE POLICY Tab -->
+            <div id="tabContentCreate" class="hidden">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-6">Create New Policy</h2>
+                    <form id="newPolicyForm" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Policy Name</label>
+                            <input type="text" id="policyName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g., Facility Maintenance Classification">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Policy Type</label>
+                            <select id="policyType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="">Select type...</option>
+                                <option value="classification">GL Account Classification</option>
+                                <option value="capitalization">Capitalization Eligibility</option>
+                                <option value="revenue">Revenue Recognition Rules</option>
+                                <option value="approval">Approval Routing</option>
+                                <option value="tax">Tax Treatment</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Policy Description</label>
+                            <textarea id="policyDesc" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-24" placeholder="Describe the policy in natural language..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Triggering Conditions</label>
+                            <textarea id="policyConditions" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-20" placeholder="e.g., expense_type='facility' AND amount<5000 → account 6100"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Effective Date</label>
+                            <input type="date" id="policyEffective" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+                            Create Policy
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Policy Detail Modal -->
+        <div id="policyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                    <h2 id="policyModalTitle" class="text-xl font-bold text-gray-900">Policy Details</h2>
+                    <button onclick="closePolicyModal()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-6">
+                    <div id="policyDetail"></div>
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+                            Edit Policy
+                        </button>
+                        <button class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400">
+                            Deprecate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="eime-bus.js"></script>
+    <script src="eime-shell.js"></script>
+    <script src="eime-chat-rail.js"></script>
+    <script>
+        let allPolicies = [];
+        let driftAlerts = [];
+        const CHURCH_ID = 'holy_comforter';
+
+        async function loadPolicies() {
+            try {
+                // For now, use mock data
+                allPolicies = [
+                    {
+                        id: 'pol_001',
+                        name: 'Facility Maintenance Classification',
+                        type: 'classification',
+                        description: 'All facility/maintenance expenses under $5,000 go to account 6100',
+                        conditions: 'expense_type="facility" AND amount<5000',
+                        effective_date: '2026-01-01',
+                        version: 3,
+                        active: true,
+                        affected_transactions: 127,
+                        last_modified: '2026-04-15',
+                        modified_by: 'CFO'
+                    },
+                    {
+                        id: 'pol_002',
+                        name: 'Capitalization Threshold',
+                        type: 'capitalization',
+                        description: 'Assets over $2,500 are capitalized; under $2,500 are expensed',
+                        conditions: 'asset_amount>2500 → classify as PP&E; <2500 → expense',
+                        effective_date: '2025-07-01',
+                        version: 2,
+                        active: true,
+                        affected_transactions: 342,
+                        last_modified: '2026-03-20',
+                        modified_by: 'Controller'
+                    }
+                ];
+
+                driftAlerts = [
+                    {
+                        alert_id: 'drift_001',
+                        policy_id: 'pol_001',
+                        policy_name: 'Facility Maintenance Classification',
+                        detected_at: '2026-05-02T10:15:00Z',
+                        description: 'Coding pattern deviation detected: 3 recent facility expenses coded to 5000 instead of 6100',
+                        historical_pattern: '6100 (100%)',
+                        current_pattern: '6100 (80%), 5000 (20%)',
+                        affected_count: 3,
+                        total_amount: 12000,
+                        confidence: 0.85,
+                        action_needed: 'Controller: confirm if 5000 is correct for subset, or standardize on 6100'
+                    }
+                ];
+
+                renderActivePolicies();
+                renderDriftAlerts();
+                renderHistory();
+            } catch (error) {
+                console.error('Error loading policies:', error);
+            }
+        }
+
+        function renderActivePolicies() {
+            const container = document.getElementById('activePoliciesList');
+            if (allPolicies.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 bg-white rounded-lg p-6">No active policies</div>';
+                return;
+            }
+
+            container.innerHTML = allPolicies.filter(p => p.active).map(policy => `
+                <div onclick="showPolicyDetail('${policy.id}')" class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md cursor-pointer transition border-l-4 border-blue-500">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="font-semibold text-gray-900">${policy.name}</p>
+                            <p class="text-xs text-gray-600">ID: ${policy.id} • Version: ${policy.version}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            ACTIVE
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">${policy.description}</p>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">Type</p>
+                            <p class="text-gray-900">${policy.type}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">Affected Transactions</p>
+                            <p class="text-gray-900 font-bold">${policy.affected_transactions}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">Last Modified</p>
+                            <p class="text-gray-900">${new Date(policy.last_modified).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderDriftAlerts() {
+            const container = document.getElementById('driftAlertsList');
+            if (driftAlerts.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 bg-white rounded-lg p-6">✓ No policy drift detected</div>';
+                return;
+            }
+
+            container.innerHTML = driftAlerts.map(alert => `
+                <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-semibold text-gray-900">${alert.policy_name}</p>
+                            <p class="text-xs text-gray-600">Detected: ${new Date(alert.detected_at).toLocaleString()}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            ACTION NEEDED
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-4">${alert.description}</p>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600 mb-1">Historical Pattern</p>
+                            <p class="text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded">${alert.historical_pattern}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-600 mb-1">Current Pattern</p>
+                            <p class="text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded">${alert.current_pattern}</p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-xs font-medium text-gray-600 mb-2">Impact</p>
+                        <p class="text-sm text-gray-900">
+                            <strong>${alert.affected_count}</strong> transactions affected •
+                            <strong>$${alert.total_amount.toLocaleString()}</strong> amount •
+                            <strong>${(alert.confidence * 100).toFixed(0)}%</strong> confidence
+                        </p>
+                    </div>
+                    <p class="text-sm bg-yellow-50 p-3 rounded border border-yellow-200 text-yellow-900 mb-4">
+                        <strong>Action:</strong> ${alert.action_needed}
+                    </p>
+                    <div class="flex gap-2">
+                        <button class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+                            ✓ Confirm New Pattern
+                        </button>
+                        <button class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                            🔍 Investigate
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            const history = [
+                {
+                    policy_id: 'pol_001',
+                    policy_name: 'Facility Maintenance Classification',
+                    version: 3,
+                    changed_at: '2026-04-15T14:30:00Z',
+                    changed_by: 'CFO',
+                    change: 'Updated amount threshold from $3,000 to $5,000',
+                    affected_tx: 45
+                },
+                {
+                    policy_id: 'pol_001',
+                    policy_name: 'Facility Maintenance Classification',
+                    version: 2,
+                    changed_at: '2026-02-01T09:00:00Z',
+                    changed_by: 'Controller',
+                    change: 'Initial classification rule created',
+                    affected_tx: 127
+                }
+            ];
+
+            container.innerHTML = history.map(h => `
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-semibold text-gray-900">${h.policy_name}</p>
+                            <p class="text-xs text-gray-600">Version ${h.version} • Changed ${new Date(h.changed_at).toLocaleString()}</p>
+                        </div>
+                        <span class="text-xs font-medium text-gray-600">By ${h.changed_by}</span>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">${h.change}</p>
+                    <p class="text-xs text-gray-600">Affected ${h.affected_tx} transactions at time of change</p>
+                </div>
+            `).join('');
+        }
+
+        function showPolicyDetail(policyId) {
+            const policy = allPolicies.find(p => p.id === policyId);
+            if (!policy) return;
+
+            document.getElementById('policyModalTitle').textContent = policy.name;
+            document.getElementById('policyDetail').innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <p class="text-sm font-medium text-gray-900 mb-2">Description</p>
+                        <p class="text-sm text-gray-700">${policy.description}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 mb-1">Policy Type</p>
+                            <p class="text-sm text-gray-900">${policy.type}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 mb-1">Current Version</p>
+                            <p class="text-sm text-gray-900">v${policy.version}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 mb-1">Effective Date</p>
+                            <p class="text-sm text-gray-900">${new Date(policy.effective_date).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 mb-1">Affected Transactions</p>
+                            <p class="text-sm text-gray-900 font-bold">${policy.affected_transactions}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 mb-2">Triggering Conditions</p>
+                        <div class="bg-gray-50 p-3 rounded font-mono text-xs text-gray-900">
+                            ${policy.conditions}
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 mb-2">Last Modified</p>
+                        <p class="text-xs text-gray-700">${new Date(policy.last_modified).toLocaleString()} by ${policy.modified_by}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('policyModal').classList.remove('hidden');
+        }
+
+        function closePolicyModal() {
+            document.getElementById('policyModal').classList.add('hidden');
+        }
+
+        function switchPolicyTab(tab) {
+            ['active', 'drift', 'history', 'create'].forEach(t => {
+                document.getElementById(`tabContentPolicy${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.add('hidden');
+                document.getElementById(`tabPolicy${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+                document.getElementById(`tabPolicy${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.add('border-transparent', 'text-gray-600');
+            });
+
+            document.getElementById(`tabContentPolicy${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            document.getElementById(`tabPolicy${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById(`tabPolicy${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('border-transparent', 'text-gray-600');
+        }
+
+        document.getElementById('newPolicyForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newPolicy = {
+                id: `pol_${Math.random().toString(36).substr(2, 9)}`,
+                name: document.getElementById('policyName').value,
+                type: document.getElementById('policyType').value,
+                description: document.getElementById('policyDesc').value,
+                conditions: document.getElementById('policyConditions').value,
+                effective_date: document.getElementById('policyEffective').value,
+                version: 1,
+                active: true,
+                affected_transactions: 0,
+                last_modified: new Date().toISOString(),
+                modified_by: 'Current User'
+            };
+            allPolicies.push(newPolicy);
+            renderActivePolicies();
+            document.getElementById('newPolicyForm').reset();
+            alert('Policy created successfully!');
+        });
+
+        async function onMounted() {
+            await loadPolicies();
+            eime.setContext({
+                page: 'policy-management',
+                payload: { churchId: CHURCH_ID }
+            });
+        }
+
+        EIMEShell.mount({
+            onMounted: onMounted,
+            navAttribute: 'data-nav'
+        });
+    </script>
+</body>
+</html>

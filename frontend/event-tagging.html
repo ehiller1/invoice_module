@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Tagging — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <link rel="stylesheet" href="/responsive.css">
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div id="eime-root"></div>
+
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-shell.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-responsive.js"></script>
+
+  <script>
+    const PAGE_ID = 'event-tagging';
+    const DIMENSIONS = [
+      'account', 'project', 'customer', 'function',
+      'geography', 'esg', 'segment', 'capitalization_eligible', 'tax_treatment'
+    ];
+
+    let allEvents = [];
+    let filteredEvents = [];
+
+    const MOCK_EVENTS = [
+      {
+        id: 'EVT-2024-4701',
+        timestamp: '2024-09-14T14:22:00Z',
+        event_type: 'invoice_received',
+        source: 'pdf',
+        description: 'Facility services — Sept utilities',
+        economic_substance: 'Monthly facility service obligation',
+        amount: 8450,
+        suggested_tags: {
+          account: { value: '6100_Facilities', confidence: 95 },
+          project: { value: 'operations', confidence: 92 },
+          customer: { value: 'internal', confidence: 98 },
+          function: { value: 'facilities', confidence: 96 },
+          geography: { value: 'us_midwest', confidence: 88 },
+          esg: { value: 'energy_consumption', confidence: 72 },
+          segment: { value: 'occupancy', confidence: 85 },
+          capitalization_eligible: { value: 'no', confidence: 99 },
+          tax_treatment: { value: 'deductible', confidence: 97 }
+        },
+        applied_tags: {
+          account: '6100_Facilities',
+          project: 'operations',
+          customer: 'internal',
+          function: 'facilities',
+          geography: 'us_midwest'
+        },
+        overrides: []
+      },
+      {
+        id: 'EVT-2024-4702',
+        timestamp: '2024-09-14T10:05:00Z',
+        event_type: 'invoice_received',
+        source: 'pdf',
+        description: 'Professional services — audit retainer Q4',
+        economic_substance: 'External audit contract payment',
+        amount: 22500,
+        suggested_tags: {
+          account: { value: '7200_Professional_Fees', confidence: 98 },
+          project: { value: 'compliance', confidence: 96 },
+          customer: { value: 'internal', confidence: 99 },
+          function: { value: 'audit', confidence: 97 },
+          geography: { value: 'us_midwest', confidence: 85 },
+          esg: { value: 'governance', confidence: 88 },
+          segment: { value: 'compliance', confidence: 94 },
+          capitalization_eligible: { value: 'no', confidence: 100 },
+          tax_treatment: { value: 'deductible', confidence: 99 }
+        },
+        applied_tags: {
+          account: '7200_Professional_Fees',
+          project: 'compliance',
+          customer: 'internal',
+          function: 'audit',
+          geography: 'us_midwest',
+          tax_treatment: 'deductible'
+        },
+        overrides: []
+      },
+      {
+        id: 'EVT-2024-4703',
+        timestamp: '2024-09-13T16:45:00Z',
+        event_type: 'revenue_service',
+        source: 'email',
+        description: 'Membership dues — Month 9 recognition',
+        economic_substance: 'Monthly recurring membership revenue',
+        amount: 18600,
+        suggested_tags: {
+          account: { value: '4100_Membership_Revenue', confidence: 97 },
+          project: { value: 'membership', confidence: 99 },
+          customer: { value: 'members', confidence: 98 },
+          function: { value: 'revenue', confidence: 99 },
+          geography: { value: 'us_midwest', confidence: 84 },
+          esg: { value: 'social_impact', confidence: 76 },
+          segment: { value: 'membership', confidence: 98 },
+          capitalization_eligible: { value: 'no', confidence: 100 },
+          tax_treatment: { value: 'non_taxable_donation', confidence: 92 }
+        },
+        applied_tags: {
+          account: '4100_Membership_Revenue',
+          project: 'membership',
+          customer: 'members',
+          function: 'revenue',
+          geography: 'us_midwest',
+          tax_treatment: 'non_taxable_donation'
+        },
+        overrides: []
+      },
+      {
+        id: 'EVT-2024-4704',
+        timestamp: '2024-09-13T13:20:00Z',
+        event_type: 'invoice_received',
+        source: 'pdf',
+        description: 'Capital equipment — HVAC replacement parts',
+        economic_substance: 'HVAC system component replacement',
+        amount: 34800,
+        suggested_tags: {
+          account: { value: '1700_Equipment', confidence: 85 },
+          project: { value: 'facilities', confidence: 88 },
+          customer: { value: 'internal', confidence: 99 },
+          function: { value: 'capital', confidence: 91 },
+          geography: { value: 'us_midwest', confidence: 87 },
+          esg: { value: 'energy_efficiency', confidence: 79 },
+          segment: { value: 'occupancy', confidence: 86 },
+          capitalization_eligible: { value: 'yes', confidence: 82 },
+          tax_treatment: { value: 'capitalized', confidence: 88 }
+        },
+        applied_tags: {
+          account: '1700_Equipment',
+          project: 'facilities',
+          customer: 'internal',
+          function: 'capital',
+          geography: 'us_midwest',
+          capitalization_eligible: 'yes'
+        },
+        overrides: [
+          { dimension: 'esg', previous: 'energy_efficiency', current: 'energy_consumption', reason: 'Initial install, not upgrade' }
+        ]
+      }
+    ];
+
+    function loadEvents() {
+      return fetch('/api/events')
+        .then(r => r.json())
+        .catch(() => {
+          // Use mock data
+          return { events: MOCK_EVENTS };
+        })
+        .then(data => {
+          allEvents = data.events || MOCK_EVENTS;
+          filteredEvents = [...allEvents];
+          renderEvents();
+        });
+    }
+
+    function renderEvents() {
+      const container = document.getElementById('events-container');
+      container.innerHTML = filteredEvents.map(evt => `
+        <div class="bg-navy-800 rounded-lg p-4 border border-navy-700 hover:border-navy-600 transition-colors cursor-pointer"
+             onclick="showEventDetail('${evt.id}')">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <p class="text-sm font-semibold text-slate-100">${evt.id}</p>
+              <p class="text-xs text-slate-400">${new Date(evt.timestamp).toLocaleDateString()} • ${evt.event_type}</p>
+            </div>
+            <span class="text-xs font-medium text-gold-400">$${evt.amount.toLocaleString()}</span>
+          </div>
+          <p class="text-sm text-slate-300 mb-3">${evt.description}</p>
+          <div class="flex flex-wrap gap-1">
+            ${Object.entries(evt.applied_tags).map(([dim, val]) => `
+              <span class="inline-flex items-center gap-1 px-2 py-1 bg-navy-700 rounded text-xs text-slate-200">
+                ${dim}:<span class="text-gold-400 font-medium">${val}</span>
+              </span>
+            `).join('')}
+          </div>
+          ${evt.overrides.length > 0 ? `
+            <div class="mt-2 pt-2 border-t border-navy-700 text-xs text-amber-400">
+              ${evt.overrides.length} tag override${evt.overrides.length !== 1 ? 's' : ''}
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    function showEventDetail(eventId) {
+      const evt = allEvents.find(e => e.id === eventId);
+      if (!evt) return;
+
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4';
+      modal.onclick = e => e.target === modal && modal.remove();
+
+      const suggested = evt.suggested_tags;
+      const applied = evt.applied_tags;
+      const dimensions = [...new Set(Object.keys(suggested))];
+
+      modal.innerHTML = `
+        <div class="bg-navy-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-navy-700">
+          <div class="sticky top-0 bg-navy-900 border-b border-navy-700 px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-100">${evt.id}</h2>
+              <p class="text-xs text-slate-400">${new Date(evt.timestamp).toLocaleString()}</p>
+            </div>
+            <button onclick="this.closest('div').parentElement.remove()" class="text-slate-400 hover:text-white">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-6">
+            <!-- Event Details -->
+            <div>
+              <h3 class="text-sm font-semibold text-slate-300 mb-2">Event</h3>
+              <div class="bg-navy-700/50 rounded p-3 text-sm text-slate-300">
+                <p><span class="text-slate-400">Type:</span> ${evt.event_type}</p>
+                <p><span class="text-slate-400">Source:</span> ${evt.source}</p>
+                <p><span class="text-slate-400">Amount:</span> $${evt.amount.toLocaleString()}</p>
+                <p class="mt-2"><span class="text-slate-400">Description:</span> ${evt.description}</p>
+                <p><span class="text-slate-400">Economic Substance:</span> ${evt.economic_substance}</p>
+              </div>
+            </div>
+
+            <!-- Tagging Section -->
+            <div>
+              <h3 class="text-sm font-semibold text-slate-300 mb-3">Semantic Tags</h3>
+              <div class="space-y-3">
+                ${dimensions.map(dim => {
+                  const sugg = suggested[dim];
+                  const appl = applied[dim] || '(none)';
+                  const isOverridden = applied[dim] && applied[dim] !== sugg.value;
+                  return `
+                    <div class="bg-navy-700/50 rounded p-3">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">${dim}</span>
+                        ${isOverridden ? `<span class="text-xs font-medium px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded">Overridden</span>` : ''}
+                      </div>
+                      <div class="space-y-2">
+                        <div>
+                          <p class="text-xs text-slate-400 mb-1">Agent suggestion (${sugg.confidence}% confidence)</p>
+                          <div class="flex items-center gap-2">
+                            <span class="px-2 py-1 bg-gold-500/20 text-gold-400 text-xs rounded font-medium">${sugg.value}</span>
+                            <div class="flex-1 bg-navy-600 rounded-full h-1.5 overflow-hidden">
+                              <div class="bg-gold-500 h-full" style="width: ${sugg.confidence}%"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <p class="text-xs text-slate-400 mb-1">Applied tag</p>
+                          <span class="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded font-medium">${appl}</span>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Overrides History -->
+            ${evt.overrides.length > 0 ? `
+              <div>
+                <h3 class="text-sm font-semibold text-slate-300 mb-2">Tag Overrides</h3>
+                <div class="space-y-2">
+                  ${evt.overrides.map(ov => `
+                    <div class="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-sm">
+                      <p class="text-amber-400 font-medium mb-1">${ov.dimension}</p>
+                      <p class="text-slate-300"><span class="text-slate-400">Changed from:</span> ${ov.previous}</p>
+                      <p class="text-slate-300"><span class="text-slate-400">Changed to:</span> ${ov.current}</p>
+                      <p class="text-slate-400 text-xs mt-1">Reason: ${ov.reason}</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Actions -->
+            <div class="flex gap-2 pt-2">
+              <button onclick="editEventTags('${evt.id}')" class="flex-1 px-3 py-2 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium text-sm transition-colors">
+                Edit Tags
+              </button>
+              <button onclick="this.closest('div').parentElement.remove()" class="px-3 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function editEventTags(eventId) {
+      const evt = allEvents.find(e => e.id === eventId);
+      if (!evt) return;
+
+      const modal = document.querySelector('.fixed');
+      if (modal) modal.remove();
+
+      const editModal = document.createElement('div');
+      editModal.className = 'fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4';
+      editModal.onclick = e => e.target === editModal && editModal.remove();
+
+      const suggested = evt.suggested_tags;
+      const applied = evt.applied_tags;
+      const dimensions = [...new Set(Object.keys(suggested))];
+
+      editModal.innerHTML = `
+        <div class="bg-navy-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-navy-700">
+          <div class="sticky top-0 bg-navy-900 border-b border-navy-700 px-6 py-4">
+            <h2 class="text-lg font-semibold text-slate-100">Edit Tags — ${evt.id}</h2>
+          </div>
+
+          <div class="p-6 space-y-4">
+            ${dimensions.map(dim => `
+              <div class="bg-navy-700/50 rounded p-4">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">${dim}</label>
+                <div class="flex gap-2 items-start">
+                  <div class="flex-1">
+                    <input type="text" value="${applied[dim] || ''}"
+                      class="w-full px-3 py-2 bg-navy-600 border border-navy-500 rounded text-sm text-slate-100 placeholder-slate-500"
+                      placeholder="Enter or select tag value">
+                  </div>
+                  <div class="text-xs text-slate-400 whitespace-nowrap pt-2">
+                    Agent: <span class="text-gold-400 font-medium">${suggested[dim].value}</span>
+                    <span class="text-slate-500">(${suggested[dim].confidence}%)</span>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="bg-navy-900 border-t border-navy-700 px-6 py-4 flex gap-2 justify-end">
+            <button onclick="this.closest('div').parentElement.remove()" class="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+              Cancel
+            </button>
+            <button onclick="this.closest('div').parentElement.remove(); showEventDetail('${evt.id}')" class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium text-sm transition-colors">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(editModal);
+    }
+
+    function filterByDimension() {
+      const dim = document.getElementById('dimension-filter').value;
+      if (!dim) {
+        filteredEvents = [...allEvents];
+      } else {
+        filteredEvents = allEvents.filter(evt => {
+          const tags = evt.applied_tags;
+          return Object.keys(tags).includes(dim);
+        });
+      }
+      renderEvents();
+    }
+
+    function initPage() {
+      const root = document.getElementById('eime-root');
+      root.innerHTML = `
+        <div class="flex h-full w-full">
+          ${EIME_SHELL_HTML}
+          <main class="flex-1 overflow-auto bg-slate-950">
+            <div class="max-w-7xl mx-auto p-6">
+              <!-- Header -->
+              <div class="mb-6">
+                <h1 class="text-3xl font-bold text-slate-100 mb-2">Event Tagging</h1>
+                <p class="text-slate-400">Add semantic dimensions to economic events. Agent confidence shown for each suggestion.</p>
+              </div>
+
+              <!-- KPI Cards -->
+              <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
+                  <p class="text-xs text-slate-400 mb-1">Total Events</p>
+                  <p class="text-2xl font-bold text-slate-100">${MOCK_EVENTS.length}</p>
+                </div>
+                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
+                  <p class="text-xs text-slate-400 mb-1">Fully Tagged</p>
+                  <p class="text-2xl font-bold text-gold-400">${MOCK_EVENTS.filter(e => Object.keys(e.applied_tags).length >= 5).length}</p>
+                </div>
+                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
+                  <p class="text-xs text-slate-400 mb-1">Overridden</p>
+                  <p class="text-2xl font-bold text-amber-400">${MOCK_EVENTS.filter(e => e.overrides.length > 0).length}</p>
+                </div>
+                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
+                  <p class="text-xs text-slate-400 mb-1">Avg Agent Confidence</p>
+                  <p class="text-2xl font-bold text-sky-400">92%</p>
+                </div>
+              </div>
+
+              <!-- Filter -->
+              <div class="bg-navy-800 rounded-lg p-4 border border-navy-700 mb-6">
+                <div class="flex gap-3">
+                  <div class="flex-1">
+                    <label class="text-xs font-semibold text-slate-400 mb-2 block">Filter by Dimension</label>
+                    <select id="dimension-filter" onchange="filterByDimension()"
+                      class="w-full px-3 py-2 bg-navy-700 border border-navy-600 rounded text-slate-100 text-sm">
+                      <option value="">All Dimensions</option>
+                      ${DIMENSIONS.map(d => `<option value="${d}">${d}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="flex items-end">
+                    <button onclick="document.getElementById('dimension-filter').value = ''; filterByDimension()"
+                      class="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Events Grid -->
+              <div id="events-container" class="grid grid-cols-1 gap-3">
+                <!-- Events will render here -->
+              </div>
+            </div>
+          </main>
+          ${EIME_CHAT_RAIL_HTML}
+        </div>
+      `;
+
+      EIMEShell.init(PAGE_ID);
+      EIMEChatRail.init(PAGE_ID);
+      loadEvents();
+    }
+
+    document.addEventListener('DOMContentLoaded', initPage);
+  </script>
+</body>
+</html>
