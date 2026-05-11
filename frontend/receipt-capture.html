@@ -35,21 +35,24 @@
     </div>
   </header>
 
+  <!-- Toast notifications -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
   <div class="flex flex-col h-full">
     <!-- Upload Section -->
     <div class="px-8 py-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
       <h2 class="text-sm font-semibold text-slate-800 mb-4">Capture Receipt</h2>
       <input type="file" id="receipt-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" />
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div onclick="document.getElementById('receipt-file-input').click()" class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
-          <p class="text-2xl mb-2">📸</p>
+          <p class="text-3xl mb-3">📸</p>
           <p class="text-sm font-medium text-slate-700">Take Photo</p>
           <p class="text-xs text-slate-500 mt-1">Use device camera</p>
         </div>
 
         <div onclick="document.getElementById('receipt-file-input').click()" class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
-          <p class="text-2xl mb-2">📁</p>
+          <p class="text-3xl mb-3">📁</p>
           <p class="text-sm font-medium text-slate-700">Upload File</p>
           <p class="text-xs text-slate-500 mt-1">PDF, JPG, or PNG</p>
         </div>
@@ -94,6 +97,17 @@
 <script>
 const CHURCH_ID = 'holy_comforter';
 let recentReceipts = [];
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bgColor = type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700';
+  const icon = type === 'error' ? '❌' : type === 'success' ? '✓' : 'ℹ️';
+  toast.className = `border rounded-lg px-4 py-3 text-sm ${bgColor} shadow-lg animate-pulse`;
+  toast.innerHTML = `<div class="flex items-center gap-2"><span>${icon}</span><span>${message}</span></div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
 
 async function init() {
   await EIMEShell.mount({
@@ -161,20 +175,49 @@ function renderReceipts() {
 
 async function handleFileUpload(event) {
   const file = event.target.files[0];
-  if (!file) return;
+  if (!file) {
+    showToast('Please select a file to upload', 'info');
+    return;
+  }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('church_id', CHURCH_ID);
+  if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
+    showToast('Only PDF, JPG, and PNG files are supported', 'error');
+    return;
+  }
+
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('File is too large. Maximum size is 50 MB', 'error');
+    return;
+  }
+
+  showToast('Processing receipt...', 'info');
+
+  // Backend expects JSON with base64-encoded image_data, not multipart FormData
+  let base64;
+  try {
+    base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  } catch (error) {
+    showToast('Failed to read file. Please try again', 'error');
+    console.error('FileReader error:', error);
+    return;
+  }
 
   try {
     const response = await fetch('/api/receipts/process', {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_data: base64, file_name: file.name, church_id: CHURCH_ID }),
     });
 
     if (!response.ok) {
-      alert(`Error processing receipt: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData.detail || response.statusText || 'Unable to process receipt';
+      showToast(`Error: ${errorMsg}`, 'error');
       return;
     }
 
@@ -190,9 +233,10 @@ async function handleFileUpload(event) {
 
     recentReceipts.unshift(receipt);
     renderReceipts();
+    showToast(`✓ Receipt processed: ${receipt.vendor_info?.name || 'Unknown vendor'}`, 'success');
   } catch (error) {
     console.error('Error uploading receipt:', error);
-    alert(`Error: ${error.message}`);
+    showToast(`Network error: ${error.message}. Check your connection and try again`, 'error');
   }
 
   event.target.value = '';

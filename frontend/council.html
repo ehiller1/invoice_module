@@ -125,28 +125,37 @@ EIMEShell.mount({
  */
 async function loadQueues() {
   try {
-    // Phase 3: Call real aggregation endpoint
-    const res = await fetch(`${API}/api/council/queues?church_id=${CHURCH_ID}`);
+    // Fetch each queue from its real endpoint in parallel
+    const [exRes, polRes, qRes] = await Promise.all([
+      fetch(`${API}/api/churches/${CHURCH_ID}/exceptions`).catch(() => null),
+      fetch(`${API}/api/churches/${CHURCH_ID}/policies`).catch(() => null),
+      fetch(`${API}/api/churches/${CHURCH_ID}/questions`).catch(() => null),
+    ]);
 
-    if (res.ok) {
-      const data = await res.json();
-      allCards = {
-        exceptions: data.exceptions || [],
-        policies: data.policies || [],
-        questions: data.questions || [],
-        recommendations: data.recommendations || []
-      };
+    if (exRes?.ok) {
+      const d = await exRes.json();
+      allCards.exceptions = Array.isArray(d) ? d : (d?.exceptions || []);
     } else {
-      // Endpoint exists but returned error
-      console.warn('Council queues endpoint returned error; using empty queues');
-      allCards = { exceptions: [], policies: [], questions: [], recommendations: [] };
+      allCards.exceptions = [];
     }
+    if (polRes?.ok) {
+      const d = await polRes.json();
+      allCards.policies = Array.isArray(d) ? d : (d?.policies || []);
+    } else {
+      allCards.policies = [];
+    }
+    if (qRes?.ok) {
+      const d = await qRes.json();
+      allCards.questions = Array.isArray(d) ? d : (d?.questions || []);
+    } else {
+      allCards.questions = [];
+    }
+    allCards.recommendations = [];
 
     updateDashboard();
     renderRecentItems();
   } catch (e) {
     console.error('Error loading queues:', e);
-    // Graceful fallback: empty queues
     allCards = { exceptions: [], policies: [], questions: [], recommendations: [] };
     updateDashboard();
     renderRecentItems();

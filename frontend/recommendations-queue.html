@@ -188,9 +188,9 @@ function renderRecommendations() {
 
         ${rec.state === 'OPEN' ? `
           <div class="flex gap-2">
-            <button onclick="acceptRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Accept</button>
-            <button onclick="declineRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Decline</button>
-            <button onclick="modifyRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Modify</button>
+            <button onclick="acceptRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+            <button onclick="declineRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Reject</button>
+            <button onclick="modifyRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700">Review Details</button>
           </div>
         ` : `
           <div class="text-xs text-slate-600">

@@ -95,6 +95,9 @@
     </div>
   </div>
 
+  <!-- Toast notifications -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
   <!-- Exception Cards List -->
   <div id="exceptions-list" class="space-y-4">
     <p class="text-slate-500 text-center py-8">Loading exception queue...</p>
@@ -228,13 +231,45 @@ function applyFilters() {
   renderExceptions();
 }
 
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bgColor = type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700';
+  const icon = type === 'error' ? '❌' : type === 'success' ? '✓' : 'ℹ️';
+  toast.className = `border rounded-lg px-4 py-3 text-sm ${bgColor} shadow-lg`;
+  toast.innerHTML = `<div class="flex items-center gap-2"><span>${icon}</span><span>${message}</span></div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
 function renderExceptions() {
   document.getElementById('queue-count').textContent = filteredExceptions.filter(e => e.state === 'OPEN').length;
 
   const container = document.getElementById('exceptions-list');
 
   if (filteredExceptions.length === 0) {
-    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No exceptions match the current filter</p>';
+    container.innerHTML = `
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+        <div class="text-5xl mb-3">📋</div>
+        <h3 class="text-lg font-semibold text-blue-900 mb-2">No Exceptions Currently</h3>
+        <p class="text-sm text-blue-800 mb-4">Exceptions flag items that need your attention:</p>
+        <ul class="text-sm text-blue-800 space-y-2 mb-6 max-w-lg mx-auto text-left">
+          <li class="flex items-start gap-2">
+            <span class="text-lg mt-0">🎁</span>
+            <span><strong>Ambiguous Gifts:</strong> Donations with unclear intent (endowment vs operations)</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-lg">💰</span>
+            <span><strong>Capitalization Issues:</strong> Assets coded to expense accounts; need reclassification</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-lg">⚠️</span>
+            <span><strong>Policy Violations:</strong> Transactions that conflict with church governance rules</span>
+          </li>
+        </ul>
+        <p class="text-xs text-blue-700">Exceptions are created when the system detects unusual transactions or when staff members flag items for review.</p>
+      </div>
+    `;
     return;
   }
 
@@ -319,98 +354,145 @@ function formatDate(dateStr) {
 }
 
 async function approveException(id) {
-  if (!confirm('Approve this exception?')) return;
-  try {
-    const res = await fetch(`${API}/api/exceptions/${id}/approve`, { method: 'POST' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert('Exception approved');
-    loadExceptions();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
+  showConfirmDialog('Approve this exception?', 'Approving will mark this as resolved and remove it from the queue.', async () => {
+    try {
+      const res = await fetch(`${API}/api/exceptions/${id}/approve`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('✓ Exception approved and marked resolved', 'success');
+      loadExceptions();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  });
 }
 
 async function rejectException(id) {
-  if (!confirm('Reject this exception?')) return;
-  try {
-    const res = await fetch(`${API}/api/exceptions/${id}/reject`, { method: 'POST' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert('Exception rejected');
-    loadExceptions();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
+  showConfirmDialog('Reject this exception?', 'Rejecting will close this exception without resolving the underlying issue. Route it to the appropriate owner instead if needed.', async () => {
+    try {
+      const res = await fetch(`${API}/api/exceptions/${id}/reject`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('✓ Exception rejected', 'success');
+      loadExceptions();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  });
 }
 
 async function routeException(id) {
-  const tier = prompt('Route to tier (1, 2, or 3+)?', '2');
-  if (!tier) return;
-  try {
-    const res = await fetch(`${API}/api/exceptions/${id}/route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ next_tier: parseInt(tier) })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert('Exception routed');
-    loadExceptions();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
+  showRouteDialog(async (principal) => {
+    if (!principal) return;
+    try {
+      const res = await fetch(`${API}/api/exceptions/${id}/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ principal })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast(`✓ Exception routed to ${principal}`, 'success');
+      loadExceptions();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
+  });
 }
 
 async function batchApprove() {
-  if (selectedIds.size === 0) { alert('No exceptions selected'); return; }
-  if (!confirm(`Approve ${selectedIds.size} exceptions?`)) return;
-
-  for (const id of selectedIds) {
-    try {
-      await fetch(`${API}/api/exceptions/${id}/approve`, { method: 'POST' });
-    } catch (e) {
-      console.error('Error approving', id, e);
+  if (selectedIds.size === 0) { showToast('No exceptions selected', 'info'); return; }
+  showConfirmDialog(`Approve ${selectedIds.size} exception(s)?`, 'This will approve all selected exceptions and mark them as resolved.', async () => {
+    for (const id of selectedIds) {
+      try {
+        await fetch(`${API}/api/exceptions/${id}/approve`, { method: 'POST' });
+      } catch (e) {
+        console.error('Error approving', id, e);
+      }
     }
-  }
-
-  alert(`${selectedIds.size} exceptions approved`);
-  loadExceptions();
+    showToast(`✓ ${selectedIds.size} exceptions approved`, 'success');
+    selectedIds.clear();
+    loadExceptions();
+  });
 }
 
 async function batchReject() {
-  if (selectedIds.size === 0) { alert('No exceptions selected'); return; }
-  if (!confirm(`Reject ${selectedIds.size} exceptions?`)) return;
-
-  for (const id of selectedIds) {
-    try {
-      await fetch(`${API}/api/exceptions/${id}/reject`, { method: 'POST' });
-    } catch (e) {
-      console.error('Error rejecting', id, e);
+  if (selectedIds.size === 0) { showToast('No exceptions selected', 'info'); return; }
+  showConfirmDialog(`Reject ${selectedIds.size} exception(s)?`, 'This will reject the selected exceptions without resolving them. Consider routing to the appropriate owner instead.', async () => {
+    for (const id of selectedIds) {
+      try {
+        await fetch(`${API}/api/exceptions/${id}/reject`, { method: 'POST' });
+      } catch (e) {
+        console.error('Error rejecting', id, e);
+      }
     }
-  }
-
-  alert(`${selectedIds.size} exceptions rejected`);
-  loadExceptions();
+    showToast(`✓ ${selectedIds.size} exceptions rejected`, 'success');
+    selectedIds.clear();
+    loadExceptions();
+  });
 }
 
 async function batchRoute() {
-  if (selectedIds.size === 0) { alert('No exceptions selected'); return; }
-
-  const tier = prompt('Route to tier (1, 2, or 3+)?', '2');
-  if (!tier) return;
-
-  for (const id of selectedIds) {
-    try {
-      await fetch(`${API}/api/exceptions/${id}/route`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ next_tier: parseInt(tier) })
-      });
-    } catch (e) {
-      console.error('Error routing', id, e);
+  if (selectedIds.size === 0) { showToast('No exceptions selected', 'info'); return; }
+  showRouteDialog(async (principal) => {
+    if (!principal) return;
+    for (const id of selectedIds) {
+      try {
+        await fetch(`${API}/api/exceptions/${id}/route`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ principal })
+        });
+      } catch (e) {
+        console.error('Error routing', id, e);
+      }
     }
-  }
+    showToast(`✓ ${selectedIds.size} exceptions routed to ${principal}`, 'success');
+    selectedIds.clear();
+    loadExceptions();
+  });
+}
 
-  alert(`${selectedIds.size} exceptions routed`);
-  loadExceptions();
+function showConfirmDialog(title, message, onConfirm) {
+  const dialogHTML = `
+    <div id="confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-lg max-w-sm w-full mx-4">
+        <div class="px-6 py-4 border-b border-slate-200">
+          <h3 class="font-semibold text-slate-900">${title}</h3>
+        </div>
+        <div class="px-6 py-3">
+          <p class="text-sm text-slate-700">${message}</p>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 flex gap-2 justify-end border-t border-slate-200">
+          <button onclick="document.getElementById('confirm-modal').remove()" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button onclick="(function() { document.getElementById('confirm-modal').remove(); })(); window._confirmAction?.();" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Confirm</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', dialogHTML);
+  window._confirmAction = onConfirm;
+}
+
+function showRouteDialog(onSubmit) {
+  const dialogHTML = `
+    <div id="route-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-lg max-w-sm w-full mx-4">
+        <div class="px-6 py-4 border-b border-slate-200">
+          <h3 class="font-semibold text-slate-900">Route Exception</h3>
+        </div>
+        <div class="px-6 py-3">
+          <label class="block text-sm font-medium text-slate-700 mb-2">Send to (email or role)</label>
+          <input type="text" id="route-principal" placeholder="e.g. treasurer@church.org or 'Treasurer'" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 outline-none" />
+          <p class="text-xs text-slate-500 mt-2">Assign this exception to a specific person or role for action.</p>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 flex gap-2 justify-end border-t border-slate-200">
+          <button onclick="document.getElementById('route-modal').remove()" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button onclick="(function() { const principal = document.getElementById('route-principal').value; document.getElementById('route-modal').remove(); window._routeAction?.(principal); })();" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Route</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', dialogHTML);
+  window._routeAction = onSubmit;
+  document.getElementById('route-principal').focus();
 }
 </script>
 

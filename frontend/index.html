@@ -103,6 +103,18 @@
       <h2 class="text-lg font-semibold text-slate-800">Processing Pipeline</h2>
       <span id="pipeline-status-badge" class="pill bg-blue-100 text-blue-800">Running</span>
     </div>
+
+    <!-- Progress bar -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-slate-600">Overall Progress</span>
+        <span id="progress-percentage" class="text-xs font-semibold text-slate-600">0%</span>
+      </div>
+      <div class="w-full bg-slate-200 rounded-full h-2">
+        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
     <div class="space-y-3" id="pipeline-steps"></div>
   </div>
 
@@ -255,6 +267,24 @@ async function pollJobStatus() {
       item.querySelector('.step-status').textContent = status;
       item.querySelector('.step-status').className = `step-status text-xs ${color}`;
     }
+    updateProgressBar();
+  };
+
+  const updateProgressBar = () => {
+    const steps = document.querySelectorAll('[data-step]');
+    let completedSteps = 0;
+    steps.forEach(step => {
+      const status = step.querySelector('.step-status').textContent;
+      if (status === 'Complete' || status === 'In Progress') {
+        completedSteps++;
+      }
+    });
+    const totalSteps = steps.length;
+    const percentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
+    if (progressBar) progressBar.style.width = percentage + '%';
+    if (progressPercentage) progressPercentage.textContent = percentage + '%';
   };
 
   const checkJob = async () => {

@@ -244,8 +244,8 @@
         fetch(`${API_BASE}/api/churches/${church}/questions`).catch(() => null),
       ]);
       let count = 0;
-      if (exRes && exRes.ok) { const d = await exRes.json(); count += (d || []).filter(e => e.status === 'OPEN').length; }
-      if (qRes && qRes.ok) { const d = await qRes.json(); count += (d || []).filter(q => q.status === 'OPEN').length; }
+      if (exRes && exRes.ok) { const d = await exRes.json(); const exArr = Array.isArray(d) ? d : (d?.exceptions || []); count += exArr.filter(e => (e.status || '').toUpperCase() === 'OPEN').length; }
+      if (qRes && qRes.ok) { const d = await qRes.json(); const qArr = Array.isArray(d) ? d : (d?.questions || []); count += qArr.filter(q => (q.status || '').toUpperCase() === 'OPEN').length; }
       document.querySelectorAll('[data-badge="inbox"]').forEach((el) => {
         if (count > 0) { el.textContent = count; el.classList.remove('hidden'); }
         else el.classList.add('hidden');

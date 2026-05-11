@@ -31,6 +31,9 @@
     <div>
       <h1 class="text-3xl font-bold text-slate-900 mb-2">📋 Policy Queue</h1>
       <p class="text-slate-600">Governance decisions and votes — <span id="queue-count">0</span> pending</p>
+      <div id="quorum-summary" class="mt-3 text-sm text-slate-600 hidden">
+        <span id="quorum-text"></span>
+      </div>
     </div>
     <button onclick="toggleFilterPanel()" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700">🔍 Filter</button>
   </div>
@@ -175,13 +178,49 @@ function applyFilters() {
   renderPolicies();
 }
 
+function updateQuorumSummary() {
+  const openPolicies = allPolicies.filter(p => p.state === 'OPEN');
+  const summaryEl = document.getElementById('quorum-summary');
+  const summaryText = document.getElementById('quorum-text');
+
+  if (openPolicies.length === 0) {
+    summaryEl.classList.add('hidden');
+    return;
+  }
+
+  const quorumStats = openPolicies.map(pol => {
+    const votedBy = pol.voted_by || [];
+    const yesCount = votedBy.filter(v => v.vote === 'yes').length;
+    const votesRequired = pol.votes_required || pol.quorum || 0;
+    return { yesCount, votesRequired };
+  });
+
+  const totalYes = quorumStats.reduce((sum, s) => sum + s.yesCount, 0);
+  const totalRequired = quorumStats.reduce((sum, s) => sum + s.votesRequired, 0);
+  const needsMore = quorumStats.filter(s => s.yesCount < s.votesRequired).length;
+
+  let text = `📊 Quorum Status: ${totalYes}/${totalRequired} yes votes across ${openPolicies.length} open ${openPolicies.length === 1 ? 'policy' : 'policies'}`;
+  if (needsMore > 0) {
+    text += ` · ${needsMore} ${needsMore === 1 ? 'needs' : 'need'} more votes`;
+  }
+
+  summaryText.textContent = text;
+  summaryEl.classList.remove('hidden');
+}
+
 function renderPolicies() {
   document.getElementById('queue-count').textContent = filteredPolicies.filter(p => p.state === 'OPEN').length;
+  updateQuorumSummary();
 
   const container = document.getElementById('policies-list');
 
   if (filteredPolicies.length === 0) {
-    container.innerHTML = '<p class="text-slate-500 text-center py-8">✓ No policies match the current filter</p>';
+    container.innerHTML = `<div class="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+      <div class="text-5xl mb-3">📜</div>
+      <h3 class="text-lg font-semibold text-blue-900 mb-2">No Policies to Vote On</h3>
+      <p class="text-sm text-blue-800 mb-4">Governance decisions require quorum and documented votes.</p>
+      <p class="text-sm text-blue-700">Policies control how your organization operates—fund sizes, endowment draws, new initiatives. When proposed, they go into the Policy Queue for governance committee members to review and vote on.</p>
+    </div>`;
     return;
   }
 
@@ -192,9 +231,13 @@ function renderPolicies() {
       'tabled': 'bg-orange-50 text-orange-700'
     }[pol.decision] || (pol.state === 'OPEN' ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-700');
 
-    const votesSummary = pol.voted_by.length > 0 ?
-      `${pol.voted_by.filter(v => v.vote === 'yes').length} yes, ${pol.voted_by.filter(v => v.vote === 'no').length} no, ${pol.voted_by.filter(v => v.vote === 'abstain').length} abstain`
+    const votedBy = pol.voted_by || [];
+    const yesCount = votedBy.filter(v => v.vote === 'yes').length;
+    const votesSummary = votedBy.length > 0
+      ? `${yesCount} yes, ${votedBy.filter(v => v.vote === 'no').length} no, ${votedBy.filter(v => v.vote === 'abstain').length} abstain`
       : 'No votes yet';
+    const votesRequired = pol.votes_required || pol.quorum || null;
+    const quorumText = votesRequired ? ` — ${yesCount}/${votesRequired} yes votes for quorum` : '';
 
     return `
       <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
@@ -209,7 +252,7 @@ function renderPolicies() {
         </div>
         <div class="bg-slate-50 rounded p-3 mb-3 text-xs">
           <p class="text-slate-700"><strong>Proposed:</strong> ${pol.proposed_action}</p>
-          <p class="text-slate-600 mt-1"><strong>Votes:</strong> ${votesSummary}</p>
+          <p class="text-slate-600 mt-1"><strong>Votes:</strong> ${votesSummary}${quorumText}</p>
         </div>
         ${pol.state === 'OPEN' ? `
           <div class="flex gap-2">

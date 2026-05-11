@@ -203,7 +203,10 @@ async function submitTreasurerDecision(action) {
   try {
     const res = await fetch(`/api/jobs/${currentJob.job_id}/treasurer-decision`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Role': 'TREASURER_ADMIN',
+      },
       body: JSON.stringify({
         action,
         treasurer_id: treasurerId,

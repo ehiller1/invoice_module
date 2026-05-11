@@ -65,34 +65,8 @@
                 <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200">
-              <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3 text-sm text-slate-700">Utilities Accrual</td>
-                <td class="px-4 py-3 text-sm text-slate-600">7200 Utilities</td>
-                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
-                <td class="px-4 py-3 text-sm font-mono text-slate-700">$1,245.50</td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Draft</span>
-                </td>
-              </tr>
-              <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3 text-sm text-slate-700">Payroll Accrual</td>
-                <td class="px-4 py-3 text-sm text-slate-600">6100 Salaries & Wages</td>
-                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
-                <td class="px-4 py-3 text-sm font-mono text-slate-700">$8,320.00</td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Draft</span>
-                </td>
-              </tr>
-              <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3 text-sm text-slate-700">Insurance Accrual</td>
-                <td class="px-4 py-3 text-sm text-slate-600">7100 Insurance</td>
-                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
-                <td class="px-4 py-3 text-sm font-mono text-slate-700">$850.00</td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Posted</span>
-                </td>
-              </tr>
+            <tbody id="accruals-tbody" class="divide-y divide-slate-200">
+              <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">Loading accruals…</td></tr>
             </tbody>
           </table>
         </div>
@@ -232,6 +206,46 @@ async function loadAccruals() {
     page: 'accrual-amortization',
     payload: { church_id: activeChurch }
   });
+  try {
+    const res = await fetch(`/api/accruals?church_id=${activeChurch}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderAccruals(data.schedules || []);
+  } catch (e) {
+    console.error('Error loading accruals:', e);
+    document.getElementById('accruals-tbody').innerHTML =
+      `<tr><td colspan="5" class="px-4 py-8 text-center text-sm text-red-600">Error loading accruals: ${e.message}</td></tr>`;
+  }
+}
+
+function renderAccruals(schedules) {
+  const tbody = document.getElementById('accruals-tbody');
+  if (!schedules.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8"><div class="text-center">
+      <div class="text-5xl mb-3">📈</div>
+      <h3 class="text-lg font-semibold text-slate-800 mb-2">No Accruals Configured</h3>
+      <p class="text-sm text-slate-600 mb-4">Automatically estimate period-end accruals and amortization schedules.</p>
+      <p class="text-sm text-slate-500">Accruals recognize expenses and revenues before cash is received or paid (matching principle). Amortization spreads asset costs over their useful life. Once configured, these run automatically on your closing schedule.</p>
+    </div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = schedules.map(s => {
+    const pct = s.pct_complete != null ? s.pct_complete.toFixed(0) + '%' : '—';
+    const statusCls = s.status === 'posted'
+      ? 'bg-green-100 text-green-700'
+      : s.status === 'active'
+      ? 'bg-blue-100 text-blue-700'
+      : 'bg-slate-100 text-slate-600';
+    const periodEnd = s.end_date ? new Date(s.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    const amount = s.total_amount != null ? '$' + Number(s.total_amount).toLocaleString() : '—';
+    return `<tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 text-sm text-slate-700">${s.description || s.schedule_id}</td>
+      <td class="px-4 py-3 text-sm text-slate-600">${s.account || '—'}</td>
+      <td class="px-4 py-3 text-sm text-slate-600">${periodEnd}</td>
+      <td class="px-4 py-3 text-sm font-mono text-slate-700">${amount}</td>
+      <td class="px-4 py-3 text-sm"><span class="px-2 py-1 rounded text-xs font-medium ${statusCls}">${s.status || 'draft'}</span></td>
+    </tr>`;
+  }).join('');
 }
 
 function switchTab(tab) {

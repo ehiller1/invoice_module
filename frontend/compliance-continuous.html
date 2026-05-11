@@ -113,7 +113,14 @@
         function renderCovenantsTab() {
             const covenants = complianceData.covenants || [];
             if (covenants.length === 0) {
-                document.getElementById('covenantsList').innerHTML = '<div class="text-center text-gray-500">No covenants configured</div>';
+                document.getElementById('covenantsList').innerHTML = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+                        <div class="text-5xl mb-3">📋</div>
+                        <h3 class="text-lg font-semibold text-blue-900 mb-2">No Loan Covenants Configured</h3>
+                        <p class="text-sm text-blue-800 mb-4">If you have loans, add the financial ratios and limits your lenders require.</p>
+                        <p class="text-sm text-blue-700">Covenants are promises you make to lenders—minimum cash reserves, maximum debt ratios, etc. We track your position vs. these limits and warn you 6 months before you'd breach them.</p>
+                    </div>
+                `;
                 return;
             }
 

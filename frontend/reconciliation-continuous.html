@@ -354,24 +354,49 @@
             });
         }
 
+        const TAB_MAP = {
+            cash:  { btn: 'tabReconcCash',  content: 'tabContentCash' },
+            ar:    { btn: 'tabReconcAR',    content: 'tabContentAR' },
+            ap:    { btn: 'tabReconcAP',    content: 'tabContentAP' },
+            aging: { btn: 'tabReconcAging', content: 'tabContentAging' },
+        };
+
         function switchReconcTab(tab) {
-            ['cash', 'ar', 'ap', 'aging'].forEach(t => {
-                document.getElementById(`tabContentReconcTab${t.toUpperCase()}`).classList.remove('hidden');
-                document.getElementById(`tabReconcTab${t.toUpperCase()}`).classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
-                document.getElementById(`tabReconcTab${t.toUpperCase()}`).classList.add('border-transparent', 'text-gray-600');
+            Object.values(TAB_MAP).forEach(({ btn, content }) => {
+                document.getElementById(content).classList.add('hidden');
+                const el = document.getElementById(btn);
+                el.classList.remove('border-blue-600', 'text-blue-600');
+                el.classList.add('border-transparent', 'text-gray-600');
             });
-            // Fix: proper tab names
-            document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
-            document.getElementById(`tabReconcTab${tab.charAt(0).toUpperCase() + (tab.length > 1 ? tab.slice(1) : '')}`).classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
-            document.getElementById(`tabReconcTab${tab.charAt(0).toUpperCase() + (tab.length > 1 ? tab.slice(1) : '')}`).classList.remove('border-transparent', 'text-gray-600');
+            document.getElementById(TAB_MAP[tab].content).classList.remove('hidden');
+            const active = document.getElementById(TAB_MAP[tab].btn);
+            active.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            active.classList.remove('border-transparent', 'text-gray-600');
+        }
+
+        let ws = null;
+
+        function connectWebSocket() {
+            const base = (window.EIME_API || 'http://localhost:8000').replace(/^http/, 'ws');
+            ws = new WebSocket(`${base}/ws/reconciliation?church_id=${CHURCH_ID}`);
+            ws.onmessage = (event) => {
+                reconcData = JSON.parse(event.data);
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString() + ' (live)';
+                updateCashCard(); updateARCard(); updateAPCard(); updatePayrollCard(); updateIntercoCard();
+                renderCashTab(); renderARTab(); renderAPTab(); initAgingCharts();
+            };
+            ws.onclose = () => {
+                ws = null;
+                // Fall back to REST polling every 30 s
+                setTimeout(() => loadReconcData(), 3000);
+            };
+            ws.onerror = () => ws && ws.close();
         }
 
         async function onMounted() {
-            await loadReconcData();
-            eime.setContext({
-                page: 'reconciliation-continuous',
-                payload: { churchId: CHURCH_ID }
-            });
+            window.eime.setContext({ page: 'reconciliation-continuous', payload: { churchId: CHURCH_ID } });
+            await loadReconcData();   // immediate first paint
+            connectWebSocket();       // then upgrade to live push
         }
 
         EIMEShell.mount({
