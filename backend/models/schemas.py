@@ -521,6 +521,10 @@ class ProcessingJob(BaseModel):
     primary_approver_role: Optional[str] = None  # role used for authority check
     escalation_reason: Optional[str] = None
     escalation_level: Optional[str] = None  # "TREASURER" when authority lacks
+    # Phase 8: Guider cascade verdict
+    cascade_verdict: Optional[str] = None  # Decision.APPROVE / BLOCK / ESCALATE
+    cascade_verdict_timestamp: Optional[datetime] = None
+    cascade_reasoning: Optional[str] = None
 
 
 # ===== FR-05 Approval Chain =====

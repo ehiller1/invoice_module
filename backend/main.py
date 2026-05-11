@@ -112,6 +112,14 @@ except Exception as _phase6_err:  # pragma: no cover - defensive
     import logging as _l
     _l.getLogger("eime.phase6").warning("Phase 6 HITL router failed to mount: %r", _phase6_err)
 
+# Phase 8: Approval + ACS posting with guider verdicts
+try:
+    from .routes import approvals as _phase8_approvals
+    app.include_router(_phase8_approvals.router)
+except Exception as _phase8_err:  # pragma: no cover - defensive
+    import logging as _l
+    _l.getLogger("eime.phase8").warning("Phase 8 approvals router failed to mount: %r", _phase8_err)
+
 
 @app.on_event("startup")
 async def startup() -> None:
