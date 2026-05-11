@@ -117,10 +117,10 @@ def match_transactions(church_id: str, transaction_ids: List[str]) -> Dict[str, 
 
 
 @tool("create_exception_card")
-async def create_exception_card(church_id: str, exception_type: str, title: str, description: str, evidence: Dict[str, Any]) -> str:
+async def create_exception_card(church_id: str, exception_type: str, title: str, description: str, evidence: Dict[str, Any]) -> Dict[str, Any]:
     """Flag a transaction as an exception for human review.
 
-    Writes to CardStore as single source of truth for all queries.
+    Writes to CardStore as single source of truth. Checks delegation rules for routing.
 
     Args:
         church_id: Church identifier
@@ -130,19 +130,26 @@ async def create_exception_card(church_id: str, exception_type: str, title: str,
         evidence: JSON evidence (e.g., {"txn_id": "...", "confidence": 0.45})
 
     Returns:
-        Exception card ID
+        {card_id, routed_to, routing_rule} if routed, else {card_id}
     """
     from backend.membrane.stores.exceptions import ExceptionCardStore
 
-    card_id = await ExceptionCardStore.create(
+    card_id, routing = await ExceptionCardStore.create(
         church_id,
         exception_type,
         title,
         description,
         evidence=evidence,
+        principal="compliance-engine",
     )
 
-    return card_id
+    result = {"card_id": card_id}
+    if routing:
+        result["routed_to"] = routing.get("target")
+        result["routing_rule"] = routing.get("rule_id")
+        result["notification_level"] = routing.get("notification_level")
+
+    return result
 
 
 # ============================================================================

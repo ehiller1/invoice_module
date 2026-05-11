@@ -26,8 +26,11 @@ class ExceptionCardStore:
         suggested_action: Optional[Dict[str, Any]] = None,
         job_id: Optional[str] = None,
         assigned_to: Optional[str] = None,
-    ) -> str:
+        principal: str = "compliance-engine",
+    ) -> tuple[str, Optional[Dict[str, Any]]]:
         """Create an exception card.
+
+        Checks if exception should be routed based on delegations.
 
         Args:
             church_id: Church identifier
@@ -38,10 +41,13 @@ class ExceptionCardStore:
             suggested_action: Suggested action dict
             job_id: Optional processing job ID
             assigned_to: Optional user to assign to
+            principal: Principal creating exception (for routing checks)
 
         Returns:
-            Card ID (exception-{uuid})
+            Tuple of (card_id, routing_info) where routing_info is dict if routed, else None
         """
+        from backend.membrane.routing import RoutingEngine
+
         card_store = get_card_store()
 
         card_id = f"exception-{church_id}-{datetime.utcnow().timestamp()}"
@@ -75,7 +81,29 @@ class ExceptionCardStore:
         card_store.write(card, chain=True)
         logger.info("Created exception card %s for %s", card_id, exception_type)
 
-        return card_id
+        routing = await RoutingEngine.route_decision(
+            principal=principal,
+            church_id=church_id,
+            decision_type="exception",
+            decision_id=card_id,
+            decision_context={
+                "exception_type": exception_type,
+                "has_suggested_action": bool(suggested_action),
+            },
+            decision_subject=title,
+        )
+
+        if routing:
+            metadata["routed_to"] = routing.get("target")
+            metadata["routing_rule"] = routing.get("rule_id")
+            logger.info(
+                "Exception %s routed to %s via rule %s",
+                card_id,
+                routing.get("target"),
+                routing.get("rule_id"),
+            )
+
+        return card_id, routing
 
     @staticmethod
     async def list_by_status(

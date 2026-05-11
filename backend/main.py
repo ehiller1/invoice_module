@@ -3387,6 +3387,8 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
     - Set trigger conditions (thresholds, risk levels)
     - Configure notification levels
 
+    Creates immutable audit trail in CardStore.
+
     Args:
         principal: Cabinet member ID (treasurer, cfo, etc.)
         body: {
@@ -3400,6 +3402,9 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
     Returns:
         Delegation record with ID and audit trail
     """
+    from backend.membrane.stores.delegations import DelegationCardStore
+    from backend.membrane.stores.audits import AuditCardStore
+
     delegation_type = body.get("delegation_type")
     decision_type = body.get("decision_type")
     target = body.get("target_agent_or_member")
@@ -3410,10 +3415,32 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
     if not all([delegation_type, decision_type, target]):
         return _json({"error": "Missing required fields"}, status_code=400)
 
-    delegation_id = f"deleg_{uuid.uuid4().hex[:12]}"
+    card_id = await DelegationCardStore.create(
+        principal=principal,
+        church_id=church_id,
+        delegation_type=delegation_type,
+        decision_type=decision_type,
+        target=target,
+        trigger_condition=condition,
+        notification_level=notify_level,
+    )
+
+    await AuditCardStore.record_event(
+        church_id=church_id,
+        actor_email=principal,
+        action="DELEGATION_CREATED",
+        resource_type="DELEGATION",
+        resource_id=card_id,
+        details={
+            "decision_type": decision_type,
+            "target": target,
+            "trigger_condition": condition,
+            "notification_level": notify_level,
+        },
+    )
 
     return _json({
-        "delegation_id": delegation_id,
+        "delegation_id": card_id,
         "principal": principal,
         "church_id": church_id,
         "delegation_type": delegation_type,
@@ -3423,6 +3450,7 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
         "notification_level": notify_level,
         "status": "active",
         "created_at": datetime.now().isoformat(),
+        "audit_trail_entry": f"audit-{church_id}",
         "message": f"Delegation created: {decision_type} decisions routed to {target}"
     })
 

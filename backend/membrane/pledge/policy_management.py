@@ -159,18 +159,24 @@ async def vote_on_policy(
     voter_id: str,
     vote: str,  # approve, reject, abstain
     rationale: Optional[str] = None,
+    church_id: str = "holy_comforter",
 ) -> Dict[str, Any]:
     """Record a vote on a policy.
+
+    Checks if vote should be routed to other cabinet members based on delegations.
 
     Args:
         policy_id: Policy identifier
         voter_id: ID of voter
         vote: approve, reject, or abstain
         rationale: Optional voting rationale
+        church_id: Church identifier
 
     Returns:
-        Vote record
+        Vote record with routing info if applicable
     """
+    from backend.membrane.routing import RoutingEngine
+
     validate_id_component(policy_id, field="policy_id")
     validate_id_component(voter_id, field="voter_id")
     card_store = get_card_store()
@@ -194,6 +200,19 @@ async def vote_on_policy(
     )
 
     card_store.write(vote_card, chain=True)
+
+    routing = await RoutingEngine.route_decision(
+        principal=voter_id,
+        church_id=church_id,
+        decision_type="policy",
+        decision_id=f"vote-{policy_id}-{voter_id}",
+        decision_context={"vote": vote, "policy_id": policy_id},
+        decision_subject=f"Vote on policy {policy_id}: {vote}",
+    )
+
+    if routing:
+        vote_data["routed_to"] = routing.get("target")
+        vote_data["routing_rule"] = routing.get("rule_id")
 
     return vote_data
 
