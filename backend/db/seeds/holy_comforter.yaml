@@ -1,0 +1,326 @@
+# Church of the Holy Comforter - Episcopal COA
+# Realistic Episcopal parish with CPF and diocesan assessment
+church_id: holy_comforter
+church_name: Church of the Holy Comforter
+denomination_type: EPISCOPAL
+fiscal_year: 2026
+fiscal_year_start: 2026-01-01
+
+# Capitalization threshold
+capitalisation_threshold_usd: "2500"
+
+# Clergy allowance (Episcopal rector)
+parsonage_allowance_current_year: "42000"
+parsonage_allowance_used_ytd: "21000"
+
+# Funds
+funds:
+  - fund_id: GEN
+    fund_name: General Operating
+    fund_category: GENERAL_OPERATING
+    restriction_class: WITHOUT_RESTRICTION
+    purpose_description: Day-to-day ministry and operations
+    expenditure_rules: Unrestricted - any operating expense
+    current_balance: "120000"
+
+  - fund_id: BLDG
+    fund_name: Building Fund
+    fund_category: CAPITAL_CAMPAIGN
+    restriction_class: WITH_RESTRICTION_PURPOSE
+    purpose_description: Capital improvements and restoration
+    expenditure_rules: Building improvements only
+    current_balance: "185000"
+
+  - fund_id: MISS
+    fund_name: World Relief
+    fund_category: TEMP_RESTRICTED_PURPOSE
+    restriction_class: WITH_RESTRICTION_PURPOSE
+    purpose_description: International mission support
+    expenditure_rules: Vetted charitable organizations only
+    current_balance: "35000"
+
+  - fund_id: RECTOR
+    fund_name: Rector's Discretionary
+    fund_category: BOARD_DESIGNATED
+    restriction_class: WITH_RESTRICTION_PURPOSE
+    purpose_description: Emergency assistance at rector's discretion
+    expenditure_rules: IRS Form 8282 required; charitable purposes
+    current_balance: "5000"
+
+  - fund_id: ENDOW
+    fund_name: Endowment Fund
+    fund_category: PERMANENTLY_RESTRICTED
+    restriction_class: WITH_RESTRICTION_PERMANENT
+    purpose_description: Permanent capital; income supports operations
+    expenditure_rules: Income only; 4% annual distribution
+    current_balance: "350000"
+
+# Chart of Accounts
+accounts:
+  # Assets
+  - account_number: "1010"
+    account_name: Operating Cash
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "1020"
+    account_name: Building Fund Cash
+    account_type: Asset
+    fund_id: BLDG
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "1030"
+    account_name: Relief Fund Cash
+    account_type: Asset
+    fund_id: MISS
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "1500"
+    account_name: Land
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "1510"
+    account_name: Church Building
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "1520"
+    account_name: Rectory
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "1530"
+    account_name: Equipment
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "1540"
+    account_name: Furnishings & Vestments
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Liabilities
+  - account_number: "2010"
+    account_name: Accounts Payable
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "2020"
+    account_name: CPF Assessment Payable
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "2030"
+    account_name: Diocesan Assessment Payable
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "2040"
+    account_name: Payroll Liabilities
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Net Assets
+  - account_number: "3100"
+    account_name: Net Assets - Without Restriction
+    account_type: Equity
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "3200"
+    account_name: Net Assets - Purpose Restricted
+    account_type: Equity
+    fund_id: MISS
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "3300"
+    account_name: Net Assets - Endowment
+    account_type: Equity
+    fund_id: ENDOW
+    restriction_class: WITH_RESTRICTION_PERMANENT
+
+  # Revenue
+  - account_number: "4100"
+    account_name: Pledges & Offerings
+    account_type: Revenue
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "4110"
+    account_name: Plate Offerings
+    account_type: Revenue
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "4200"
+    account_name: Designated Gifts - Building
+    account_type: Revenue
+    fund_id: BLDG
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "4210"
+    account_name: Designated Gifts - Missions
+    account_type: Revenue
+    fund_id: MISS
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "4220"
+    account_name: Endowment Income
+    account_type: Revenue
+    fund_id: ENDOW
+    restriction_class: WITH_RESTRICTION_PERMANENT
+  - account_number: "4300"
+    account_name: Fundraising Events
+    account_type: Revenue
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Personnel (5000)
+  - account_number: "5100"
+    account_name: Rector Salary
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "5101"
+    account_name: Rector Housing Allowance
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "5110"
+    account_name: Rector Pension - CPF
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "5200"
+    account_name: Staff Salaries
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "5210"
+    account_name: Staff Taxes & Benefits
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Worship & Ministry (6000)
+  - account_number: "6100"
+    account_name: Altar & Worship Supplies
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6110"
+    account_name: Music & Choir
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6120"
+    account_name: Liturgical Training
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6200"
+    account_name: Christian Education
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6300"
+    account_name: Pastoral Care & Counseling
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6400"
+    account_name: Outreach & Community Service
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "6500"
+    account_name: Relief Disbursements
+    account_type: Expense
+    fund_id: MISS
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "6600"
+    account_name: Diocesan Programs
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Facility & Operations (7000)
+  - account_number: "7100"
+    account_name: Mortgage & Taxes
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "7110"
+    account_name: Rectory Maintenance
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "7200"
+    account_name: Utilities
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "7300"
+    account_name: Building Maintenance
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "7400"
+    account_name: Insurance
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "7500"
+    account_name: Grounds & Landscaping
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Administration (8000)
+  - account_number: "8100"
+    account_name: Office Supplies
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "8110"
+    account_name: Communications & Office
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "8200"
+    account_name: Professional Services
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "8300"
+    account_name: Software & Subscriptions
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "8400"
+    account_name: Diocesan Assessment
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "8410"
+    account_name: Parish Share (Diocesan)
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Capital (9000)
+  - account_number: "9100"
+    account_name: Depreciation Expense
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+  - account_number: "9200"
+    account_name: Capital Improvements
+    account_type: Asset
+    fund_id: BLDG
+    restriction_class: WITH_RESTRICTION_PURPOSE
+  - account_number: "9300"
+    account_name: Building Loan
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+# Apportionment accounts
+apportionment_accounts:
+  - account_number: "8400"
+    pct_of_revenue: "12.5"

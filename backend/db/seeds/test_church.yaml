@@ -1,0 +1,68 @@
+# Minimal Test Church COA
+# Used for integration tests - simplified structure
+church_id: test_church
+church_name: Test Church
+denomination_type: OTHER
+fiscal_year: 2026
+fiscal_year_start: 2026-01-01
+
+# Capitalization threshold
+capitalisation_threshold_usd: "1000"
+
+# Clergy allowance (default)
+parsonage_allowance_current_year: "0"
+parsonage_allowance_used_ytd: "0"
+
+# Minimal funds
+funds:
+  - fund_id: GEN
+    fund_name: General Fund
+    fund_category: GENERAL_OPERATING
+    restriction_class: WITHOUT_RESTRICTION
+    purpose_description: General operations
+    expenditure_rules: General expenses
+    current_balance: "10000"
+
+# Minimal chart of accounts (essential for testing)
+accounts:
+  # Assets
+  - account_number: "1000"
+    account_name: Cash
+    account_type: Asset
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Liabilities
+  - account_number: "2000"
+    account_name: Accounts Payable
+    account_type: Liability
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Equity
+  - account_number: "3000"
+    account_name: Net Assets
+    account_type: Equity
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Revenue
+  - account_number: "4000"
+    account_name: Donations
+    account_type: Revenue
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Expense - Facilities (for testing)
+  - account_number: "7100"
+    account_name: Rent/Mortgage
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION
+
+  # Expense - Personnel (for testing)
+  - account_number: "5100"
+    account_name: Salaries
+    account_type: Expense
+    fund_id: GEN
+    restriction_class: WITHOUT_RESTRICTION

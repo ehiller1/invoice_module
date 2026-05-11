@@ -484,6 +484,72 @@ def list_churches() -> List[dict]:
     ]
 
 
+def find_account_by_name(church_id: str, name_pattern: str, account_type: Optional[str] = None) -> Optional[str]:
+    """Find a GL account number by name pattern.
+
+    Args:
+        church_id: Church identifier
+        name_pattern: Partial name to search for (case-insensitive substring)
+        account_type: Optional account type to filter (e.g., "Expense", "Liability")
+
+    Returns:
+        Account number if found, None otherwise. If multiple matches, returns first active account.
+    """
+    church_pk = _try_resolve_church_pk(church_id)
+    if church_pk is None:
+        return None
+
+    query = """
+        SELECT account_number
+        FROM gl_accounts
+        WHERE church_id = %s
+          AND is_active = true
+          AND LOWER(name) LIKE LOWER(%s)
+    """
+    params: list[Any] = [church_pk, f"%{name_pattern}%"]
+
+    if account_type:
+        query += " AND account_type = %s"
+        params.append(account_type)
+
+    query += " ORDER BY account_number LIMIT 1"
+
+    row = execute_query(query, tuple(params), fetch_one=True)
+    return row["account_number"] if row else None
+
+
+def find_account_by_type(church_id: str, account_type: str) -> Optional[str]:
+    """Find first GL account of a given type.
+
+    Useful for finding default accounts (e.g., first Expense account).
+
+    Args:
+        church_id: Church identifier
+        account_type: Account type (e.g., "Asset", "Liability", "Expense", "Revenue")
+
+    Returns:
+        Account number if found, None otherwise.
+    """
+    church_pk = _try_resolve_church_pk(church_id)
+    if church_pk is None:
+        return None
+
+    row = execute_query(
+        """
+        SELECT account_number
+        FROM gl_accounts
+        WHERE church_id = %s
+          AND is_active = true
+          AND account_type = %s
+        ORDER BY account_number
+        LIMIT 1
+        """,
+        (church_pk, account_type),
+        fetch_one=True,
+    )
+    return row["account_number"] if row else None
+
+
 # ---------------------------------------------------------------------------
 # Single-account / single-fund mutators
 # ---------------------------------------------------------------------------
@@ -776,35 +842,30 @@ def ensure_seed() -> List[str]:
     """Idempotent seed for first launch.
 
     Creates the canonical demo churches ('grace_umc', 'holy_comforter')
-    if they do not yet exist. Returns the list of church_ids that were
-    actually created (may be empty on subsequent calls).
+    from YAML seed files if they do not yet exist.
+    Returns the list of church_ids that were actually created (may be empty on subsequent calls).
 
-    The actual seed data lives in the legacy tools.coa_store module which
-    builds full AccountingContext objects; we delegate construction there
-    and persist via save_accounting_context().
+    Seed data is stored in backend/db/seeds/*.yaml files, not in Python code.
+    This decouples data from source code.
     """
     created: List[str] = []
 
+    # Map church IDs to their YAML seed files
     seeds = (
-        ("grace_umc", "seed_sample_church"),
-        ("holy_comforter", "seed_holy_comforter"),
+        ("grace_umc", "grace_umc.yaml"),
+        ("holy_comforter", "holy_comforter.yaml"),
     )
 
-    for church_id, builder_name in seeds:
+    for church_id, yaml_filename in seeds:
         if _try_resolve_church_pk(church_id) is not None:
             continue
         try:
-            from ..tools import coa_store as _legacy  # type: ignore
-            builder = getattr(_legacy, builder_name, None)
-            if builder is None:
-                continue
-            ctx = builder()
-            # Force the church_id to match expected key
-            if getattr(ctx, "church_id", None) != church_id:
-                try:
-                    ctx.church_id = church_id  # pydantic v2 allows assignment
-                except Exception:
-                    pass
+            from . import seed_loader
+            ctx = seed_loader.load_seed_yaml(yaml_filename)
+            # Verify church_id matches
+            if ctx.church_id != church_id:
+                # Update to ensure consistency
+                ctx.church_id = church_id
             save_accounting_context(ctx)
             created.append(church_id)
         except Exception:
