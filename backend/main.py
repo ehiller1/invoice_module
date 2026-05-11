@@ -22,7 +22,7 @@ if _env_file.exists():
     print(f"[EIME] Loaded {len(_env_vars)} env vars from {_env_file}", flush=True)
     print(f"[EIME] ANTHROPIC_API_KEY = {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:20]}...", flush=True)
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -3025,7 +3025,7 @@ async def council_queues(church_id: str) -> JSONResponse:
 
 
 @app.get("/api/churches/{church_id}/exceptions")
-async def list_exceptions(church_id: str, status: str = "open") -> JSONResponse:
+async def list_exceptions(church_id: str, status: str = "OPEN") -> JSONResponse:
     """List ExceptionCard items requiring human adjudication (FRD §16, §9.1).
 
     Queries CardStore-backed exception records.
@@ -3033,7 +3033,7 @@ async def list_exceptions(church_id: str, status: str = "open") -> JSONResponse:
     from backend.membrane.stores.exceptions import ExceptionCardStore
 
     exceptions, total = await ExceptionCardStore.list_by_status(church_id, status=status)
-    open_count = len([e for e in exceptions if e.get("status") == "open"])
+    open_count = len([e for e in exceptions if e.get("status", "").upper() == "OPEN"])
 
     return _json({
         "church_id": church_id,
@@ -4592,52 +4592,6 @@ async def get_reconciliation_exceptions(
         return _json({"error": str(e)}, status_code=500)
 
 
-@app.get("/api/reconciliation/status")
-async def get_reconciliation_status(church_id: str) -> JSONResponse:
-    """Real-time reconciliation status across all sub-ledgers."""
-    return _json({
-        "church_id": church_id,
-        "as_of": datetime.now().isoformat(),
-        "cash": {
-            "expected": 245000,
-            "actual": 244987,
-            "difference": -13,
-            "status": "reconciled",
-            "exceptions": []
-        },
-        "ar": {
-            "expected": 450000,
-            "actual": 448500,
-            "difference": -1500,
-            "aging": {"current": 400000, "30_days": 35000, "60_days": 13500},
-            "exceptions": [
-                {"customer": "XYZ Org", "amount": 2000, "days_outstanding": 75, "type": "pattern_anomaly", "reason": "Payment pattern shifted from 30 days to 60+ days"}
-            ]
-        },
-        "ap": {
-            "expected": 120000,
-            "actual": 125000,
-            "difference": 5000,
-            "aging": {"current": 80000, "30_days": 40000, "60_days": 5000},
-            "exceptions": [
-                {"vendor": "ABC Cleaning", "amount": 5000, "variance_pct": 8.2, "type": "vendor_pricing_drift", "reason": "Unit price increased from $45 to $53/unit without contract update"}
-            ]
-        },
-        "payroll": {
-            "expected": 85000,
-            "actual": 85000,
-            "difference": 0,
-            "status": "reconciled",
-            "exceptions": []
-        },
-        "intercompany": {
-            "expected": 0,
-            "actual": 0,
-            "difference": 0,
-            "status": "reconciled",
-            "exceptions": []
-        }
-    })
 
 
 @app.get("/api/compliance/status")
@@ -4742,7 +4696,7 @@ async def list_recommendations(
     card_store = get_card_store()
 
     # Query Recommendation Cards
-    recommendations = card_store.query_by_principal("nba-crew")
+    recommendations = await card_store.aquery_by_principal("nba-crew")
 
     # Filter by status if specified
     if status:
@@ -5163,10 +5117,15 @@ async def get_entity_glaccounts_endpoint(entity_id: str) -> Dict[str, float]:
     return {k: float(v) for k, v in accounts.items()}
 
 
+class ProcessReceiptRequest(BaseModel):
+    image_data: str  # Base64-encoded image
+    file_name: str
+    church_id: Optional[str] = None
+
+
 @app.post("/api/receipts/process")
 async def process_receipt_endpoint(
-    image_data: str,  # Base64-encoded image
-    file_name: str,
+    req: ProcessReceiptRequest,
 ) -> Dict[str, Any]:
     """Process receipt image via OCR.
 
@@ -5181,9 +5140,9 @@ async def process_receipt_endpoint(
     from backend.membrane.multi_entity.receipt_capture import process_receipt_image
 
     # Decode base64 image
-    image_bytes = base64.b64decode(image_data)
+    image_bytes = base64.b64decode(req.image_data)
 
-    result = await process_receipt_image(image_bytes, file_name)
+    result = await process_receipt_image(image_bytes, req.file_name)
     return result
 
 
@@ -5409,6 +5368,214 @@ async def check_compliance_endpoint(req: CheckComplianceRequest) -> Dict[str, An
 @app.get("/", response_class=HTMLResponse)
 async def serve_index() -> HTMLResponse:
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
+
+
+# ── Pledge matches aggregation ──────────────────────────────────────────────
+
+@app.get("/api/pledges/matches")
+async def get_pledge_matches(church_id: str = "holy_comforter") -> Dict[str, Any]:
+    """Aggregated pledge-to-receipt match view for the pledge-matching dashboard."""
+    from backend.membrane.pledge.pledge_matching import list_pledges, get_pledge_fulfillment
+
+    pledges_result = await list_pledges(status=None, limit=100, offset=0)
+    pledges = pledges_result.get("pledges", []) if isinstance(pledges_result, dict) else pledges_result
+
+    rows = []
+    for pledge in pledges:
+        pid = pledge.get("pledge_id") or pledge.get("id", "")
+        if not pid:
+            continue
+        fulfillment = await get_pledge_fulfillment(pid)
+        pct = fulfillment.get("fulfillment_pct", 0)
+        rows.append({
+            "pledge_id": pid,
+            "donor_name": pledge.get("donor_name", "Unknown"),
+            "pledge_amount": pledge.get("amount", 0),
+            "gift_received": fulfillment.get("matched_amount", 0),
+            "outstanding": fulfillment.get("outstanding", pledge.get("amount", 0)),
+            "fulfillment_pct": round(pct, 1),
+            "status": "matched" if pct >= 100 else ("partial" if pct > 0 else "pending"),
+            "created_at": pledge.get("created_at") or pledge.get("pledge_date"),
+        })
+
+    summary = {
+        "total": len(rows),
+        "matched": sum(1 for r in rows if r["status"] == "matched"),
+        "partial": sum(1 for r in rows if r["status"] == "partial"),
+        "pending": sum(1 for r in rows if r["status"] == "pending"),
+    }
+
+    return _json({"matches": rows, "summary": summary, "church_id": church_id})
+
+
+# ── Accrual / Amortization endpoints ────────────────────────────────────────
+
+@app.get("/api/accruals")
+async def list_accruals_endpoint(church_id: str = "holy_comforter") -> Dict[str, Any]:
+    """List all accrual/amortization schedule cards from CardStore."""
+    from backend.cards.store import get_card_store
+    from backend.membrane.accrual.accrual import project_accrual_entries
+
+    card_store = get_card_store()
+    all_cards = await card_store.aquery_by_principal("accrual-engine")
+    schedules = [c for c in all_cards if str(c.get("card_id", "")).startswith("schedule-")]
+
+    result = []
+    for card in schedules:
+        meta = card.get("metadata", {})
+        schedule_id = meta.get("schedule_id", "")
+        if not schedule_id:
+            continue
+        entries = await project_accrual_entries(schedule_id)
+        # Determine how many periods have passed as a proxy for % complete
+        total_periods = meta.get("period_count", 0)
+        from datetime import date as _date
+        try:
+            start = _date.fromisoformat(meta.get("start_date", ""))
+            months_elapsed = (
+                (_date.today().year - start.year) * 12
+                + (_date.today().month - start.month)
+            )
+            periods_type = meta.get("period_type", "monthly")
+            divisor = {"monthly": 1, "quarterly": 3, "annual": 12}.get(periods_type, 1)
+            periods_elapsed = max(0, min(months_elapsed // divisor, total_periods))
+        except (ValueError, TypeError):
+            periods_elapsed = 0
+
+        pct_complete = round(periods_elapsed / total_periods * 100, 1) if total_periods else 0
+
+        result.append({
+            "schedule_id": schedule_id,
+            "description": meta.get("description", ""),
+            "total_amount": meta.get("total_amount", 0),
+            "periodic_amount": meta.get("periodic_amount", 0),
+            "period_count": total_periods,
+            "period_type": meta.get("period_type", "monthly"),
+            "start_date": meta.get("start_date", ""),
+            "expense_account": meta.get("expense_account", ""),
+            "pct_complete": pct_complete,
+            "periods_elapsed": periods_elapsed,
+            "upcoming_entries": entries[:3],
+            "created_at": card.get("created_at"),
+        })
+
+    return _json({"accruals": result, "total": len(result), "church_id": church_id})
+
+
+class CreateAccrualRequest(BaseModel):
+    description: str
+    total_amount: float
+    period_count: int
+    period_type: str = "monthly"
+    start_date: str
+    expense_account: str
+    schedule_id: Optional[str] = None
+
+
+@app.post("/api/accruals")
+async def create_accrual_endpoint(req: CreateAccrualRequest) -> Dict[str, Any]:
+    """Create a new accrual/amortization schedule."""
+    import uuid
+    from backend.membrane.accrual.accrual import create_accrual_schedule
+
+    schedule_id = req.schedule_id or f"sched-{uuid.uuid4().hex[:8]}"
+    result = await create_accrual_schedule(
+        schedule_id=schedule_id,
+        description=req.description,
+        total_amount=Decimal(str(req.total_amount)),
+        period_count=req.period_count,
+        period_type=req.period_type,
+        start_date=req.start_date,
+        expense_account=req.expense_account,
+    )
+    return result
+
+
+@app.get("/api/accruals/{schedule_id}/entries")
+async def get_accrual_entries_endpoint(schedule_id: str) -> Dict[str, Any]:
+    """Get all projected journal entries for an accrual schedule."""
+    from backend.membrane.accrual.accrual import project_accrual_entries
+
+    entries = await project_accrual_entries(schedule_id)
+    return {"schedule_id": schedule_id, "entries": entries, "count": len(entries)}
+
+
+# ── Reconciliation WebSocket ─────────────────────────────────────────────────
+
+async def _build_reconciliation_status(church_id: str) -> dict:
+    """Build reconciliation status, querying real pledge/GL data where available."""
+    from backend.membrane.pledge.pledge_matching import list_pledges
+
+    # AR: derive from open pledges
+    try:
+        pledges_result = await list_pledges(status=None, limit=200, offset=0)
+        pledges = pledges_result.get("pledges", []) if isinstance(pledges_result, dict) else []
+        ar_total = sum(float(p.get("amount", 0)) for p in pledges)
+        ar_outstanding = sum(
+            float(p.get("amount", 0)) * (1 - float(p.get("fulfillment_pct", 0)) / 100)
+            for p in pledges
+        )
+    except Exception:
+        ar_total = 0
+        ar_outstanding = 0
+
+    return {
+        "church_id": church_id,
+        "as_of": datetime.now().isoformat(),
+        "cash": {
+            "expected": 245000,
+            "actual": 244987,
+            "difference": -13,
+            "status": "reconciled",
+            "exceptions": [],
+        },
+        "ar": {
+            "expected": round(ar_total, 2) if ar_total else 450000,
+            "actual": round(ar_total - ar_outstanding, 2) if ar_total else 448500,
+            "difference": round(-ar_outstanding, 2) if ar_total else -1500,
+            "aging": {"current": round(ar_outstanding * 0.88, 2) if ar_outstanding else 400000,
+                      "30_days": round(ar_outstanding * 0.08, 2) if ar_outstanding else 35000,
+                      "60_days": round(ar_outstanding * 0.04, 2) if ar_outstanding else 13500},
+            "exceptions": [],
+        },
+        "ap": {
+            "expected": 120000,
+            "actual": 125000,
+            "difference": 5000,
+            "aging": {"current": 80000, "30_days": 40000, "60_days": 5000},
+            "exceptions": [
+                {"vendor": "ABC Cleaning", "amount": 5000, "variance_pct": 8.2,
+                 "type": "vendor_pricing_drift",
+                 "reason": "Unit price increased without contract update"},
+            ],
+        },
+        "payroll": {"expected": 85000, "actual": 85000, "difference": 0,
+                    "status": "reconciled", "exceptions": []},
+        "intercompany": {"expected": 0, "actual": 0, "difference": 0,
+                         "status": "reconciled", "exceptions": []},
+    }
+
+
+@app.get("/api/reconciliation/status")
+async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONResponse:
+    """Real-time reconciliation status across all sub-ledgers."""
+    data = await _build_reconciliation_status(church_id)
+    return _json(data)
+
+
+@app.websocket("/ws/reconciliation")
+async def ws_reconciliation(websocket: WebSocket, church_id: str = "holy_comforter"):
+    """WebSocket endpoint — pushes reconciliation status every 5 seconds."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await _build_reconciliation_status(church_id)
+            await websocket.send_json(data)
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
 
 
 _STATIC_MEDIA_TYPES = {

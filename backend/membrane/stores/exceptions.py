@@ -62,7 +62,7 @@ class ExceptionCardStore:
             "suggested_action": suggested_action or {},
             "job_id": job_id,
             "assigned_to": assigned_to,
-            "status": "open",
+            "status": "OPEN",
             "created_at": datetime.utcnow().isoformat(),
             "resolved_at": None,
             "resolution": None,
@@ -108,7 +108,7 @@ class ExceptionCardStore:
     @staticmethod
     async def list_by_status(
         church_id: str,
-        status: str = "open",
+        status: str = "OPEN",
         limit: int = 100,
         offset: int = 0,
     ) -> tuple[List[Dict[str, Any]], int]:
@@ -116,7 +116,7 @@ class ExceptionCardStore:
 
         Args:
             church_id: Church identifier
-            status: Filter by status (open, resolved)
+            status: Filter by status (OPEN, RESOLVED) — uppercase
             limit: Number of results
             offset: Pagination offset
 
@@ -125,12 +125,12 @@ class ExceptionCardStore:
         """
         card_store = get_card_store()
 
-        all_cards = card_store.query_by_principal(ExceptionCardStore.PRINCIPAL)
+        all_cards = await card_store.aquery_by_principal(ExceptionCardStore.PRINCIPAL)
         filtered = [
             c
             for c in all_cards
             if c.get("metadata", {}).get("church_id") == church_id
-            and c.get("metadata", {}).get("status") == status
+            and c.get("metadata", {}).get("status", "").upper() == status.upper()
         ]
 
         total = len(filtered)
@@ -143,7 +143,7 @@ class ExceptionCardStore:
                     "exception_type": c.get("metadata", {}).get("exception_type"),
                     "title": c.get("metadata", {}).get("title"),
                     "description": c.get("metadata", {}).get("description"),
-                    "status": c.get("metadata", {}).get("status"),
+                    "status": (c.get("metadata", {}).get("status") or "OPEN").upper(),
                     "assigned_to": c.get("metadata", {}).get("assigned_to"),
                     "created_at": c.get("created_at"),
                 }
@@ -165,13 +165,13 @@ class ExceptionCardStore:
         """
         card_store = get_card_store()
 
-        card = card_store.read(card_id)
+        card = await card_store.aread(card_id)
         if not card:
             logger.warning("Card %s not found for resolution", card_id)
             return
 
         metadata = card.get("metadata", {})
-        metadata["status"] = "resolved"
+        metadata["status"] = "RESOLVED"
         metadata["resolved_at"] = datetime.utcnow().isoformat()
         metadata["resolution"] = resolution
 

@@ -4,6 +4,7 @@ All cards stored as JSONL with optional SHA-256 chain immutability.
 Supports queries by card_type, principal, period, created_at range.
 """
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -379,6 +380,37 @@ class CardStore:
                 if metadata.get(field) == value:
                     results.append(card_dict)
         return results
+
+    # ── Async-safe I/O (use these from async endpoints) ─────────────────────
+
+    def _read_all_sync(self) -> list[dict]:
+        """Read every JSONL line into a list. Runs in a thread via run_in_executor."""
+        if not self.store_file.exists():
+            return []
+        result = []
+        with open(self.store_file, "r") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        result.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+        return result
+
+    async def aquery_by_principal(self, principal: str) -> list[dict]:
+        """Async, non-blocking version of query_by_principal."""
+        loop = asyncio.get_event_loop()
+        all_cards = await loop.run_in_executor(None, self._read_all_sync)
+        return [c for c in all_cards if c.get("principal") == principal]
+
+    async def aread(self, card_id: str) -> Optional[dict]:
+        """Async, non-blocking version of read."""
+        loop = asyncio.get_event_loop()
+        all_cards = await loop.run_in_executor(None, self._read_all_sync)
+        for c in all_cards:
+            if c.get("card_id") == card_id:
+                return c
+        return None
 
 
 # Singleton

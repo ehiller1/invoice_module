@@ -128,7 +128,7 @@ class PolicyCardStore:
         """
         card_store = get_card_store()
 
-        all_cards = card_store.query_by_principal(PolicyCardStore.PRINCIPAL)
+        all_cards = await card_store.aquery_by_principal(PolicyCardStore.PRINCIPAL)
         filtered = [
             c
             for c in all_cards
