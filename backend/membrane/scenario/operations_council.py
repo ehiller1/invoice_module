@@ -91,7 +91,7 @@ async def get_council_kpis(
         },
         "policy_violations": {
             "total_count": violation_count,
-            "by_type": _categorize_violations(signals_in_period),
+            "by_type": _categorize_policy_signals(signals_in_period),
             "critical": max(0, violation_count - 2),  # Critical if > 2
         },
         "budget_metrics": {
@@ -137,8 +137,8 @@ async def get_queue_status() -> Dict[str, Any]:
         if s.get("content") and "exception" in s.get("content", "").lower()
     ]
 
-    # Count policy violations
-    violations = [
+    # Count policy-related signals (signals containing "policy" keywords)
+    policy_signals = [
         s for s in all_signals
         if s.get("content") and "policy" in s.get("content", "").lower()
     ]
@@ -165,8 +165,8 @@ async def get_queue_status() -> Dict[str, Any]:
             "aging": len([e for e in exceptions if _is_aging(e)]),
         },
         "policy_violations": {
-            "total": len(violations),
-            "pending_review": len([v for v in violations if not _is_resolved(v)]),
+            "total": len(policy_signals),
+            "pending_review": len([v for v in policy_signals if not _is_resolved(v)]),
         },
         "questions_pending": len(questions),
         "recommendations": {
@@ -194,8 +194,8 @@ def _count_aging_exceptions(signals: List[Dict[str, Any]]) -> int:
     return aging
 
 
-def _categorize_violations(signals: List[Dict[str, Any]]) -> Dict[str, int]:
-    """Categorize policy violations by type."""
+def _categorize_policy_signals(signals: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Categorize policy-related signals by keyword matching."""
     categories = {}
     for signal in signals:
         content = signal.get("content", "").lower()
