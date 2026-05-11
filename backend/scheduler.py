@@ -15,7 +15,7 @@ warning and becomes a no-op) so dev environments without the package boot.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 logger = logging.getLogger("eime.scheduler")
@@ -208,7 +208,6 @@ def draft_recurring_jes() -> None:
     derived from the template_je. Updates last_drafted_at.
     """
     import json
-    from datetime import datetime as _dt
     from pathlib import Path
     from .models.schemas import JournalEntry, JEStatus
 
@@ -216,7 +215,7 @@ def draft_recurring_jes() -> None:
     if not data_dir.exists():
         return
 
-    now = _dt.utcnow()
+    now = datetime.now(timezone.utc)
     for f in data_dir.glob("recurring_*.jsonl"):
         cid = f.stem.replace("recurring_", "")
         # Read latest record per recurring_id.

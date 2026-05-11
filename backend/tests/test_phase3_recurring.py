@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import io
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -145,7 +145,7 @@ def test_scheduler_drafts_recurring_je(tmp_path, monkeypatch):
     # Simpler: write a recurring file to the real data dir, run, clean up.
     real_data = Path(sched_mod.__file__).resolve().parent / "data"
     real_data.mkdir(parents=True, exist_ok=True)
-    cid = f"sched_test_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    cid = f"sched_test_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     rec = {
         "recurring_id": f"REC-{cid}",
         "church_id": cid,
