@@ -50,9 +50,9 @@
       },
       {
         id: 'scenario-1',
-        name: 'Top 3 Customers -20%',
-        description: 'What if top 3 customers cut spend by 20%?',
-        parameters: { customer_loss_rate: 0.2, affected_customers: 3 },
+        name: 'Top 3 Donors Give 20% Less',
+        description: 'What if top 3 giving households reduce pledges by 20%?',
+        parameters: { donor_loss_rate: 0.2, affected_donors: 3 },
         results: {
           covenant_impact: [
             { covenant: 'Debt-to-Equity', current: 0.72, projected: 0.89, threshold: 1.5, p_breach: 15 },
@@ -72,7 +72,7 @@
           levers: [
             { lever: 'Reduce OPEX by 8%', impact: '+60bps margin', timing: 'immediate', difficulty: 'medium' },
             { lever: 'Extend payables by 15 days', impact: '+$35K cash', timing: '2-4 weeks', difficulty: 'easy' },
-            { lever: 'Customer retention campaign', impact: 'recover 5% spend', timing: '4-8 weeks', difficulty: 'hard' }
+            { lever: 'Stewardship outreach to lapsed donors', impact: 'recover 5% giving', timing: '4-8 weeks', difficulty: 'hard' }
           ]
         }
       },
