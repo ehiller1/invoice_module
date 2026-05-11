@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional
 
 from . import coa_store
+from .. import config
 from ..models import (
     AccountingContext, ClassifiedLineItem, DraftLineAllocation,
     DraftAllocations, InvoiceDocument, Posting, RestrictionClass,
@@ -11,7 +12,8 @@ from ..models import (
 
 
 CENTS = Decimal("0.01")
-AP_ACCOUNT = "2010"  # Accounts Payable
+# Get AP account number from config (centralized, not hard-coded)
+AP_ACCOUNT = config.AP_ACCOUNT
 
 
 def _find_account(ctx: AccountingContext, account_number: str) -> Optional[Dict]:
