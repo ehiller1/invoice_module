@@ -269,6 +269,54 @@ class CardStore:
                 results.append(json.loads(line))
         return results
 
+    def query_by_tags(self, tags: list[str]) -> list[dict]:
+        """Get all cards with any of the specified tags in metadata.
+
+        Args:
+            tags: List of tag strings to search for (OR logic)
+
+        Returns:
+            List of matching card dicts
+        """
+        results = []
+        if not self.store_file.exists():
+            return results
+
+        with open(self.store_file, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                card_dict = json.loads(line)
+                card_tags = card_dict.get("metadata", {}).get("tags", [])
+                # Check if any of the requested tags are present
+                if any(tag in card_tags for tag in tags):
+                    results.append(card_dict)
+        return results
+
+    def query_by_metadata(self, field: str, value: any) -> list[dict]:
+        """Get all cards where a metadata field matches a value.
+
+        Args:
+            field: Metadata field name (e.g., "pledge_id", "policy_id", "principal")
+            value: Value to match (exact match)
+
+        Returns:
+            List of matching card dicts
+        """
+        results = []
+        if not self.store_file.exists():
+            return results
+
+        with open(self.store_file, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                card_dict = json.loads(line)
+                metadata = card_dict.get("metadata", {})
+                if metadata.get(field) == value:
+                    results.append(card_dict)
+        return results
+
 
 # Singleton
 _card_store: Optional[CardStore] = None
