@@ -37,6 +37,15 @@ from .decision_ledger import DecisionLedger, DecisionCategory, DecisionOutcome, 
 from .db import processing_job_store, decision_ledger_store
 from .events.emitter import emit_event
 from .events.schemas import EventType, FinancialEvent, TagKind
+from .membrane.emitters import (
+    emit_invoice_ingested as _emit_invoice_ingested,
+    emit_mapping_confidence_low as _emit_mapping_confidence_low,
+    emit_budget_overage_risk as _emit_budget_overage_risk,
+    emit_fund_restriction_violation as _emit_fund_restriction_violation,
+    emit_journal_entry_ready as _emit_journal_entry_ready,
+    emit_payment_dedup_risk as _emit_payment_dedup_risk,
+    emit_policy_violation as _emit_policy_violation,
+)
 
 
 def get_ledger(church_id: str) -> DecisionLedger:
@@ -129,6 +138,18 @@ async def run_pipeline(job_id: str) -> None:
             "status": "EXTRACTING",
             "detail": f"Extracted {len(invoice.line_items)} line items from {job.filename}",
         })
+
+        # Membrane Phase 5: INVOICE_INGESTED (signal 59)
+        try:
+            _emit_invoice_ingested(
+                signal_id=job.job_id,
+                filename=job.filename,
+                vendor=invoice.vendor_name,
+                total_amount=str(invoice.total_amount),
+                job_id=job.job_id,
+            )
+        except Exception:
+            pass
 
         # Decision ledger — extraction confidence (RECOGNIZE membrane)
         _ledger_append(job.church_id, LedgerEntry(
@@ -367,6 +388,25 @@ async def run_pipeline(job_id: str) -> None:
                 metadata={"lines_mapped": len(draft_placeholder.lines)},
             ))
 
+        # Membrane Phase 5: MAPPING_CONFIDENCE_LOW (signal 60)
+        try:
+            if draft_placeholder and draft_placeholder.lines:
+                _threshold = float(os.environ.get("EMBARK_MAPPING_LOW_THRESHOLD", "0.7"))
+                for _dl in draft_placeholder.lines:
+                    _conf = float(getattr(_dl, "confidence", 1.0) or 1.0)
+                    if _conf < _threshold:
+                        _first_acc = ""
+                        if getattr(_dl, "postings", None):
+                            _first_acc = getattr(_dl.postings[0], "account_number", "") or ""
+                        _emit_mapping_confidence_low(
+                            account=_first_acc,
+                            confidence=_conf,
+                            suggestion=getattr(_dl, "line_id", None),
+                            job_id=job.job_id,
+                        )
+        except Exception:
+            pass
+
         # Step 7: Allocation review
         _update_job(job, ProcessingStatus.REVIEWING)
         await asyncio.sleep(0)
@@ -421,6 +461,28 @@ async def run_pipeline(job_id: str) -> None:
                 "warning": len(warn),
                 "total_lines_checked": len(budget_results),
             })
+
+            # Membrane Phase 5: BUDGET_OVERAGE_RISK (signal 61)
+            for _b in over:
+                try:
+                    _emit_budget_overage_risk(
+                        account=_b.account_number,
+                        amount=str(getattr(_b, "amount_on_line", "0")),
+                        projected_balance=str(_b.ytd_actual),
+                        job_id=job.job_id,
+                    )
+                except Exception:
+                    pass
+                # Membrane Phase 5: POLICY_VIOLATION (signal 68) — budget gate policy
+                try:
+                    _emit_policy_violation(
+                        policy_id="budget.overage_threshold",
+                        rule_violated=f"account {_b.account_number} over budget",
+                        entity_affected=getattr(_b, "line_id", "") or _b.account_number,
+                        job_id=job.job_id,
+                    )
+                except Exception:
+                    pass
 
             # Phase 6: Emit BudgetThresholdCrossed events for alerts
             for b in warn + over:
@@ -742,6 +804,17 @@ async def _build_and_emit(
                 m in r for r in rl.reasons for m in _FUND_RESTRICTION_MARKERS
             ):
                 violating.append(rl.line_id)
+        # Membrane Phase 5: FUND_RESTRICTION_VIOLATION (signal 62, HARD_BLOCK)
+        try:
+            _emit_fund_restriction_violation(
+                fund="(multiple)",
+                restriction_type="donor_restricted",
+                violation_detail=f"{len(violating)} line(s): {','.join(violating)}",
+                job_id=job.job_id,
+            )
+        except Exception:
+            pass
+
         _update_job(job, ProcessingStatus.BLOCKED_FUND_RESTRICTION)
         job.audit_log.append({
             "ts": datetime.utcnow().isoformat(),
@@ -786,6 +859,25 @@ async def _build_and_emit(
         job.accounting_context, hitl_decisions,
     )
     job.journal_entry = je
+
+    # Membrane Phase 5: JOURNAL_ENTRY_READY (signal 63, P0 SENSITIVE)
+    try:
+        _emit_journal_entry_ready(
+            je_id=je.entry_id,
+            account_entries=[
+                {"account": getattr(_l, "account_number", ""),
+                 "fund": getattr(_l, "fund_name", "")}
+                for _l in (je.lines or [])
+            ],
+            amounts={
+                "total_debits": str(je.total_debits),
+                "total_credits": str(je.total_credits),
+                "balanced": bool(je.balanced),
+            },
+            job_id=job.job_id,
+        )
+    except Exception:
+        pass
 
     _update_job(job, ProcessingStatus.EMITTED)
     job.audit_log.append({

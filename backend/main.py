@@ -90,6 +90,28 @@ app.add_middleware(
 # Setup wizard endpoints (/api/setup/*)
 app.include_router(_setup_wizard.router)
 
+# Phase 5: Queue action endpoints + reconciliation latest
+try:
+    from .routes import exceptions as _phase5_exceptions
+    from .routes import questions as _phase5_questions
+    from .routes import policies as _phase5_policies
+    from .routes import reconciliation as _phase5_reconciliation
+    app.include_router(_phase5_exceptions.router)
+    app.include_router(_phase5_questions.router)
+    app.include_router(_phase5_policies.router)
+    app.include_router(_phase5_reconciliation.router)
+except Exception as _phase5_err:  # pragma: no cover - defensive
+    import logging as _l
+    _l.getLogger("eime.phase5").warning("Phase 5 routers failed to mount: %r", _phase5_err)
+
+# Phase 6: HITL decision endpoint (/v2/hitl/{id}/decision)
+try:
+    from .routes import hitl as _phase6_hitl
+    app.include_router(_phase6_hitl.router)
+except Exception as _phase6_err:  # pragma: no cover - defensive
+    import logging as _l
+    _l.getLogger("eime.phase6").warning("Phase 6 HITL router failed to mount: %r", _phase6_err)
+
 
 @app.on_event("startup")
 async def startup() -> None:
@@ -3152,19 +3174,48 @@ async def answer_question(body: Dict[str, Any]) -> JSONResponse:
     intent = body.get("intent")
     query = body.get("query", "")
     church_id = body.get("church_id", "holy_comforter")
+    question_id = body.get("question_id")
+    context = body.get("context", {})
 
-    # Phase 4: Template-based answers
-    # Phase 5: Would call Claude API with intent-specific prompt
-
-    return _json({
-        "church_id": church_id,
-        "query": query,
-        "intent": intent,
-        "answer": f"Phase 4 placeholder: Answer to '{intent}' intent coming in Phase 5",
-        "provenance": [],
-        "follow_ons": generate_follow_on_suggestions(intent),
-        "message": "Answer generation ready for Phase 5 (Claude API integration)"
-    })
+    # Phase 5: cascade-driven analytical answer generation.
+    try:
+        from .routes.questions import _generate_analytical_answer
+        from .tools import question_store
+        gen = _generate_analytical_answer(query, context if isinstance(context, dict) else {})
+        if question_id:
+            try:
+                question_store.record_answer(
+                    church_id, question_id,
+                    answer=gen["answer"],
+                    answerer="cascade",
+                    confidence=gen.get("confidence"),
+                    reasoning=gen.get("reasoning"),
+                    source=gen.get("source", "cascade"),
+                )
+            except Exception:
+                pass
+        return _json({
+            "church_id": church_id,
+            "query": query,
+            "intent": intent,
+            "question_id": question_id,
+            "answer": gen["answer"],
+            "confidence": gen.get("confidence"),
+            "reasoning": gen.get("reasoning"),
+            "provenance": [],
+            "follow_ons": generate_follow_on_suggestions(intent),
+        })
+    except Exception as _exc:
+        return _json({
+            "church_id": church_id,
+            "query": query,
+            "intent": intent,
+            "answer": f"(fallback) {query}",
+            "confidence": 0.0,
+            "reasoning": f"cascade unavailable: {_exc!r}",
+            "provenance": [],
+            "follow_ons": generate_follow_on_suggestions(intent),
+        })
 
 
 # ---------- Cabinet Surface (FRD §16.5, Personal Cabinet) ----------

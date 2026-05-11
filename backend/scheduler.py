@@ -48,6 +48,57 @@ def _business_days_between(start: datetime, end: datetime) -> int:
     return max(0, days - 1)
 
 
+def emit_approval_deadline_pressure_now(window_label: str) -> None:
+    """Membrane Phase 5: emit APPROVAL_DEADLINE_PRESSURE (signal 66).
+
+    Called by the 15:00 and 17:00 cron triggers. Computes queue length and
+    oldest item age from jobs in PENDING_BUDGET_OWNER / PENDING_TREASURER.
+    """
+    try:
+        from . import flow
+        from .models.schemas import ProcessingStatus
+        from .membrane.emitters import emit_approval_deadline_pressure
+    except Exception:
+        return
+
+    try:
+        all_jobs = flow.list_jobs() if hasattr(flow, "list_jobs") else []
+    except Exception:
+        all_jobs = []
+
+    pending_states = {
+        getattr(ProcessingStatus, "PENDING_BUDGET_OWNER", None),
+        getattr(ProcessingStatus, "PENDING_TREASURER", None),
+        getattr(ProcessingStatus, "PENDING_HITL", None),
+    }
+    pending = [j for j in all_jobs if j.status in pending_states]
+    now = datetime.utcnow()
+    oldest_age_days = 0.0
+    for j in pending:
+        started = getattr(j, "pending_approval_started_at", None) or j.updated_at
+        if started:
+            age = (now - started).total_seconds() / 86400.0
+            if age > oldest_age_days:
+                oldest_age_days = age
+
+    try:
+        emit_approval_deadline_pressure(
+            queue_length=len(pending),
+            oldest_item_age_days=oldest_age_days,
+            window_label=window_label,
+        )
+    except Exception:
+        pass
+
+
+def emit_deadline_pressure_3pm() -> None:
+    emit_approval_deadline_pressure_now("15:00")
+
+
+def emit_deadline_pressure_5pm() -> None:
+    emit_approval_deadline_pressure_now("17:00")
+
+
 def check_pending_approvals() -> None:
     """Hourly job: scan jobs, send reminders, escalate."""
     # Local imports to avoid circular import at module load time.
@@ -300,6 +351,23 @@ def start_scheduler() -> None:
         "interval",
         minutes=30,
         id="plaid_sync",
+        replace_existing=True,
+    )
+    # Membrane Phase 5: APPROVAL_DEADLINE_PRESSURE emissions at 15:00 and 17:00.
+    _scheduler.add_job(
+        emit_deadline_pressure_3pm,
+        "cron",
+        hour="15",
+        minute="0",
+        id="membrane_deadline_3pm",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        emit_deadline_pressure_5pm,
+        "cron",
+        hour="17",
+        minute="0",
+        id="membrane_deadline_5pm",
         replace_existing=True,
     )
     _scheduler.start()

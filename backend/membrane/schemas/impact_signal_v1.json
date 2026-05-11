@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://embark.local/schemas/impact_signal_v1.json",
+  "title": "ImpactSignal",
+  "description": "Frozen v1 envelope for signals emitted onto the Embark Membrane. New fields require a new envelope version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_version",
+    "signal_id",
+    "signal_name",
+    "event_id",
+    "occurred_at",
+    "privacy_class",
+    "crosses_membrane",
+    "target_channel",
+    "payload",
+    "source"
+  ],
+  "properties": {
+    "envelope_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "signal_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "signal_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "privacy_class": {
+      "type": "string",
+      "enum": ["P0", "P1"]
+    },
+    "crosses_membrane": {
+      "type": "boolean"
+    },
+    "target_channel": {
+      "type": "string",
+      "pattern": "^impact:[a-z_]+:[a-z0-9_]+$"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlation_id": {
+      "type": ["string", "null"]
+    },
+    "retention": {
+      "type": ["string", "null"]
+    }
+  }
+}
