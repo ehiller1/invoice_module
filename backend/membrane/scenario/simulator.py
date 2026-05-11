@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Dict, Any, Optional
 
 from backend.cards.store import get_card_store
-from backend.cards.schemas import PlanCard
+from backend.cards.schemas import ScenarioCard
 from backend.membrane.scenario.scenario_card import ScenarioType
 
 logger = logging.getLogger(__name__)
@@ -52,34 +52,36 @@ async def simulate_scenario(
     # Analyze impact
     impact_summary = _analyze_impact(base_gl, projected_gl, assumptions)
 
-    # Create Plan Card for scenario (temporary GL projection)
+    # Create Scenario Card
     scenario_id = f"scenario-{scenario_name.lower().replace(' ', '-')}"
-    plan_card = PlanCard(
-        card_id=f"scenario-{datetime.utcnow().timestamp()}",
+    scenario_card = ScenarioCard(
+        card_id=scenario_id,
         principal="scenario-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
-        period=datetime.utcnow().isoformat(),
-        accounts=projected_gl,
-        assumptions={
-            **assumptions,
-            "scenario_name": scenario_name,
-            "scenario_type": scenario_type.value,
-            "base_gl": {k: str(v) for k, v in base_gl.items()},
-            "changes": {k: str(v) for k, v in changes.items()},
-            "scenario_id": scenario_id,
-        },
-        scenario=scenario_type.value,
+        scenario_id=scenario_id,
+        scenario_name=scenario_name,
+        scenario_type=scenario_type.value,
+        period=datetime.utcnow().isoformat()[:10],  # Just the date part
+        base_gl=base_gl,
+        projected_gl=projected_gl,
+        changes=changes,
+        affected_accounts=impact_summary.get("affected_accounts", 0),
+        variance_pct=impact_summary.get("variance_pct", 0.0),
+        metadata={
+            "assumptions": assumptions,
+            "impact_summary": impact_summary,
+        }
     )
 
     # Write to Card Store
-    card_store.write(plan_card, chain=True)
+    card_store.write(scenario_card, chain=True)
 
     logger.info(f"Created scenario {scenario_id}")
 
     return {
         "scenario_id": scenario_id,
-        "card_id": plan_card.card_id,
+        "card_id": scenario_card.card_id,
         "name": scenario_name,
         "base_gl": {k: float(v) for k, v in base_gl.items()},
         "projected_gl": {k: float(v) for k, v in projected_gl.items()},
@@ -121,19 +123,10 @@ def _analyze_impact(
 async def get_scenario(scenario_id: str) -> Optional[Dict[str, Any]]:
     """Retrieve a scenario by ID."""
     card_store = get_card_store()
-    scenarios = card_store.query_by_principal("scenario-engine")
+    card = card_store.read(scenario_id)
 
-    for scenario in scenarios:
-        # Check if scenario_id is at top level or nested in assumptions
-        if scenario.get("scenario_id") == scenario_id:
-            return scenario
-        # Check in assumptions field (where it's actually stored)
-        assumptions = scenario.get("assumptions", {})
-        if isinstance(assumptions, dict) and assumptions.get("scenario_id") == scenario_id:
-            # Return a properly formatted scenario with scenario_id at top level
-            result = dict(scenario)
-            result["scenario_id"] = scenario_id
-            return result
+    if card and card.get("card_type") == "scenario":
+        return card
 
     return None
 
@@ -145,7 +138,11 @@ async def list_scenarios(
 ) -> Dict[str, Any]:
     """List scenarios with optional filtering."""
     card_store = get_card_store()
-    scenarios = card_store.query_by_principal("scenario-engine")
+
+    # Query all scenario cards by type
+    scenarios = []
+    all_cards = card_store.query_by_principal("scenario-engine")
+    scenarios = [c for c in all_cards if c.get("card_type") == "scenario"]
 
     # Filter by status if specified
     if status:

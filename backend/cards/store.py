@@ -5,13 +5,13 @@ Supports queries by card_type, principal, period, created_at range.
 """
 
 import json
-import hashlib
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from .schemas import Card
+from .chain import compute_hash, compute_chain_hash, verify_chain
 
 
 class CardStore:
@@ -31,21 +31,11 @@ class CardStore:
 
     def _compute_hash(self, card_dict: dict) -> str:
         """Compute SHA-256 hash of card data for chain immutability."""
-        # Serialize deterministically (sorted keys, no whitespace)
-        serialized = json.dumps(card_dict, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(serialized.encode()).hexdigest()
+        return compute_hash(card_dict)
 
     def _compute_chain_hash(self, card_dict: dict, prior_hash: Optional[str]) -> str:
         """Compute chained hash: hash(current_card + prior_hash)."""
-        # Clean dict first (no hash fields)
-        clean_dict = {
-            k: v for k, v in card_dict.items() if not k.startswith("_")
-        }
-        chain_input = clean_dict.copy()
-        if prior_hash:
-            chain_input['_prior_hash'] = prior_hash
-        serialized = json.dumps(chain_input, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(serialized.encode()).hexdigest()
+        return compute_chain_hash(card_dict, prior_hash)
 
     def write(self, card: Card, chain: bool = True) -> str:
         """Write a card to store.

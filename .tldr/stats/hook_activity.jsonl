@@ -438,3 +438,79 @@
 {"hook_name": "tldr-read-enforcer", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"reads_intercepted": 3, "layers_returned": 6}, "timestamp": "2026-05-11T13:50:51.300531+00:00"}
 {"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:51:45.651056+00:00"}
 {"hook_name": "post-edit-diagnostics", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_analyzed": 3, "type_errors": 0, "lint_issues": 2}, "timestamp": "2026-05-11T13:51:45.651056+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:55:40.230012+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 4, "lint_issues": 2}, "timestamp": "2026-05-11T13:55:40.230012+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"reads_intercepted": 2, "layers_returned": 4}, "timestamp": "2026-05-11T13:55:40.230012+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:56:19.101371+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 1, "lint_issues": 6}, "timestamp": "2026-05-11T13:56:19.101371+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"reads_intercepted": 2, "layers_returned": 4}, "timestamp": "2026-05-11T13:56:19.101371+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:57:11.845534+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 1, "lint_issues": 2}, "timestamp": "2026-05-11T13:57:11.845534+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 2}, "timestamp": "2026-05-11T13:57:11.845534+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:57:52.674015+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_analyzed": 3, "type_errors": 1, "lint_issues": 4}, "timestamp": "2026-05-11T13:57:52.674015+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T13:58:41.446950+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 4}, "timestamp": "2026-05-11T13:58:41.446950+00:00"}
+{"hook_name": "import-validator", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"writes_validated": 1, "warnings_found": 1}, "timestamp": "2026-05-11T13:58:41.446950+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:04:36.652037+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 1, "lint_issues": 1}, "timestamp": "2026-05-11T14:04:36.652037+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 5}, "timestamp": "2026-05-11T14:04:36.652037+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:09:06.771309+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 1, "lint_issues": 0}, "timestamp": "2026-05-11T14:09:06.771309+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 173}, "timestamp": "2026-05-11T14:09:06.771309+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:10:28.286760+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 121, "lint_issues": 26}, "timestamp": "2026-05-11T14:10:28.286760+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:13:57.377611+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_analyzed": 3, "type_errors": 46, "lint_issues": 14}, "timestamp": "2026-05-11T14:13:57.377611+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:16:04.564446+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:16:04.564446+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 6}, "timestamp": "2026-05-11T14:16:04.564446+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:16:58.460416+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 4, "successes": 4, "failures": 0, "metrics": {"edits_analyzed": 4, "type_errors": 16, "lint_issues": 3}, "timestamp": "2026-05-11T14:16:58.460416+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:19:39.028308+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 1, "lint_issues": 0}, "timestamp": "2026-05-11T14:19:39.028308+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:21:01.738802+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 1, "lint_issues": 2}, "timestamp": "2026-05-11T14:21:01.738802+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 4}, "timestamp": "2026-05-11T14:21:01.738802+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"reads_intercepted": 2, "layers_returned": 4}, "timestamp": "2026-05-11T14:21:01.738802+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:22:32.316962+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 3, "lint_issues": 0}, "timestamp": "2026-05-11T14:22:32.316962+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:23:49.056573+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 2}, "timestamp": "2026-05-11T14:23:49.056573+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 8}, "timestamp": "2026-05-11T14:23:49.056573+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:25:49.846764+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 0, "lint_issues": 0}, "timestamp": "2026-05-11T14:25:49.846764+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 8}, "timestamp": "2026-05-11T14:25:49.846764+00:00"}
+{"hook_name": "signature-helper", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_checked": 1, "signatures_found": 1}, "timestamp": "2026-05-11T14:25:49.846764+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:26:15.450458+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_analyzed": 3, "type_errors": 2, "lint_issues": 1}, "timestamp": "2026-05-11T14:26:15.450458+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 4}, "timestamp": "2026-05-11T14:26:15.450458+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:26:44.949784+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:26:44.949784+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:27:46.898423+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 0, "lint_issues": 0}, "timestamp": "2026-05-11T14:27:46.898423+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 181}, "timestamp": "2026-05-11T14:27:46.898423+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:28:24.276595+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_analyzed": 3, "type_errors": 2, "lint_issues": 2}, "timestamp": "2026-05-11T14:28:24.276595+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:28:42.771502+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 2}, "timestamp": "2026-05-11T14:28:42.771502+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 5}, "timestamp": "2026-05-11T14:28:42.771502+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:29:49.949653+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:29:49.949653+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 178}, "timestamp": "2026-05-11T14:29:49.949653+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:30:10.758082+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:30:10.758082+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 4}, "timestamp": "2026-05-11T14:30:10.758082+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:42:05.957676+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:42:05.957676+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 3}, "timestamp": "2026-05-11T14:42:05.957676+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"reads_intercepted": 1, "layers_returned": 2}, "timestamp": "2026-05-11T14:42:05.957676+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"reads_intercepted": 3, "layers_returned": 6}, "timestamp": "2026-05-11T14:42:14.846090+00:00"}
+{"hook_name": "smart-search-router", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"queries_routed": 2, "literal_queries": 2}, "timestamp": "2026-05-11T14:42:14.846090+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 1}, "timestamp": "2026-05-11T14:45:48.159608+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_analyzed": 2, "type_errors": 2, "lint_issues": 6}, "timestamp": "2026-05-11T14:45:48.159608+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_processed": 1, "symbols_shown": 2}, "timestamp": "2026-05-11T14:45:48.159608+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_notified": 1, "reindexes_triggered": 0}, "timestamp": "2026-05-11T14:46:55.092583+00:00"}
+{"hook_name": "post-edit-diagnostics", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"edits_analyzed": 1, "type_errors": 0, "lint_issues": 1}, "timestamp": "2026-05-11T14:46:55.092583+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 12}, "timestamp": "2026-05-11T14:46:55.092583+00:00"}
+{"hook_name": "tldr-read-enforcer", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"reads_intercepted": 1, "layers_returned": 2}, "timestamp": "2026-05-11T14:46:55.092583+00:00"}

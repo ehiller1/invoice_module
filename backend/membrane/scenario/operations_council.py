@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Dict, Any, Optional, List
 
 from backend.cards.store import get_card_store
+from backend.cards.schemas import CardType
 
 logger = logging.getLogger(__name__)
 
@@ -142,18 +143,18 @@ async def get_queue_status() -> Dict[str, Any]:
         if s.get("content") and "policy" in s.get("content", "").lower()
     ]
 
-    # Count questions (would come from decision-deputy)
+    # Count questions (card_type == "question")
     decision_cards = card_store.query_by_principal("decision-deputy")
     questions = [
         c for c in decision_cards
-        if c.get("card_type") == "QUESTION" or "question" in str(c).lower()
+        if c.get("card_type") == CardType.QUESTION.value
     ]
 
-    # Count recommendations (would come from NBA crew, Phase 13)
+    # Count recommendations (card_type == "recommendation")
     nba_cards = card_store.query_by_principal("nba-crew")
     recommendations = [
         c for c in nba_cards
-        if c.get("card_type") == "RECOMMENDATION" or "recommendation" in str(c).lower()
+        if c.get("card_type") == CardType.RECOMMENDATION.value
     ]
 
     return {

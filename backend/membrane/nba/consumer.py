@@ -62,7 +62,7 @@ async def nba_consumer_runner(
                     trigger_type = _channel_to_trigger_type(channel)
 
                     # Build context from Card Store
-                    context = await _build_nba_context(trigger_type)
+                    context = await _build_nba_context(card_store, trigger_type)
 
                     # Invoke NBA crew
                     recommendations = await _generate_recommendations(
@@ -88,12 +88,15 @@ async def nba_consumer_runner(
             await asyncio.sleep(5)
 
 
-async def _build_nba_context(trigger_type: str) -> Dict[str, Any]:
+async def _build_nba_context(card_store: Any, trigger_type: str) -> Dict[str, Any]:
     """Build context for NBA crew from Card Store.
 
     Queries recent decisions, budget projections, policy violations.
+
+    Args:
+        card_store: CardStore instance (singleton)
+        trigger_type: Type of triggering signal
     """
-    card_store = get_card_store()
 
     context = {
         "trigger_type": trigger_type,
@@ -154,12 +157,68 @@ async def _generate_recommendations(
 def _parse_crew_output(output: str) -> list[Dict[str, Any]]:
     """Parse CrewAI output into recommendation dicts.
 
-    In production, parse JSON from crew output.
-    For now, return empty list (crew output parsing deferred to Phase 20).
+    CrewAI crew.kickoff() returns JSON output. Parse it to extract recommendations.
+
+    Expected format:
+    {
+        "status": "success",
+        "recommendations": [
+            {
+                "recommendation_id": "...",
+                "title": "...",
+                "description": "...",
+                ...
+            }
+        ]
+    }
     """
-    # TODO: Parse JSON from crew.kickoff() output
-    # Return list of recommendations with all required fields
-    return []
+    import json
+
+    if not output or not isinstance(output, str):
+        logger.warning(f"No crew output to parse: {output}")
+        return []
+
+    try:
+        # Try parsing as JSON
+        if isinstance(output, str):
+            # If it's a raw string, try to extract JSON
+            # Some crew outputs wrap JSON in markdown code blocks
+            if "```json" in output:
+                start = output.find("```json") + 7
+                end = output.find("```", start)
+                json_str = output[start:end].strip()
+            elif "```" in output:
+                start = output.find("```") + 3
+                end = output.find("```", start)
+                json_str = output[start:end].strip()
+            else:
+                json_str = output
+
+            data = json.loads(json_str)
+        else:
+            data = output
+
+        # Extract recommendations from the parsed data
+        if isinstance(data, dict):
+            recommendations = data.get("recommendations", [])
+            if not isinstance(recommendations, list):
+                # If recommendations is a single dict, wrap it
+                recommendations = [recommendations]
+        elif isinstance(data, list):
+            recommendations = data
+        else:
+            recommendations = []
+
+        logger.info(f"Parsed {len(recommendations)} recommendations from crew output")
+        return recommendations
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse crew output as JSON: {e}")
+        logger.debug(f"Raw output: {output}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error parsing crew output: {e}")
+        return []
 
 
 async def _write_recommendation_card(
