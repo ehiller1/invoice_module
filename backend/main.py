@@ -4667,6 +4667,832 @@ async def project_scenario(church_id: str = "holy_comforter", body: Optional[Dic
     })
 
 
+# Phase 12: Cabinet Activity Endpoints
+@app.get("/api/cabinets/{principal}/activity")
+async def get_cabinet_activity(
+    principal: str,
+    limit: int = 20,
+    offset: int = 0,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Get activity feed for a cabinet member.
+
+    Args:
+        principal: Cabinet member ID (queue-guardian, decision-deputy, etc.)
+        limit: Number of cards to return
+        offset: Pagination offset
+
+    Returns:
+        List of Memory Cards authored by this cabinet member
+    """
+    from backend.cards.store import get_card_store
+
+    card_store = get_card_store()
+    cards = card_store.query_by_principal(principal)
+
+    # Paginate
+    total = len(cards)
+    cards = cards[offset : offset + limit]
+
+    return {
+        "principal": principal,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "activity": cards,
+    }
+
+
+@app.get("/api/cabinets/{principal}/current-items")
+async def get_cabinet_current_items(
+    principal: str,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Get current escalations/items awaiting decision for cabinet member."""
+    from backend.cards.store import get_card_store
+
+    card_store = get_card_store()
+    cards = card_store.query_by_principal(principal)
+    decision_cards = [c for c in cards if c.get("card_type") == "decision"]
+
+    return {
+        "principal": principal,
+        "current_count": len(decision_cards),
+        "items": decision_cards[:10],
+    }
+
+
+@app.post("/api/cabinets/{principal}/items/{item_id}/approve")
+async def approve_cabinet_decision(
+    principal: str,
+    item_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Treasurer approves a cabinet decision/draft."""
+    if current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
+        raise HTTPException(status_code=403, detail="Only treasurers can approve")
+
+    from backend.cards.ledger import get_decision_ledger
+    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
+
+    body = body or {}
+    ledger = get_decision_ledger("holy_comforter")
+
+    # Write approval to Decision Ledger
+    entry = LedgerEntry(
+        entry_id=f"approval-{item_id}",
+        decision_id=item_id,
+        category=DecisionCategory.APPROVE,
+        timestamp=datetime.utcnow(),
+        authoring_actor={
+            "actor_id": current_user.user_id,
+            "actor_type": "TREASURER_ADMIN",
+        },
+        outcome=DecisionOutcome.ACCEPTED,
+        metadata={
+            "approved_by": current_user.user_id,
+            "approval_notes": body.get("notes", ""),
+        },
+    )
+    ledger.append(entry)
+
+    return {
+        "item_id": item_id,
+        "status": "approved",
+        "approved_at": datetime.utcnow().isoformat(),
+        "approved_by": current_user.user_id,
+    }
+
+
+@app.post("/api/cabinets/{principal}/items/{item_id}/reject")
+async def reject_cabinet_decision(
+    principal: str,
+    item_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Treasurer rejects a cabinet decision, sends back for revision."""
+    if current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
+        raise HTTPException(status_code=403, detail="Only treasurers can reject")
+
+    from backend.cards.ledger import get_decision_ledger
+    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
+
+    body = body or {}
+    ledger = get_decision_ledger("holy_comforter")
+
+    # Write rejection to Decision Ledger
+    entry = LedgerEntry(
+        entry_id=f"rejection-{item_id}",
+        decision_id=item_id,
+        category=DecisionCategory.ROUTE,
+        timestamp=datetime.utcnow(),
+        authoring_actor={
+            "actor_id": current_user.user_id,
+            "actor_type": "TREASURER_ADMIN",
+        },
+        outcome=DecisionOutcome.REJECTED,
+        metadata={
+            "rejected_by": current_user.user_id,
+            "rejection_reason": body.get("reason", ""),
+            "send_back_to": principal,
+        },
+    )
+    ledger.append(entry)
+
+    return {
+        "item_id": item_id,
+        "status": "rejected",
+        "rejected_at": datetime.utcnow().isoformat(),
+        "rejected_by": current_user.user_id,
+        "reason": body.get("reason", ""),
+    }
+
+
+# ─── Phase 13: NBA (Next Best Action) Endpoints ─────────────────────────
+
+@app.get("/api/recommendations")
+async def list_recommendations(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """List recommendations from NBA crew.
+
+    Args:
+        status: Filter by status (proposed, accepted, declined, deferred, executed)
+        priority: Filter by priority (high, medium, low)
+        limit: Number of recommendations to return
+        offset: Pagination offset
+
+    Returns:
+        List of Recommendation Cards from Card Store
+    """
+    from backend.cards.store import get_card_store
+
+    card_store = get_card_store()
+
+    # Query Recommendation Cards
+    recommendations = card_store.query_by_principal("nba-crew")
+
+    # Filter by status if specified
+    if status:
+        recommendations = [r for r in recommendations if r.get("status") == status]
+
+    # Filter by priority if specified
+    if priority:
+        recommendations = [r for r in recommendations if r.get("priority") == priority]
+
+    # Paginate
+    total = len(recommendations)
+    recommendations = recommendations[offset : offset + limit]
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "recommendations": recommendations,
+    }
+
+
+@app.get("/api/recommendations/{recommendation_id}")
+async def get_recommendation(
+    recommendation_id: str,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Get a single recommendation by ID."""
+    from backend.cards.store import get_card_store
+
+    card_store = get_card_store()
+    card = card_store.read(recommendation_id)
+
+    if not card:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    return card
+
+
+@app.post("/api/recommendations/{recommendation_id}/accept")
+async def accept_recommendation(
+    recommendation_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Accept a recommendation and record decision in ledger.
+
+    Args:
+        recommendation_id: ID of recommendation to accept
+        body: Optional notes and approval metadata
+
+    Returns:
+        Updated recommendation with decision recorded
+    """
+    from backend.cards.store import get_card_store
+    from backend.cards.ledger import get_decision_ledger
+    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
+
+    card_store = get_card_store()
+    ledger = get_decision_ledger("holy_comforter")
+    body = body or {}
+
+    # Get recommendation card
+    rec_card = card_store.read(recommendation_id)
+    if not rec_card:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    # Write approval to Decision Ledger
+    entry = LedgerEntry(
+        entry_id=f"rec-accepted-{recommendation_id}",
+        decision_id=recommendation_id,
+        category=DecisionCategory.APPROVE,
+        timestamp=datetime.utcnow(),
+        authoring_actor={
+            "actor_id": current_user.user_id,
+            "actor_type": current_user.role,
+        },
+        outcome=DecisionOutcome.ACCEPTED,
+        metadata={
+            "approved_by": current_user.user_id,
+            "approval_notes": body.get("notes", ""),
+            "recommendation_id": recommendation_id,
+        },
+    )
+    ledger.append(entry)
+
+    return {
+        "recommendation_id": recommendation_id,
+        "status": "accepted",
+        "accepted_at": datetime.utcnow().isoformat(),
+        "accepted_by": current_user.user_id,
+    }
+
+
+@app.post("/api/recommendations/{recommendation_id}/decline")
+async def decline_recommendation(
+    recommendation_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Decline a recommendation.
+
+    Args:
+        recommendation_id: ID of recommendation to decline
+        body: Reason for declining
+
+    Returns:
+        Declined recommendation with audit trail
+    """
+    from backend.cards.store import get_card_store
+    from backend.cards.ledger import get_decision_ledger
+    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
+
+    card_store = get_card_store()
+    ledger = get_decision_ledger("holy_comforter")
+    body = body or {}
+
+    # Get recommendation card
+    rec_card = card_store.read(recommendation_id)
+    if not rec_card:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    # Write decline to Decision Ledger
+    entry = LedgerEntry(
+        entry_id=f"rec-declined-{recommendation_id}",
+        decision_id=recommendation_id,
+        category=DecisionCategory.ROUTE,
+        timestamp=datetime.utcnow(),
+        authoring_actor={
+            "actor_id": current_user.user_id,
+            "actor_type": current_user.role,
+        },
+        outcome=DecisionOutcome.REJECTED,
+        metadata={
+            "declined_by": current_user.user_id,
+            "decline_reason": body.get("reason", ""),
+            "recommendation_id": recommendation_id,
+        },
+    )
+    ledger.append(entry)
+
+    return {
+        "recommendation_id": recommendation_id,
+        "status": "declined",
+        "declined_at": datetime.utcnow().isoformat(),
+        "declined_by": current_user.user_id,
+        "reason": body.get("reason", ""),
+    }
+
+
+@app.post("/api/recommendations/{recommendation_id}/defer")
+async def defer_recommendation(
+    recommendation_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Defer a recommendation for later evaluation.
+
+    Args:
+        recommendation_id: ID of recommendation to defer
+        body: Deferral notes and timeline
+
+    Returns:
+        Deferred recommendation
+    """
+    from backend.cards.store import get_card_store
+
+    card_store = get_card_store()
+    body = body or {}
+
+    # Get recommendation card
+    rec_card = card_store.read(recommendation_id)
+    if not rec_card:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    return {
+        "recommendation_id": recommendation_id,
+        "status": "deferred",
+        "deferred_at": datetime.utcnow().isoformat(),
+        "deferred_by": current_user.user_id,
+        "deferral_notes": body.get("notes", ""),
+        "defer_until": body.get("defer_until", None),
+    }
+
+
+# ─── Phase 14: Trace + Forecast Endpoints ────────────────────────────
+
+@app.get("/api/trace/{cell_id}")
+async def get_gl_trace_endpoint(
+    cell_id: str,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Get trace of events contributing to a GL cell.
+
+    Returns Signal Memory cards in chronological order that affected this cell.
+    Enables drill-down analysis of GL balance drivers.
+
+    Args:
+        cell_id: GL cell ID (e.g., "41000" for expense account)
+
+    Returns:
+        Dict with:
+        - cell_id: The GL cell
+        - current_balance: Current balance
+        - signal_count: Number of contributing signals
+        - signals: List of Signal Memory cards affecting this cell
+        - lineage: Provenance chain (by principal, by type)
+    """
+    from backend.membrane.trace.gl_trace import get_gl_trace
+
+    trace = await get_gl_trace(cell_id)
+    return trace
+
+
+@app.get("/api/forecast/merge")
+async def get_forecast_merge_endpoint(
+    from_date: str,
+    to_date: str,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Get GL projection waterfall between two dates.
+
+    Returns delta between GL snapshots at from_date and to_date.
+    Shows account-by-account changes with drivers and waterfall.
+
+    Args:
+        from_date: Start date (ISO format, e.g., "2026-04-30")
+        to_date: End date (ISO format, e.g., "2026-05-11")
+
+    Returns:
+        Dict with:
+        - from_date, to_date: Period
+        - from_snapshot: GL at from_date
+        - to_snapshot: GL at to_date
+        - delta: Account-by-account changes
+        - waterfall: Step-by-step changes with drivers
+    """
+    from backend.membrane.trace.forecast_merge import get_forecast_merge
+
+    forecast = await get_forecast_merge(from_date, to_date)
+    return forecast
+
+
+# ─── Phase 15: Scenario Forecasting + Operations Council ─────────────
+@app.post("/api/scenario/simulate")
+async def simulate_scenario_endpoint(
+    scenario_name: str,
+    scenario_type: str,
+    assumptions: Optional[Dict[str, Any]] = None,
+    changes: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """Simulate a what-if GL scenario.
+
+    Args:
+        scenario_name: Human-readable scenario name
+        scenario_type: One of baseline, optimistic, pessimistic, custom
+        assumptions: Optional assumptions underlying the projection
+        changes: Proposed GL changes {account: delta}
+
+    Returns:
+        Scenario projection with base_gl, projected_gl, impact_summary
+    """
+    from decimal import Decimal
+    from backend.membrane.scenario.scenario_card import ScenarioType
+    from backend.membrane.scenario.simulator import simulate_scenario
+
+    if assumptions is None:
+        assumptions = {}
+    if changes is None:
+        changes = {}
+
+    # Convert changes to Decimal
+    decimal_changes = {k: Decimal(str(v)) for k, v in changes.items()}
+
+    # Validate scenario type
+    scenario_type_upper = scenario_type.upper()
+    if scenario_type_upper not in [e.name for e in ScenarioType]:
+        raise ValueError(
+            f"Invalid scenario_type: {scenario_type}. Must be one of: "
+            f"{', '.join(e.name for e in ScenarioType)}"
+        )
+
+    scenario_enum = ScenarioType[scenario_type_upper]
+    projection = await simulate_scenario(scenario_name, scenario_enum, assumptions, decimal_changes)
+    return projection
+
+
+@app.get("/api/scenarios")
+async def list_scenarios_endpoint(
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """List all scenarios with optional filtering.
+
+    Args:
+        status: Optional status filter (draft, approved, executed, archived)
+        limit: Number of results to return
+        offset: Offset for pagination
+
+    Returns:
+        List of scenarios with total count
+    """
+    from backend.membrane.scenario.simulator import list_scenarios
+
+    result = await list_scenarios(status=status, limit=limit, offset=offset)
+    return result
+
+
+@app.get("/api/scenarios/{scenario_id}")
+async def get_scenario_endpoint(scenario_id: str) -> Dict[str, Any]:
+    """Retrieve a specific scenario by ID.
+
+    Args:
+        scenario_id: Scenario identifier
+
+    Returns:
+        Scenario details
+    """
+    from backend.membrane.scenario.simulator import get_scenario
+
+    scenario = await get_scenario(scenario_id)
+    if not scenario:
+        raise HTTPException(status_code=404, detail=f"Scenario {scenario_id} not found")
+    return scenario
+
+
+@app.get("/api/council/kpis")
+async def get_council_kpis_endpoint(
+    period_days: int = 7,
+    breakdown_by: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get Operations Council KPI dashboard.
+
+    Args:
+        period_days: Number of days to look back (default 7)
+        breakdown_by: Optional breakdown dimension (department, cost_center, fund)
+
+    Returns:
+        KPI dashboard with exception metrics, policy violations, budget variance, queue health
+    """
+    from backend.membrane.scenario.operations_council import get_council_kpis
+
+    kpis = await get_council_kpis(period_days=period_days, breakdown_by=breakdown_by)
+    return kpis
+
+
+@app.get("/api/council/queue-status")
+async def get_queue_status_endpoint() -> Dict[str, Any]:
+    """Get current queue status snapshot.
+
+    Returns:
+        Current counts of exceptions, violations, questions, recommendations
+    """
+    from backend.membrane.scenario.operations_council import get_queue_status
+
+    queue = await get_queue_status()
+    return queue
+
+
+# ─── Phase 16: Multi-Entity Rollup + Receipt Capture ──────────────────
+@app.get("/api/consolidation/rollup")
+async def consolidate_entities_endpoint(
+    entity_ids: Optional[List[str]] = None,
+    include_adjustments: bool = True,
+) -> Dict[str, Any]:
+    """Consolidate GL across multiple entities.
+
+    Args:
+        entity_ids: Optional list of entity IDs to consolidate
+        include_adjustments: Whether to include consolidation adjustments
+
+    Returns:
+        Consolidated GL with by-entity breakdown and adjustments
+    """
+    from backend.membrane.multi_entity.rollup import consolidate_entities
+
+    result = await consolidate_entities(
+        entity_ids=entity_ids,
+        include_adjustments=include_adjustments,
+    )
+    return result
+
+
+@app.get("/api/entities/{entity_id}/accounts")
+async def get_entity_glaccounts_endpoint(entity_id: str) -> Dict[str, float]:
+    """Get GL accounts for a specific entity.
+
+    Args:
+        entity_id: Entity identifier
+
+    Returns:
+        Dict of {account: balance}
+    """
+    from backend.membrane.multi_entity.rollup import get_entity_glaccounts
+
+    accounts = await get_entity_glaccounts(entity_id)
+    return {k: float(v) for k, v in accounts.items()}
+
+
+@app.post("/api/receipts/process")
+async def process_receipt_endpoint(
+    image_data: str,  # Base64-encoded image
+    file_name: str,
+) -> Dict[str, Any]:
+    """Process receipt image via OCR.
+
+    Args:
+        image_data: Base64-encoded image data
+        file_name: Original file name
+
+    Returns:
+        Extracted text, vendor info, line items, confidence score
+    """
+    import base64
+    from backend.membrane.multi_entity.receipt_capture import process_receipt_image
+
+    # Decode base64 image
+    image_bytes = base64.b64decode(image_data)
+
+    result = await process_receipt_image(image_bytes, file_name)
+    return result
+
+
+@app.post("/api/receipts/suggest-gl")
+async def suggest_gl_mapping_endpoint(
+    vendor_name: str,
+    amount: float,
+    description: str,
+    vendor_category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Suggest GL account mapping for receipt line item.
+
+    Args:
+        vendor_name: Vendor name
+        amount: Transaction amount
+        description: Line item description
+        vendor_category: Optional vendor category
+
+    Returns:
+        Suggested GL accounts with confidence scores
+    """
+    from decimal import Decimal
+    from backend.membrane.multi_entity.receipt_capture import suggest_gl_mapping
+
+    result = await suggest_gl_mapping(
+        vendor_name=vendor_name,
+        amount=Decimal(str(amount)),
+        description=description,
+        vendor_category=vendor_category,
+    )
+    return result
+
+
+@app.get("/api/vendors/{vendor_name}/info")
+async def extract_vendor_info_endpoint(
+    vendor_name: str,
+    address: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Extract or lookup vendor information.
+
+    Args:
+        vendor_name: Vendor name
+        address: Optional vendor address
+
+    Returns:
+        Vendor info with hierarchy and matching
+    """
+    from backend.membrane.multi_entity.receipt_capture import extract_vendor_info
+
+    result = await extract_vendor_info(vendor_name, address)
+    return result
+
+
+# ─── Phase 17: Pledge Matching + Policy Management ────────────────────
+@app.post("/api/pledges")
+async def create_pledge_endpoint(
+    pledge_id: str,
+    donor_name: str,
+    amount: float,
+    purpose: str,
+    pledge_date: str,
+    expected_receipt_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a new pledge.
+
+    Args:
+        pledge_id: Unique pledge identifier
+        donor_name: Donor name
+        amount: Pledge amount
+        purpose: Intended use
+        pledge_date: Date pledge was made
+        expected_receipt_date: Expected receipt date
+
+    Returns:
+        Pledge record
+    """
+    from decimal import Decimal
+    from backend.membrane.pledge.pledge_matching import create_pledge
+
+    result = await create_pledge(
+        pledge_id=pledge_id,
+        donor_name=donor_name,
+        amount=Decimal(str(amount)),
+        purpose=purpose,
+        pledge_date=pledge_date,
+        expected_receipt_date=expected_receipt_date,
+    )
+    return result
+
+
+@app.get("/api/pledges")
+async def list_pledges_endpoint(
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """List pledges with optional filtering.
+
+    Args:
+        status: Optional status filter
+        limit: Number of results
+        offset: Pagination offset
+
+    Returns:
+        List of pledges
+    """
+    from backend.membrane.pledge.pledge_matching import list_pledges
+
+    result = await list_pledges(status=status, limit=limit, offset=offset)
+    return result
+
+
+@app.get("/api/pledges/{pledge_id}/fulfillment")
+async def get_pledge_fulfillment_endpoint(pledge_id: str) -> Dict[str, Any]:
+    """Get pledge fulfillment status.
+
+    Args:
+        pledge_id: Pledge identifier
+
+    Returns:
+        Fulfillment summary with matched amounts
+    """
+    from backend.membrane.pledge.pledge_matching import get_pledge_fulfillment
+
+    result = await get_pledge_fulfillment(pledge_id)
+    return result
+
+
+@app.post("/api/policies")
+async def create_policy_endpoint(
+    policy_id: str,
+    title: str,
+    description: str,
+    effective_date: str,
+    enforcement_level: str = "warning",
+) -> Dict[str, Any]:
+    """Create a new financial policy.
+
+    Args:
+        policy_id: Unique policy identifier
+        title: Policy title
+        description: Policy description
+        effective_date: Date policy becomes effective
+        enforcement_level: warning or blocking
+
+    Returns:
+        Policy record
+    """
+    from backend.membrane.pledge.policy_management import create_policy
+
+    result = await create_policy(
+        policy_id=policy_id,
+        title=title,
+        description=description,
+        policy_rules={},
+        effective_date=effective_date,
+        enforcement_level=enforcement_level,
+    )
+    return result
+
+
+@app.get("/api/policies")
+async def list_policies_endpoint(
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """List policies with optional filtering.
+
+    Args:
+        status: Optional status filter
+        limit: Number of results
+        offset: Pagination offset
+
+    Returns:
+        List of policies
+    """
+    from backend.membrane.pledge.policy_management import list_policies
+
+    result = await list_policies(status=status, limit=limit, offset=offset)
+    return result
+
+
+@app.post("/api/policies/{policy_id}/vote")
+async def vote_on_policy_endpoint(
+    policy_id: str,
+    voter_id: str,
+    vote: str,  # approve, reject, abstain
+    rationale: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Record a vote on a policy.
+
+    Args:
+        policy_id: Policy identifier
+        voter_id: Voter identifier
+        vote: approve, reject, or abstain
+        rationale: Optional voting rationale
+
+    Returns:
+        Vote record
+    """
+    from backend.membrane.pledge.policy_management import vote_on_policy
+
+    result = await vote_on_policy(policy_id, voter_id, vote, rationale)
+    return result
+
+
+@app.post("/api/compliance/check")
+async def check_compliance_endpoint(
+    transaction_amount: float,
+    account: str,
+    department: str,
+    transaction_type: str,
+) -> Dict[str, Any]:
+    """Check transaction compliance with policies.
+
+    Args:
+        transaction_amount: Amount of transaction
+        account: GL account
+        department: Department code
+        transaction_type: Type of transaction
+
+    Returns:
+        Compliance check result
+    """
+    from backend.membrane.pledge.policy_management import check_policy_compliance
+
+    result = await check_policy_compliance(
+        transaction_amount=transaction_amount,
+        account=account,
+        department=department,
+        transaction_type=transaction_type,
+    )
+    return result
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index() -> HTMLResponse:
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
