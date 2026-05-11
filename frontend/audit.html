@@ -127,7 +127,7 @@
 </template>
 
 <script>
-const API = 'http://localhost:8000';
+const API = (window.EIME_API ?? '');
 let allEvents = [];
 
 EIMEShell.mount({

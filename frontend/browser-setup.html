@@ -65,7 +65,7 @@
 </template>
 
 <script>
-const API = 'http://localhost:8000';
+const API = (window.EIME_API ?? '');
 const STEPS = [
   { id: 1, title: 'Prerequisites Check' },
   { id: 2, title: 'ACS Realm Credentials' },

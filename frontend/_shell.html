@@ -3,6 +3,10 @@
   Desktop (>=1024px): [Left Nav 240px] [Center fluid] [Right Chat Rail 360px]
   Mobile  (<1024px):  Bottom tab bar (5 items) + slide-in left nav + bottom-sheet chat
 -->
+<script>
+// Global API base — set from environment or default to empty string (relative paths through proxy)
+window.EIME_API = window.EIME_API || '';
+</script>
 <div id="eime-shell-root" class="flex h-full w-full overflow-hidden">
 
   <!-- ============================================================

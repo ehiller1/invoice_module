@@ -159,7 +159,7 @@
 </template>
 
 <script>
-const API = 'http://localhost:8000';
+const API = (window.EIME_API ?? '');
 const CHURCH_ID = 'holy_comforter';
 let varianceChart = null;
 

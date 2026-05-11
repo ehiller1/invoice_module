@@ -94,7 +94,7 @@
 </template>
 
 <script>
-const API = 'http://localhost:8000';
+const API = (window.EIME_API ?? '');
 const CHURCH_ID = 'holy_comforter';
 let currentUserTier = 2; // T2 by default; from context in production
 let allCards = {

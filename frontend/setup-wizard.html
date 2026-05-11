@@ -109,7 +109,7 @@
 </template>
 
 <script>
-const API = window.location.origin.includes('8001') ? '' : 'http://localhost:8000';
+const API = (window.EIME_API ?? '');
 const WIZARD_STATE_KEY = 'eime_wizard_state';
 const TOTAL_STEPS = 9;
 
