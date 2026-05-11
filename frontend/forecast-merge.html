@@ -176,8 +176,7 @@ EIMEShell.mount({
 });
 
 /**
- * Load forecast vs actual data.
- * TODO: Real endpoint GET /api/forecast/merge?current_period=...&compare_to=...&group_by=...
+ * Load forecast vs actual data from API.
  */
 async function loadForecastData() {
   try {
@@ -185,12 +184,28 @@ async function loadForecastData() {
     const compareTo = document.getElementById('compare-select').value;
     const groupBy = document.getElementById('groupby-select').value;
 
-    // Mock data structure
-    const mergeData = generateMockMergeData(currentPeriod, compareTo, groupBy);
+    const url = `/api/forecast/merge?current_period=${encodeURIComponent(currentPeriod)}&compare_to=${encodeURIComponent(compareTo)}&group_by=${encodeURIComponent(groupBy)}&church_id=${CHURCH_ID}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const mergeData = await response.json();
     renderSummary(mergeData);
+    renderVarianceTable(mergeData);
     renderChart(mergeData);
   } catch (e) {
     console.error('Error loading forecast data:', e);
+    // Fallback to mock data on error
+    const mockData = generateMockMergeData(
+      document.getElementById('period-select').value,
+      document.getElementById('compare-select').value,
+      document.getElementById('groupby-select').value
+    );
+    renderSummary(mockData);
+    renderVarianceTable(mockData);
+    renderChart(mockData);
   }
 }
 
@@ -211,6 +226,29 @@ function generateMockMergeData(period, compareTo, groupBy) {
       { category: 'Office Supplies', current: 8900, prior: 9200, variance: -300, pct_change: -3.3, attribution: 'Bulk purchase timing' }
     ]
   };
+}
+
+function renderVarianceTable(data) {
+  const tbody = document.getElementById('variance-table');
+  const lines = data.lines || [];
+
+  tbody.innerHTML = lines.map(line => {
+    const isUnfavorable = line.variance > 0 && line.category.includes('Expense') || line.variance > 0 && !line.category.includes('Revenue');
+    const rowClass = isUnfavorable ? 'bg-red-50' : '';
+    const varianceClass = isUnfavorable ? 'text-red-700 font-bold' : 'text-green-700 font-bold';
+    const varianceSign = line.variance >= 0 ? '+' : '';
+
+    return `
+      <tr class="hover:bg-slate-50 ${rowClass}">
+        <td class="px-4 py-3 text-slate-900 font-medium">${line.category || line.name || 'Unknown'}</td>
+        <td class="text-right px-4 py-3 text-slate-900 font-mono">$${(line.current || 0).toLocaleString()}</td>
+        <td class="text-right px-4 py-3 text-slate-600 font-mono">$${(line.prior || line.prior_projection || 0).toLocaleString()}</td>
+        <td class="text-right px-4 py-3 ${varianceClass}">$${varianceSign}${(line.variance || 0).toLocaleString()}</td>
+        <td class="text-right px-4 py-3 ${varianceClass}">${varianceSign}${(line.pct_change || 0).toFixed(1)}%</td>
+        <td class="text-left px-4 py-3 text-slate-600 text-xs">${line.attribution || line.reason || 'No explanation'}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderSummary(data) {

@@ -158,9 +158,34 @@
       `).join('');
     }
 
-    function selectScenario(id) {
+    async function selectScenario(id) {
       selectedScenario = scenarios.find(s => s.id === id);
       renderScenarioList();
+
+      if (selectedScenario && selectedScenario.id !== 'base') {
+        try {
+          const response = await fetch('/api/scenario/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scenario_name: selectedScenario.name,
+              scenario_type: 'custom',
+              assumptions: selectedScenario.parameters || {},
+              changes: {}
+            })
+          });
+
+          if (response.ok) {
+            const simResult = await response.json();
+            if (simResult.results) {
+              selectedScenario.results = simResult.results;
+            }
+          }
+        } catch (error) {
+          console.error('Error simulating scenario:', error);
+        }
+      }
+
       renderScenarioResults();
     }
 

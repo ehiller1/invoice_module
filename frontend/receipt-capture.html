@@ -39,15 +39,16 @@
     <!-- Upload Section -->
     <div class="px-8 py-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
       <h2 class="text-sm font-semibold text-slate-800 mb-4">Capture Receipt</h2>
+      <input type="file" id="receipt-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" />
 
       <div class="grid grid-cols-2 gap-4">
-        <div class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
+        <div onclick="document.getElementById('receipt-file-input').click()" class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
           <p class="text-2xl mb-2">📸</p>
           <p class="text-sm font-medium text-slate-700">Take Photo</p>
           <p class="text-xs text-slate-500 mt-1">Use device camera</p>
         </div>
 
-        <div class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
+        <div onclick="document.getElementById('receipt-file-input').click()" class="bg-white border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-navy-600 hover:bg-blue-50 transition">
           <p class="text-2xl mb-2">📁</p>
           <p class="text-sm font-medium text-slate-700">Upload File</p>
           <p class="text-xs text-slate-500 mt-1">PDF, JPG, or PNG</p>
@@ -58,80 +59,7 @@
     <!-- Recent Captures -->
     <div class="overflow-y-auto flex-1 px-8 py-6">
       <h3 class="text-sm font-semibold text-slate-800 mb-4">Recent Captures</h3>
-
-      <div class="space-y-3">
-        <div class="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
-          <div class="flex items-start justify-between mb-2">
-            <div>
-              <h4 class="font-semibold text-slate-800 text-sm">Duke Energy — Utility Bill</h4>
-              <p class="text-xs text-slate-500 mt-1">Captured: May 8, 2026 • 2:34 PM</p>
-            </div>
-            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Coded</span>
-          </div>
-          <div class="grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <p class="text-slate-500">Amount</p>
-              <p class="font-mono text-slate-700 font-semibold">$324.50</p>
-            </div>
-            <div>
-              <p class="text-slate-500">GL Code</p>
-              <p class="font-mono text-slate-700 font-semibold">7200</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Confidence</p>
-              <p class="text-green-700 font-semibold">98%</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
-          <div class="flex items-start justify-between mb-2">
-            <div>
-              <h4 class="font-semibold text-slate-800 text-sm">Office Depot — Supplies</h4>
-              <p class="text-xs text-slate-500 mt-1">Captured: May 7, 2026 • 10:15 AM</p>
-            </div>
-            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Pending Review</span>
-          </div>
-          <div class="grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <p class="text-slate-500">Amount</p>
-              <p class="font-mono text-slate-700 font-semibold">$127.83</p>
-            </div>
-            <div>
-              <p class="text-slate-500">GL Code</p>
-              <p class="font-mono text-slate-700 font-semibold">7400?</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Confidence</p>
-              <p class="text-amber-700 font-semibold">72%</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
-          <div class="flex items-start justify-between mb-2">
-            <div>
-              <h4 class="font-semibold text-slate-800 text-sm">Staples — Office Furniture</h4>
-              <p class="text-xs text-slate-500 mt-1">Captured: May 5, 2026 • 3:45 PM</p>
-            </div>
-            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Coded</span>
-          </div>
-          <div class="grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <p class="text-slate-500">Amount</p>
-              <p class="font-mono text-slate-700 font-semibold">$892.00</p>
-            </div>
-            <div>
-              <p class="text-slate-500">GL Code</p>
-              <p class="font-mono text-slate-700 font-semibold">1500</p>
-            </div>
-            <div>
-              <p class="text-slate-500">Confidence</p>
-              <p class="text-green-700 font-semibold">95%</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div id="receipts-container" class="space-y-3"></div>
 
       <!-- Mobile Features -->
       <div class="mt-8 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
@@ -164,6 +92,9 @@
 </template>
 
 <script>
+const CHURCH_ID = 'holy_comforter';
+let recentReceipts = [];
+
 async function init() {
   await EIMEShell.mount({
     activeNav: 'upload-invoice',
@@ -175,6 +106,108 @@ async function init() {
     page: 'receipt-capture',
     payload: { }
   });
+
+  document.getElementById('receipt-file-input').addEventListener('change', handleFileUpload);
+  await loadRecentReceipts();
+}
+
+async function loadRecentReceipts() {
+  try {
+    const response = await fetch(`/api/churches/${CHURCH_ID}/receipts`);
+    if (response.ok) {
+      recentReceipts = await response.json();
+      renderReceipts();
+    }
+  } catch (error) {
+    console.error('Error loading receipts:', error);
+  }
+}
+
+function renderReceipts() {
+  const container = document.getElementById('receipts-container');
+  if (!recentReceipts || recentReceipts.length === 0) {
+    container.innerHTML = '<p class="text-sm text-slate-500 text-center py-8">No receipts captured yet.</p>';
+    return;
+  }
+
+  container.innerHTML = recentReceipts.map(receipt => `
+    <div class="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
+      <div class="flex items-start justify-between mb-2">
+        <div>
+          <h4 class="font-semibold text-slate-800 text-sm">${receipt.vendor || 'Unknown'} — ${receipt.description || 'Receipt'}</h4>
+          <p class="text-xs text-slate-500 mt-1">Captured: ${new Date(receipt.created_at).toLocaleDateString()} • ${new Date(receipt.created_at).toLocaleTimeString()}</p>
+        </div>
+        <span class="px-2 py-1 ${receipt.gl_code ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'} rounded text-xs font-medium">
+          ${receipt.gl_code ? 'Coded' : 'Pending Review'}
+        </span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-xs">
+        <div>
+          <p class="text-slate-500">Amount</p>
+          <p class="font-mono text-slate-700 font-semibold">$${(receipt.amount || 0).toFixed(2)}</p>
+        </div>
+        <div>
+          <p class="text-slate-500">GL Code</p>
+          <p class="font-mono text-slate-700 font-semibold">${receipt.gl_code || 'TBD'}</p>
+        </div>
+        <div>
+          <p class="text-slate-500">Confidence</p>
+          <p class="text-${receipt.confidence >= 90 ? 'green' : receipt.confidence >= 70 ? 'amber' : 'red'}-700 font-semibold">${(receipt.confidence || 0).toFixed(0)}%</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('church_id', CHURCH_ID);
+
+  try {
+    const response = await fetch('/api/receipts/process', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      alert(`Error processing receipt: ${response.statusText}`);
+      return;
+    }
+
+    const receipt = await response.json();
+
+    if (receipt.vendor && receipt.amount) {
+      const glSuggestion = await getSuggestedGL(receipt.vendor, receipt.amount);
+      if (glSuggestion && glSuggestion.gl_code) {
+        receipt.gl_code = glSuggestion.gl_code;
+        receipt.confidence = glSuggestion.confidence || 75;
+      }
+    }
+
+    recentReceipts.unshift(receipt);
+    renderReceipts();
+  } catch (error) {
+    console.error('Error uploading receipt:', error);
+    alert(`Error: ${error.message}`);
+  }
+
+  event.target.value = '';
+}
+
+async function getSuggestedGL(vendor, amount) {
+  try {
+    const response = await fetch(`/api/receipts/suggest-gl?vendor=${encodeURIComponent(vendor)}&amount=${amount}&church_id=${CHURCH_ID}`);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('Error getting GL suggestion:', error);
+  }
+  return null;
 }
 
 function downloadMobileApp() {

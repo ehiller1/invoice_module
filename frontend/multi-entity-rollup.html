@@ -174,9 +174,105 @@ async function init() {
   });
 }
 
-function generateRollup() {
+async function generateRollup() {
   const period = document.getElementById('rollup-period').value;
-  alert(`Generated consolidation for ${period}\n\nConsolidating:\n• Holy Comforter Church\n• St. Mary's Parish\n• Youth Education Fund`);
+
+  const selectedEntities = Array.from(document.querySelectorAll('#page-center-content input[type="checkbox"]:checked'))
+    .map(cb => cb.parentElement.textContent.trim());
+
+  if (selectedEntities.length === 0) {
+    alert('Please select at least one entity to consolidate.');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/consolidation/rollup?period=${encodeURIComponent(period)}&entities=${encodeURIComponent(selectedEntities.join(','))}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(`Error: ${data.error || 'Failed to generate rollup'}`);
+      return;
+    }
+
+    renderRollupResults(data);
+  } catch (error) {
+    console.error('Error generating rollup:', error);
+    alert(`Error: ${error.message}`);
+  }
+}
+
+function renderRollupResults(data) {
+  const summaryHtml = `
+    <div class="grid grid-cols-4 gap-4 mb-4">
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-600 font-medium mb-2">Total Revenue</p>
+        <p class="text-2xl font-bold text-green-600">$${(data.summary.total_revenue || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+        <p class="text-xs text-slate-500 mt-1">${data.entities.length} entities</p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-600 font-medium mb-2">Total Expenses</p>
+        <p class="text-2xl font-bold text-red-600">$${(data.summary.total_expenses || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+        <p class="text-xs text-slate-500 mt-1">${data.entities.length} entities</p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-600 font-medium mb-2">Net Income</p>
+        <p class="text-2xl font-bold text-blue-600">$${(data.summary.net_income || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+        <p class="text-xs text-slate-500 mt-1">${((data.summary.net_income / data.summary.total_revenue * 100) || 0).toFixed(1)}% margin</p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-600 font-medium mb-2">Consolidation Adjustments</p>
+        <p class="text-2xl font-bold text-slate-700">($${(data.summary.consolidation_adjustments || 0).toLocaleString('en-US', {minimumFractionDigits: 2})})</p>
+        <p class="text-xs text-slate-500 mt-1">Inter-entity eliminations</p>
+      </div>
+    </div>
+  `;
+
+  const tableRows = (data.entities || []).map(e => `
+    <tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 text-sm font-medium text-slate-800">${e.entity_name}</td>
+      <td class="px-4 py-3 text-sm font-mono text-slate-700">$${(e.revenue || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+      <td class="px-4 py-3 text-sm font-mono text-slate-700">$${(e.expenses || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+      <td class="px-4 py-3 text-sm font-mono text-green-700 font-semibold">$${(e.net_income || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+      <td class="px-4 py-3 text-sm text-slate-700">${(e.pct_of_total || 0).toFixed(1)}%</td>
+    </tr>
+  `).join('');
+
+  const tableHtml = `
+    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Entity</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Revenue</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Expenses</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Net Income</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">% of Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          ${tableRows}
+          <tr class="bg-slate-50 font-semibold">
+            <td class="px-4 py-3 text-sm text-slate-900">CONSOLIDATED TOTAL</td>
+            <td class="px-4 py-3 text-sm font-mono text-slate-900">$${(data.summary.total_revenue || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            <td class="px-4 py-3 text-sm font-mono text-slate-900">$${(data.summary.total_expenses || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            <td class="px-4 py-3 text-sm font-mono text-green-700">$${(data.summary.net_income || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+            <td class="px-4 py-3 text-sm text-slate-900">100%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const resultsContainer = document.querySelector('.overflow-y-auto');
+  if (resultsContainer) {
+    resultsContainer.innerHTML = `
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Consolidated Results (${document.getElementById('rollup-period').value})</h3>
+      <div class="space-y-4">
+        ${summaryHtml}
+        ${tableHtml}
+      </div>
+    `;
+  }
 }
 
 window.generateRollup = generateRollup;
