@@ -2694,7 +2694,7 @@ async def upload_bank_statement(church_id: str, file: UploadFile = File(...), ac
 # without needing to construct church_id paths.
 
 @app.get("/api/budget/variance")
-async def budget_variance_alias(church_id: str = "holy_comforter") -> JSONResponse:
+async def budget_variance_alias(church_id: str) -> JSONResponse:
     """Alias for /api/churches/{church_id}/budget/variance-report — Budget projections.
 
     Returns variance report with year-forward projections per FR-03.3.
@@ -2765,7 +2765,7 @@ async def budget_variance_alias(church_id: str = "holy_comforter") -> JSONRespon
 
 
 @app.get("/api/coa/search")
-async def coa_search_alias(q: str, church_id: str = "holy_comforter", k: int = 5) -> JSONResponse:
+async def coa_search_alias(q: str, church_id: str, k: int = 5) -> JSONResponse:
     """Alias for /api/churches/{church_id}/search — Semantic COA search.
 
     Uses ChromaDB to find GL accounts most similar to the query string.
@@ -2796,7 +2796,7 @@ async def coa_search_alias(q: str, church_id: str = "holy_comforter", k: int = 5
 
 
 @app.get("/api/coa")
-async def coa_list_alias(church_id: str = "holy_comforter") -> JSONResponse:
+async def coa_list_alias(church_id: str) -> JSONResponse:
     """List all GL accounts for a church (frontend convenience)."""
     ctx = coa_store.load_accounting_context(church_id)
     if not ctx:
@@ -2923,7 +2923,7 @@ def _run_acs_install() -> None:
 # ---------- Operations Council (FRD §16) ----------
 
 @app.get("/api/council/queues")
-async def council_queues(church_id: str = "holy_comforter") -> JSONResponse:
+async def council_queues(church_id: str) -> JSONResponse:
     """Aggregate four Operations Council queues: exceptions, policies, questions, recommendations (FRD §16.1).
 
     Returns:
@@ -3244,7 +3244,7 @@ async def answer_question(body: Dict[str, Any]) -> JSONResponse:
 # ---------- Cabinet Surface (FRD §16.5, Personal Cabinet) ----------
 
 @app.get("/api/cabinets/{principal}/activity")
-async def get_cabinet_activity(principal: str, church_id: str = "holy_comforter") -> JSONResponse:
+async def get_cabinet_activity(principal: str, church_id: str) -> JSONResponse:
     """Get per-principal activity log: recent approvals, decisions, pending actions.
 
     Returns activity feed for Personal Cabinet with:
@@ -3458,7 +3458,7 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
 # ---------- Phase 6: Adversarial Membrane & Auditor Surface (FRD MEM-26, §16) ----------
 
 @app.get("/api/audit/adversarial-findings")
-async def get_adversarial_findings(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_adversarial_findings(church_id: str) -> JSONResponse:
     """Get Adversarial Membrane outputs: anomalies, drift, patterns, outliers.
 
     MEM-26 counter-agent identifies:
@@ -3541,7 +3541,7 @@ async def get_adversarial_findings(church_id: str = "holy_comforter") -> JSONRes
 
 
 @app.get("/api/audit/materiality-budget")
-async def get_materiality_budget(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_materiality_budget(church_id: str) -> JSONResponse:
     """Get materiality budget for external auditor.
 
     Tracks audit findings materiality threshold and evidence pack requirements.
@@ -3560,7 +3560,7 @@ async def get_materiality_budget(church_id: str = "holy_comforter") -> JSONRespo
 
 
 @app.get("/api/audit/evidence-pack")
-async def get_evidence_pack(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_evidence_pack(church_id: str) -> JSONResponse:
     """Get audit evidence pack for external auditor.
 
     Returns structured evidence for:
@@ -3611,7 +3611,7 @@ async def get_evidence_pack(church_id: str = "holy_comforter") -> JSONResponse:
 # ---------- Federated Peer Benchmarking (Phase 6, FRD MEM-28) ----------
 
 @app.get("/api/benchmarking/peers")
-async def get_peer_benchmarks(church_id: str = "holy_comforter", metric: str = None) -> JSONResponse:
+async def get_peer_benchmarks(church_id: str, metric: str = None) -> JSONResponse:
     """Get peer organization benchmarking data for financial health comparison.
 
     Federated Membrane (MEM-28) queries similar organizations:
@@ -3720,7 +3720,7 @@ async def get_peer_benchmarks(church_id: str = "holy_comforter", metric: str = N
 # ---------- ACS Realm browser plug-in setup (FR-06.5) ----------
 
 @app.get("/api/integrations/acs/status")
-async def acs_status(church_id: str = "holy_comforter") -> JSONResponse:
+async def acs_status(church_id: str) -> JSONResponse:
     """Get current ACS Realm browser plug-in configuration status."""
     from .integrations.acs_realm import credentials as _creds
     try:
@@ -3866,7 +3866,7 @@ async def acs_install_status() -> JSONResponse:
 
 @app.get("/api/events")
 async def list_events(
-    church_id: str = "holy_comforter",
+    church_id: str,
     filters: Optional[str] = None,  # JSON string of filter conditions
     limit: int = 50,
     offset: int = 0
@@ -4037,7 +4037,7 @@ async def get_event(event_id: str) -> JSONResponse:
 
 @app.get("/api/decisions")
 async def list_decisions(
-    church_id: str = "holy_comforter",
+    church_id: str,
     category: Optional[str] = None,
     job_id: Optional[str] = None,
     limit: int = 100,
@@ -4078,7 +4078,7 @@ async def list_decisions(
 
 @app.get("/api/events-with-exceptions")
 async def list_events_with_exceptions(
-    church_id: str = "holy_comforter",
+    church_id: str,
     limit: int = 100,
     offset: int = 0,
     show_exceptions_only: bool = False,
@@ -4199,7 +4199,7 @@ async def list_events_with_exceptions(
 @app.get("/api/events/{event_id}/similar")
 async def find_similar_events(
     event_id: str,
-    church_id: str = "holy_comforter",
+    church_id: str,
     limit: int = 5,
 ) -> JSONResponse:
     """Find similar events for Q&A loop - transactions with matching dimensions.
@@ -4271,7 +4271,7 @@ async def find_similar_events(
 @app.post("/api/events/{event_id}/approve")
 async def approve_exception(
     event_id: str,
-    church_id: str = "holy_comforter",
+    church_id: str,
     body: Optional[dict] = None,
 ) -> JSONResponse:
     """Approve an exception as 'OK' - marks it as reviewed and no action needed.
@@ -4311,7 +4311,7 @@ async def approve_exception(
 @app.get("/api/decisions/{decision_id}/evidence")
 async def get_decision_evidence(
     decision_id: str,
-    church_id: str = "holy_comforter",
+    church_id: str,
 ) -> JSONResponse:
     """Get evidence (cited events) for a decision - shows reasoning context.
 
@@ -4486,7 +4486,7 @@ async def get_dimension_details(dimension_name: str) -> JSONResponse:
 
 
 @app.get("/api/operations-council")
-async def get_operations_council(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_operations_council(church_id: str) -> JSONResponse:
     """Unified judgment surface showing exceptions, policy drifts, and questions."""
     return _json({
         "church_id": church_id,
@@ -4560,7 +4560,7 @@ async def get_operations_council(church_id: str = "holy_comforter") -> JSONRespo
 
 @app.get("/api/reconciliation/exceptions")
 async def get_reconciliation_exceptions(
-    church_id: str = "holy_comforter",
+    church_id: str,
     limit: int = 50,
     offset: int = 0,
 ) -> JSONResponse:
@@ -4639,7 +4639,7 @@ async def get_reconciliation_exceptions(
 
 
 @app.get("/api/reconciliation/status")
-async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_reconciliation_status(church_id: str) -> JSONResponse:
     """Real-time reconciliation status across all sub-ledgers."""
     return _json({
         "church_id": church_id,
@@ -4687,7 +4687,7 @@ async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONRe
 
 
 @app.get("/api/compliance/status")
-async def get_compliance_status(church_id: str = "holy_comforter") -> JSONResponse:
+async def get_compliance_status(church_id: str) -> JSONResponse:
     """Live compliance position: covenants, GAAP, tax, policies, materiality.
 
     Policy section is sourced from the membrane (real data). Covenants/GAAP/tax/
@@ -4736,7 +4736,7 @@ async def update_policy(policy_id: str, body: Dict[str, Any]) -> JSONResponse:
 
 
 @app.post("/api/scenarios/project")
-async def project_scenario(church_id: str = "holy_comforter", body: Optional[Dict[str, Any]] = None) -> JSONResponse:
+async def project_scenario(church_id: str, body: Optional[Dict[str, Any]] = None) -> JSONResponse:
     """Project what-if scenario impact on covenant, margin, cash position."""
     scenario = body or {}
     return _json({
