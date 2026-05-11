@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from backend.cards.schemas import MemoryCard
 from backend.cards.store import get_card_store
 
 logger = logging.getLogger(__name__)
@@ -33,13 +34,11 @@ async def create_policy(
     Returns:
         Policy card
     """
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     policy_card = MemoryCard(
         card_id=f"policy-{policy_id}",
-        principal="decision-deputy",
+        principal="policy-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Policy: {title}. {description}",
@@ -153,14 +152,12 @@ async def vote_on_policy(
     Returns:
         Vote record
     """
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     # Create vote record
     vote_card = MemoryCard(
         card_id=f"vote-{policy_id}-{voter_id}",
-        principal="decision-deputy",
+        principal="policy-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Vote on policy {policy_id}: {vote}" +

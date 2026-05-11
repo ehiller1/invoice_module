@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any, List
 
+from backend.cards.schemas import MemoryCard
 from backend.cards.store import get_card_store
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,6 @@ async def create_accrual_schedule(
     expense_account: str,
 ) -> Dict[str, Any]:
     """Create accrual/amortization schedule."""
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     # Calculate periodic amount
@@ -40,7 +39,7 @@ async def create_accrual_schedule(
 
     card = MemoryCard(
         card_id=f"schedule-{schedule_id}",
-        principal="decision-deputy",
+        principal="accrual-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Accrual: {description}",
@@ -74,8 +73,6 @@ async def record_audit_finding(
     affected_accounts: List[str],
 ) -> Dict[str, Any]:
     """Record an audit finding."""
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     finding_data = {
@@ -90,7 +87,7 @@ async def record_audit_finding(
 
     card = MemoryCard(
         card_id=f"audit-{finding_id}",
-        principal="decision-deputy",
+        principal="audit-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Audit finding: {description}",

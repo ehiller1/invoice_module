@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any, Optional
 
+from backend.cards.schemas import MemoryCard
 from backend.cards.store import get_card_store
 
 logger = logging.getLogger(__name__)
@@ -36,17 +37,24 @@ async def create_pledge(
     Returns:
         Pledge card with ID and metadata
     """
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     pledge_card = MemoryCard(
         card_id=f"pledge-{pledge_id}",
-        principal="intake-specialist",
+        principal="pledge-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Pledge from {donor_name}: ${amount} for {purpose}",
         confidence=0.95,
+        metadata={
+            "pledge_id": pledge_id,
+            "donor_name": donor_name,
+            "amount": float(amount),
+            "purpose": purpose,
+            "pledge_date": pledge_date,
+            "expected_receipt_date": expected_receipt_date,
+            "restrictions": restrictions or {},
+        },
     )
 
     # Store pledge metadata
@@ -85,14 +93,12 @@ async def match_pledge_to_receipt(
     Returns:
         Match record with pledge-to-cash link
     """
-    from backend.cards.schemas import MemoryCard
-
     card_store = get_card_store()
 
     # Create match record
     match_card = MemoryCard(
         card_id=f"pledge-match-{pledge_id}-{receipt_date}",
-        principal="decision-deputy",
+        principal="pledge-engine",
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
         content=f"Matched ${receipt_amount} to pledge {pledge_id}",
@@ -126,11 +132,10 @@ async def get_pledge_fulfillment(
     """
     card_store = get_card_store()
 
-    # Query pledge and matches
-    all_cards = card_store.query_by_principal("intake-specialist")
-    pledge_cards = [c for c in all_cards if pledge_id in str(c.get("card_id"))]
+    # Query pledge record
+    pledge_card = card_store.read(f"pledge-{pledge_id}")
 
-    if not pledge_cards:
+    if not pledge_card:
         return {
             "pledge_id": pledge_id,
             "status": "not_found",
@@ -139,11 +144,21 @@ async def get_pledge_fulfillment(
             "outstanding": 0.0,
         }
 
-    # Extract pledge amount (would normally be from stored metadata)
-    pledge_amount = Decimal("10000")  # Placeholder
+    # Extract pledge amount from metadata
+    metadata = pledge_card.get("metadata", {})
+    pledge_amount = Decimal(str(metadata.get("amount", 0)))
 
-    # Get matches
-    match_cards = card_store.query_by_principal("decision-deputy")
+    if pledge_amount == 0:
+        return {
+            "pledge_id": pledge_id,
+            "status": "invalid",
+            "fulfillment_pct": 0.0,
+            "matched_amount": 0.0,
+            "outstanding": 0.0,
+        }
+
+    # Get matches from pledge-engine
+    match_cards = card_store.query_by_principal("pledge-engine")
     pledge_matches = [
         m for m in match_cards
         if pledge_id in str(m.get("content", ""))
@@ -185,7 +200,7 @@ async def list_pledges(
     card_store = get_card_store()
 
     # Query pledges
-    all_cards = card_store.query_by_principal("intake-specialist")
+    all_cards = card_store.query_by_principal("pledge-engine")
     pledge_cards = [c for c in all_cards if "pledge" in str(c.get("card_id", "")).lower()]
 
     # Filter by status if specified
