@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .auth import requires_role, User, verify_bearer_token
 from .models import (
     Account, AccountingContext, AllocationSchedule, ApportionmentAccount,
     ApprovalChain, BudgetMonth, BudgetPlan, ChatRequest, DenominationType,
@@ -80,11 +81,13 @@ app = FastAPI(
     description="Church invoice multi-agent COA mapping system (FRS-EMBARK-ACCT-001)",
     version="1.1.0",
 )
+# CORS: restrict to known origins in production
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-User-Role", "X-User-Email", "X-Proxy-Secret"],
 )
 
 # Setup wizard endpoints (/api/setup/*)
@@ -1186,7 +1189,16 @@ async def approve_via_token(
         "notes": "",
     })
 
-    if action.upper() == "REJECT":
+    action_upper = action.upper()
+    if action_upper not in {"APPROVE", "REJECT"}:
+        return HTMLResponse(
+            f"<html><body><h2>Invalid action</h2>"
+            f"<p>Action must be APPROVE or REJECT, not '{action}'.</p>"
+            f"</body></html>",
+            status_code=400,
+        )
+
+    if action_upper == "REJECT":
         job.status = ProcessingStatus.REJECTED
         job.updated_at = datetime.utcnow()
         body_html = (
@@ -1194,7 +1206,7 @@ async def approve_via_token(
             "<p>The invoice has been rejected and will not be posted.</p>"
             "</body></html>"
         )
-    else:
+    else:  # APPROVE
         job.status = ProcessingStatus.PENDING_TREASURER
         job.updated_at = datetime.utcnow()
         job.pending_approval_started_at = datetime.utcnow()

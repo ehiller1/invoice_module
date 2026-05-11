@@ -25,6 +25,7 @@ import inspect
 from typing import Callable, Iterable, Optional
 
 from fastapi import HTTPException, Request
+from pydantic import BaseModel
 
 
 # Role precedence — higher index = more privileged
@@ -39,6 +40,13 @@ ROLE_LEVELS = {
 def _extract_role(request: Optional[Request]) -> Optional[str]:
     if request is None:
         return None
+    # Validate proxy secret if configured (protect against header spoofing in dev)
+    import os
+    trusted_secret = os.environ.get("TRUSTED_PROXY_SECRET")
+    if trusted_secret:
+        provided_secret = request.headers.get("x-proxy-secret") or request.headers.get("X-Proxy-Secret")
+        if provided_secret != trusted_secret:
+            return None  # Role header ignored without valid secret
     role = request.headers.get("x-user-role") or request.headers.get("X-User-Role")
     if role:
         return role.strip().upper()
@@ -124,3 +132,16 @@ def get_caller_role(request: Optional[Request]) -> Optional[str]:
 
 def get_caller_email(request: Optional[Request]) -> Optional[str]:
     return _extract_email(request)
+
+
+class User(BaseModel):
+    """Stub user model extracted from request headers."""
+    user_id: Optional[str] = None
+    role: Optional[str] = None
+
+
+async def verify_bearer_token(request: Request) -> User:
+    """Extract user from request headers (trusted reverse proxy auth)."""
+    role = _extract_role(request)
+    email = _extract_email(request)
+    return User(user_id=email or "unknown", role=role or "FINANCE_STAFF")

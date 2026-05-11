@@ -26,10 +26,18 @@ CHROMA_DIR = DATA_ROOT / "chroma"
 CHROMA_DIR.mkdir(exist_ok=True)
 
 
-_embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name="all-MiniLM-L6-v2"
-)
+_embed_fn = None
 _chroma_client: Optional[chromadb.PersistentClient] = None
+
+
+def _get_embed_fn():
+    """Lazy-initialize the embedding function on first use."""
+    global _embed_fn
+    if _embed_fn is None:
+        _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    return _embed_fn
 
 
 def _client() -> chromadb.PersistentClient:
@@ -93,7 +101,7 @@ def _rebuild_index(ctx: AccountingContext) -> None:
         pass
     coll = client.create_collection(
         name=coll_name,
-        embedding_function=_embed_fn,
+        embedding_function=_get_embed_fn(),
         metadata={"church_id": ctx.church_id},
     )
     fund_lookup = {f.fund_id: f for f in ctx.funds}
@@ -129,7 +137,7 @@ def semantic_search(church_id: str, query: str, k: int = 5,
     coll_name = _coll_name(church_id)
     client = _client()
     try:
-        coll = client.get_collection(coll_name, embedding_function=_embed_fn)
+        coll = client.get_collection(coll_name, embedding_function=_get_embed_fn())
     except Exception:
         return []
     where = None
