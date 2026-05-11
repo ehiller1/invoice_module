@@ -151,7 +151,7 @@
 
       async function loadTiles() {
         // Invoices to Review
-        const jobs = await safeFetch(`${API}/api/jobs?status=pending`);
+        const jobs = await safeFetch(`${API}/api/jobs?church_id=${CHURCH_ID}&status=pending`);
         setTile('invoices_review', arrCount(jobs, 'jobs'));
 
         // Items Flagged
