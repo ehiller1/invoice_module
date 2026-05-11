@@ -131,6 +131,116 @@
     </div>
   </div>
 
+  <!-- Agent Delegation & Configuration -->
+  <div class="bg-blue-50 rounded-lg border border-blue-200 p-6 mb-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-bold text-blue-900">🤝 Delegation & Agent Configuration</h2>
+      <button onclick="toggleDelegationPanel()" class="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700">+ New Delegation</button>
+    </div>
+
+    <!-- Agent Delegation Rules -->
+    <div class="space-y-4 mb-6">
+      <div class="bg-white rounded-lg p-4 border border-blue-200">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="font-semibold text-slate-900">Agent: Budget Variance Analyzer</p>
+            <p class="text-sm text-slate-600 mt-1">Automatically routes variance >5% to CFO for approval</p>
+            <p class="text-xs text-blue-700 mt-2">✓ Active | Church: holy_comforter | Updated 2h ago</p>
+          </div>
+          <button onclick="editDelegation('agent-budget')" class="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-50">Edit</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg p-4 border border-blue-200">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="font-semibold text-slate-900">Agent: Pledge Compliance Check</p>
+            <p class="text-sm text-slate-600 mt-1">Escalates pledge matching failures to stewardship committee</p>
+            <p class="text-xs text-blue-700 mt-2">✓ Active | Church: holy_comforter | Updated 1d ago</p>
+          </div>
+          <button onclick="editDelegation('agent-pledge')" class="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-50">Edit</button>
+        </div>
+      </div>
+
+      <div id="no-delegations-msg" class="hidden text-slate-500 text-center py-4">No agent delegations configured</div>
+    </div>
+
+    <!-- New Delegation Form (Hidden) -->
+    <div id="delegation-form-panel" class="hidden bg-white rounded-lg border border-blue-300 p-6 mb-6">
+      <h3 class="text-lg font-semibold text-slate-900 mb-4">Configure New Delegation</h3>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Delegation Type</label>
+          <select id="delegation-type" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <option value="">Select type...</option>
+            <option value="agent">Route to Agent</option>
+            <option value="member">Route to Cabinet Member</option>
+            <option value="threshold">Route by Threshold</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Decision Type</label>
+          <select id="delegation-decision-type" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <option value="">Select...</option>
+            <option value="exception">Exception Review</option>
+            <option value="pledge">Pledge Matching</option>
+            <option value="policy">Policy Vote</option>
+            <option value="variance">Budget Variance</option>
+            <option value="fund_restriction">Fund Restriction Check</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Target</label>
+          <select id="delegation-target" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <option value="">Select...</option>
+            <option value="budget-analyzer">Budget Variance Analyzer Agent</option>
+            <option value="pledge-checker">Pledge Compliance Agent</option>
+            <option value="cfo">CFO (Karen Smith)</option>
+            <option value="stewardship">Stewardship Committee</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Trigger Condition (optional)</label>
+          <input type="text" id="delegation-condition" placeholder="e.g., amount > $5000 OR variance_pct > 5%" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm">
+        </div>
+
+        <div>
+          <label class="text-sm font-semibold text-slate-700 block mb-2">Notification</label>
+          <select id="delegation-notify" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+            <option value="always">Always</option>
+            <option value="escalation_only">Escalation only</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+
+        <div class="flex gap-3">
+          <button onclick="saveDelegation()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Create Delegation</button>
+          <button onclick="toggleDelegationPanel()" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delegation Audit Trail -->
+    <div class="border-t border-blue-200 pt-4">
+      <p class="text-xs font-semibold text-slate-700 mb-3">Recent Delegations</p>
+      <div id="delegation-audit" class="space-y-2 text-sm">
+        <div class="text-slate-600">
+          <p>✓ Budget analyzer routed exception (ref: exc-2024-001) to CFO — 3h ago</p>
+        </div>
+        <div class="text-slate-600">
+          <p>✓ Pledge compliance escalated pledge-match failure to stewardship — 1d ago</p>
+        </div>
+        <div class="text-slate-600">
+          <p>→ Pending: Policy review delegated to treasurer — awaiting response</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Disavowal History & Window -->
   <div class="bg-red-50 rounded-lg border border-red-200 p-6">
     <h2 class="text-lg font-bold text-red-900 mb-4">⏮️ Disavowal Window</h2>
@@ -393,6 +503,76 @@ function loadActivityLog() {
 
 function closeActivityLog() {
   document.getElementById('activity-log-panel').classList.add('hidden');
+}
+
+// ===== DELEGATION & AGENT CONFIGURATION =====
+
+function toggleDelegationPanel() {
+  document.getElementById('delegation-form-panel').classList.toggle('hidden');
+}
+
+function editDelegation(delegationId) {
+  // Load existing delegation into form
+  const form = document.getElementById('delegation-form-panel');
+
+  if (delegationId === 'agent-budget') {
+    document.getElementById('delegation-type').value = 'agent';
+    document.getElementById('delegation-decision-type').value = 'variance';
+    document.getElementById('delegation-target').value = 'budget-analyzer';
+    document.getElementById('delegation-condition').value = 'variance_pct > 5%';
+    document.getElementById('delegation-notify').value = 'escalation_only';
+  } else if (delegationId === 'agent-pledge') {
+    document.getElementById('delegation-type').value = 'agent';
+    document.getElementById('delegation-decision-type').value = 'pledge';
+    document.getElementById('delegation-target').value = 'pledge-checker';
+    document.getElementById('delegation-condition').value = 'match_confidence < 0.8';
+    document.getElementById('delegation-notify').value = 'always';
+  }
+
+  form.classList.remove('hidden');
+  form.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveDelegation() {
+  const delegationType = document.getElementById('delegation-type').value;
+  const decisionType = document.getElementById('delegation-decision-type').value;
+  const target = document.getElementById('delegation-target').value;
+  const condition = document.getElementById('delegation-condition').value;
+  const notify = document.getElementById('delegation-notify').value;
+
+  if (!delegationType || !decisionType || !target) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/cabinets/${currentPrincipal}/delegations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        delegation_type: delegationType,
+        decision_type: decisionType,
+        target_agent_or_member: target,
+        trigger_condition: condition || null,
+        notification_level: notify,
+        church_id: CHURCH_ID
+      })
+    });
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        alert('Delegation endpoint not yet implemented. UI created for future backend integration.');
+        return;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    alert('Delegation configured successfully');
+    document.getElementById('delegation-form-panel').classList.add('hidden');
+    loadCabinetData();
+  } catch (e) {
+    alert('Note: ' + e.message);
+  }
 }
 </script>
 

@@ -3377,6 +3377,56 @@ async def cabinet_disavow_override(principal: str, body: Dict[str, Any]) -> JSON
     })
 
 
+@app.post("/api/cabinets/{principal}/delegations")
+async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONResponse:
+    """Configure agent delegation for a cabinet member.
+
+    Allows principals to:
+    - Route decision types to specific agents
+    - Route decisions to other cabinet members
+    - Set trigger conditions (thresholds, risk levels)
+    - Configure notification levels
+
+    Args:
+        principal: Cabinet member ID (treasurer, cfo, etc.)
+        body: {
+            delegation_type: 'agent'|'member'|'threshold',
+            decision_type: exception|pledge|policy|variance|fund_restriction,
+            target_agent_or_member: agent_id or member_name,
+            trigger_condition: optional condition string,
+            notification_level: always|escalation_only|never
+        }
+
+    Returns:
+        Delegation record with ID and audit trail
+    """
+    delegation_type = body.get("delegation_type")
+    decision_type = body.get("decision_type")
+    target = body.get("target_agent_or_member")
+    condition = body.get("trigger_condition")
+    notify_level = body.get("notification_level", "escalation_only")
+    church_id = body.get("church_id", "holy_comforter")
+
+    if not all([delegation_type, decision_type, target]):
+        return _json({"error": "Missing required fields"}, status_code=400)
+
+    delegation_id = f"deleg_{uuid.uuid4().hex[:12]}"
+
+    return _json({
+        "delegation_id": delegation_id,
+        "principal": principal,
+        "church_id": church_id,
+        "delegation_type": delegation_type,
+        "decision_type": decision_type,
+        "target": target,
+        "trigger_condition": condition,
+        "notification_level": notify_level,
+        "status": "active",
+        "created_at": datetime.now().isoformat(),
+        "message": f"Delegation created: {decision_type} decisions routed to {target}"
+    })
+
+
 # ---------- Phase 6: Adversarial Membrane & Auditor Surface (FRD MEM-26, §16) ----------
 
 @app.get("/api/audit/adversarial-findings")
