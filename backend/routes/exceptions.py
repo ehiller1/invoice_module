@@ -1,6 +1,7 @@
 """Phase 5: Exceptions Queue action endpoints.
 
 Endpoints:
+  GET /api/churches/{church_id}/exceptions        — list exceptions for a church
   POST /api/exceptions/{id}/resolve   — mark resolved, no further action
   POST /api/exceptions/{id}/approve   — approve, write DECISION_PACKET verdict=APPROVED
   POST /api/exceptions/{id}/reject    — reject, write DECISION_PACKET verdict=REJECTED
@@ -16,10 +17,15 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
+from ..db import card_store
 from ..tools import exception_store
 from ..membrane.emitters import emit_hitl_escalation
 
-router = APIRouter(prefix="/api/exceptions", tags=["exceptions-queue"])
+# Router for listing exceptions by church
+church_router = APIRouter(prefix="/api/churches", tags=["exceptions-queue"])
+
+# Router for exception actions
+action_router = APIRouter(prefix="/api/exceptions", tags=["exceptions-queue"])
 
 _DEFAULT_CHURCH = os.environ.get("EMBARK_DEFAULT_CHURCH", "holy_comforter")
 
@@ -32,7 +38,32 @@ def _resolve_church(body: Optional[Dict[str, Any]], church_id: Optional[str]) ->
     return _DEFAULT_CHURCH
 
 
-@router.post("/{exception_id}/resolve")
+# GET endpoint to list exceptions for a church
+@church_router.get("/{church_id}/exceptions")
+async def list_exceptions(church_id: str) -> Dict[str, Any]:
+    """List exception cards for a church."""
+    try:
+        cards, total = card_store.list_exception_cards(church_id, limit=100)
+        return {
+            "church_id": church_id,
+            "cards": cards,
+            "total": total,
+            "count": len(cards),
+            "ok": True,
+        }
+    except Exception as e:
+        return {
+            "church_id": church_id,
+            "cards": [],
+            "total": 0,
+            "count": 0,
+            "ok": False,
+            "error": str(e),
+        }
+
+
+# POST endpoints for exception actions
+@action_router.post("/{exception_id}/resolve")
 async def resolve_exception(
     exception_id: str,
     body: Optional[Dict[str, Any]] = Body(default=None),
@@ -50,7 +81,7 @@ async def resolve_exception(
     return {"ok": True, "card_id": exception_id, "status": "RESOLVED"}
 
 
-@router.post("/{exception_id}/approve")
+@action_router.post("/{exception_id}/approve")
 async def approve_exception(
     exception_id: str,
     body: Optional[Dict[str, Any]] = Body(default=None),
@@ -65,7 +96,7 @@ async def approve_exception(
     return {"ok": True, "card_id": exception_id, "verdict": "APPROVED", "packet": packet}
 
 
-@router.post("/{exception_id}/reject")
+@action_router.post("/{exception_id}/reject")
 async def reject_exception(
     exception_id: str,
     body: Optional[Dict[str, Any]] = Body(default=None),
@@ -80,7 +111,7 @@ async def reject_exception(
     return {"ok": True, "card_id": exception_id, "verdict": "REJECTED", "packet": packet}
 
 
-@router.post("/{exception_id}/route")
+@action_router.post("/{exception_id}/route")
 async def route_exception(
     exception_id: str,
     body: Optional[Dict[str, Any]] = Body(default=None),
@@ -119,3 +150,7 @@ async def route_exception(
         "principal": new_principal,
         "status": "IN_REVIEW",
     }
+
+
+# Export both routers
+router = action_router  # Default export for backward compatibility

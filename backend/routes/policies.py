@@ -9,17 +9,43 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
+from ..db import card_store
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from ..membrane.pledge.policy_management import vote_on_policy as _vote_on_policy
 
-router = APIRouter(prefix="/api/policies", tags=["policies-queue"])
+church_router = APIRouter(prefix="/api/churches", tags=["policies-queue"])
+action_router = APIRouter(prefix="/api/policies", tags=["policies-queue"])
+
+
+@church_router.get("/{church_id}/policies")
+async def list_policies(church_id: str) -> Dict[str, Any]:
+    """List policy cards for a church."""
+    try:
+        cards, total = card_store.list_policy_cards(church_id, limit=100)
+        return {
+            "church_id": church_id,
+            "cards": cards,
+            "total": total,
+            "count": len(cards),
+            "ok": True,
+        }
+    except Exception as e:
+        return {
+            "church_id": church_id,
+            "cards": [],
+            "total": 0,
+            "count": 0,
+            "ok": False,
+            "error": str(e),
+        }
+
 
 _DEFAULT_CHURCH = os.environ.get("EMBARK_DEFAULT_CHURCH", "holy_comforter")
 _DEFAULT_VOTER = os.environ.get("EMBARK_DEFAULT_VOTER", "anonymous")
 
 
-@router.post("/{policy_id}/vote")
+@action_router.post("/{policy_id}/vote")
 async def vote_on_policy(
     policy_id: str,
     body: Optional[Dict[str, Any]] = Body(default=None),

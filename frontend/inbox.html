@@ -146,15 +146,80 @@ async function loadAll() {
     fetch(`${API}/api/churches/${CHURCH}/policies`).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
-  const exceptions = exRes.value || [];
-  const questions = qRes.value || [];
-  const recommendations = recRes.value || [];
-  const policies = polRes.value || [];
+  // Extract cards from API responses
+  const exceptions = (exRes.value?.cards || []).map(card => ({
+    exception_id: card.card_id,
+    exception_type: card.exception_type,
+    state: card.status,
+    summary: card.title,
+    details: { reason: card.description, ...card.evidence },
+    assigned_to: card.assigned_to,
+    priority: card.evidence?.priority || 'NORMAL',
+    privacy_class: card.evidence?.privacy_class || 'P2',
+    version: 1,
+    created_at: card.created_at,
+    updated_at: card.resolved_at || card.created_at
+  }));
 
-  renderExceptions(Array.isArray(exceptions) ? exceptions : (exceptions.exceptions || []));
-  renderQuestions(Array.isArray(questions) ? questions : (questions.questions || []));
-  renderRecommendations(Array.isArray(recommendations) ? recommendations : (recommendations.recommendations || []));
-  renderPolicies(Array.isArray(policies) ? policies : (policies.policies || []));
+  const questions = (qRes.value?.cards || []).map(card => ({
+    question_id: card.card_id,
+    state: card.status,
+    query: card.title,
+    question: card.title,
+    intent: card.evidence?.intent || 'general_inquiry',
+    answer: card.evidence?.answer || null,
+    context: card.description,
+    provenance: card.evidence?.provenance || [],
+    follow_on_suggestions: card.evidence?.follow_on_suggestions || [],
+    asker_id: card.assigned_to || 'analyst@example.com',
+    privacy_class: card.evidence?.privacy_class || 'P2',
+    version: 1,
+    created_at: card.created_at,
+    updated_at: card.resolved_at || card.created_at
+  }));
+
+  const recommendations = (recRes.value?.cards || []).map(card => ({
+    recommendation_id: card.card_id,
+    state: card.status,
+    title: card.title,
+    summary: card.title,
+    description: card.description,
+    candidates: card.evidence?.candidates || [],
+    selected_option: card.evidence?.selected_candidate || null,
+    selected_candidate: card.evidence?.selected_candidate || null,
+    rationale: card.evidence?.rationale || '',
+    impact_projection: card.evidence?.impact_projection || { cash_impact: '', mission_impact: '', covenant_impact: '' },
+    decision_deadline: card.evidence?.decision_deadline || new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+    decided_by: card.evidence?.decided_by || null,
+    decision: card.evidence?.decision || null,
+    privacy_class: card.evidence?.privacy_class || 'P2',
+    version: 1,
+    created_at: card.created_at,
+    updated_at: card.resolved_at || card.created_at
+  }));
+
+  const policies = (polRes.value?.cards || []).map(card => ({
+    policy_id: card.card_id,
+    policy_type: card.evidence?.policy_type || 'governance',
+    state: card.status,
+    title: card.title,
+    summary: card.title,
+    description: card.description,
+    proposed_action: card.evidence?.proposed_action || card.title,
+    effective_date: card.evidence?.effective_date || new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
+    voted_by: card.evidence?.voted_by || [],
+    decision: card.evidence?.decision || null,
+    my_vote: card.evidence?.my_vote || null,
+    privacy_class: card.evidence?.privacy_class || 'P2',
+    version: 1,
+    created_at: card.created_at,
+    updated_at: card.resolved_at || card.created_at
+  }));
+
+  renderExceptions(exceptions);
+  renderQuestions(questions);
+  renderRecommendations(recommendations);
+  renderPolicies(policies);
 }
 
 // ── Exceptions ──────────────────────────────────────────────────────────────

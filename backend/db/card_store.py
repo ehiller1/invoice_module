@@ -84,9 +84,10 @@ def list_exception_cards(church_id: str, status: Optional[str] = None, limit: in
     # Parse JSON fields
     for row in rows:
         if row.get('evidence'):
-            row['evidence'] = json.loads(row['evidence'])
-        if row.get('suggested_action'):
-            row['suggested_action'] = json.loads(row['suggested_action'])
+            if row.get('evidence') and isinstance(row['evidence'], str):
+                row['evidence'] = json.loads(row['evidence'])
+            if row.get('suggested_action') and isinstance(row['suggested_action'], str):
+                row['suggested_action'] = json.loads(row['suggested_action'])
 
     return rows, total.get('cnt', 0) if total else 0
 
@@ -145,7 +146,7 @@ def list_policy_cards(church_id: str, status: Optional[str] = None, limit: int =
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, policy_id, title, description, proposed_by, requires_vote, status, created_at
+            """SELECT card_id, policy_id, title, description, proposed_by, requires_vote, status, created_at, resolved_at, resolution_data
                FROM policy_cards WHERE church_id = %s AND status = %s
                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
             (church_row['id'], status, limit, offset)
@@ -157,11 +158,23 @@ def list_policy_cards(church_id: str, status: Optional[str] = None, limit: int =
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, policy_id, title, description, proposed_by, requires_vote, status, created_at
+            """SELECT card_id, policy_id, title, description, proposed_by, requires_vote, status, created_at, resolved_at, resolution_data
                FROM policy_cards WHERE church_id = %s
                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
             (church_row['id'], limit, offset)
         ))
+
+    # Normalize output format to match exception_cards schema
+    for row in rows:
+        # Normalize evidence from resolution_data
+        row['evidence'] = {}
+        if row.get('resolution_data'):
+            if isinstance(row['resolution_data'], str):
+                row['evidence'] = json.loads(row['resolution_data'])
+            else:
+                row['evidence'] = row['resolution_data'] or {}
+        row['exception_type'] = 'policy'  # For consistency
+        row['assigned_to'] = row.get('proposed_by')  # Map proposed_by to assigned_to
 
     return rows, total.get('cnt', 0) if total else 0
 
@@ -209,7 +222,7 @@ def list_question_cards(church_id: str, status: Optional[str] = None, limit: int
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, question_text, asked_by, assigned_to, status, created_at
+            """SELECT card_id, question_text, asked_by, assigned_to, status, created_at, resolved_at, response_data
                FROM question_cards WHERE church_id = %s AND status = %s
                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
             (church_row['id'], status, limit, offset)
@@ -221,11 +234,25 @@ def list_question_cards(church_id: str, status: Optional[str] = None, limit: int
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, question_text, asked_by, assigned_to, status, created_at
+            """SELECT card_id, question_text, asked_by, assigned_to, status, created_at, resolved_at, response_data
                FROM question_cards WHERE church_id = %s
                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
             (church_row['id'], limit, offset)
         ))
+
+    # Normalize output format to match exception_cards schema
+    for row in rows:
+        # Map question_text to title
+        row['title'] = row.get('question_text', '')
+        row['description'] = ''  # questions don't have descriptions
+        # Normalize evidence from response_data
+        row['evidence'] = {}
+        if row.get('response_data'):
+            if isinstance(row['response_data'], str):
+                row['evidence'] = json.loads(row['response_data'])
+            else:
+                row['evidence'] = row['response_data'] or {}
+        row['exception_type'] = 'question'  # For consistency
 
     return rows, total.get('cnt', 0) if total else 0
 
@@ -275,7 +302,7 @@ def list_recommendation_cards(church_id: str, status: Optional[str] = None, limi
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, recommendation_type, title, description, impact_score, confidence_pct, status, created_at
+            """SELECT card_id, recommendation_type, title, description, impact_score, confidence_pct, status, created_at, decided_at, decision_data
                FROM recommendation_cards WHERE church_id = %s AND status = %s
                ORDER BY impact_score DESC LIMIT %s OFFSET %s""",
             (church_row['id'], status, limit, offset)
@@ -287,10 +314,22 @@ def list_recommendation_cards(church_id: str, status: Optional[str] = None, limi
             fetch_one=True
         ))
         rows = cast(List[Dict[str, Any]], execute_query(
-            """SELECT card_id, recommendation_type, title, description, impact_score, confidence_pct, status, created_at
+            """SELECT card_id, recommendation_type, title, description, impact_score, confidence_pct, status, created_at, decided_at, decision_data
                FROM recommendation_cards WHERE church_id = %s
                ORDER BY impact_score DESC LIMIT %s OFFSET %s""",
             (church_row['id'], limit, offset)
         ))
+
+    # Normalize output format to match exception_cards schema
+    for row in rows:
+        # Normalize evidence from decision_data
+        row['evidence'] = {}
+        if row.get('decision_data'):
+            if isinstance(row['decision_data'], str):
+                row['evidence'] = json.loads(row['decision_data'])
+            else:
+                row['evidence'] = row['decision_data'] or {}
+        row['exception_type'] = 'recommendation'  # For consistency
+        row['resolved_at'] = row.get('decided_at')  # Map decided_at to resolved_at
 
     return rows, total.get('cnt', 0) if total else 0

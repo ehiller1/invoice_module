@@ -104,8 +104,23 @@ async function loadPolicies() {
     const res = await fetch(`${API}/api/churches/${CHURCH_ID}/policies`);
     const data = await res.json();
 
-    if (data.policies && Array.isArray(data.policies) && data.policies.length > 0) {
-      allPolicies = data.policies;
+    if (data.cards && Array.isArray(data.cards) && data.cards.length > 0) {
+      // Convert DB format to frontend format
+      allPolicies = data.cards.map((card, idx) => ({
+        policy_id: card.card_id,
+        policy_type: card.evidence?.policy_type || 'governance',
+        state: card.status,
+        title: card.title,
+        description: card.description,
+        proposed_action: card.evidence?.proposed_action || card.title,
+        effective_date: card.evidence?.effective_date || new Date(Date.now() + 30 * 24 * 3600000).toISOString(),
+        voted_by: card.evidence?.voted_by || [],
+        decision: card.evidence?.decision || null,
+        privacy_class: card.evidence?.privacy_class || 'P2',
+        version: 1,
+        created_at: card.created_at,
+        updated_at: card.resolved_at || card.created_at
+      }));
     } else {
       // Fallback to mock data
       allPolicies = [

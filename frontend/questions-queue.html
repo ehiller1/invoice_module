@@ -64,8 +64,22 @@ async function loadQuestions() {
     const res = await fetch(`${API}/api/churches/${CHURCH_ID}/questions`);
     const data = await res.json();
 
-    if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-      allQuestions = data.questions;
+    if (data.cards && Array.isArray(data.cards) && data.cards.length > 0) {
+      // Convert DB format to frontend format
+      allQuestions = data.cards.map((card, idx) => ({
+        question_id: card.card_id,
+        state: card.status,
+        query: card.title,
+        intent: card.evidence?.intent || 'general_inquiry',
+        answer: card.evidence?.answer || null,
+        provenance: card.evidence?.provenance || [],
+        follow_on_suggestions: card.evidence?.follow_on_suggestions || [],
+        asker_id: card.assigned_to || 'analyst@example.com',
+        privacy_class: card.evidence?.privacy_class || 'P2',
+        version: 1,
+        created_at: card.created_at,
+        updated_at: card.resolved_at || card.created_at
+      }));
     } else {
       // Fallback to mock data
       allQuestions = [

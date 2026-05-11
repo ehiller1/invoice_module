@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException
 
+from ..db import card_store
 from ..tools import question_store
 
 router = APIRouter(prefix="/api/churches", tags=["questions-queue"])
@@ -65,6 +66,29 @@ async def answer_question(
             reasoning=gen["reasoning"],
             source=gen["source"],
         )
+
+
+@router.get("/{church_id}/questions")
+async def list_questions(church_id: str) -> Dict[str, Any]:
+    """List question cards for a church."""
+    try:
+        cards, total = card_store.list_question_cards(church_id, limit=100)
+        return {
+            "church_id": church_id,
+            "cards": cards,
+            "total": total,
+            "count": len(cards),
+            "ok": True,
+        }
+    except Exception as e:
+        return {
+            "church_id": church_id,
+            "cards": [],
+            "total": 0,
+            "count": 0,
+            "ok": False,
+            "error": str(e),
+        }
         return {"ok": True, "question_id": question_id, "answer_record": rec, "generated": True}
 
     rec = question_store.record_answer(

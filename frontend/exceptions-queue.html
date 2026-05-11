@@ -139,8 +139,24 @@ async function loadExceptions() {
     const data = await res.json();
 
     // If endpoint returns exceptions array, use it; otherwise use mock
-    if (data.exceptions && Array.isArray(data.exceptions) && data.exceptions.length > 0) {
-      allExceptions = data.exceptions;
+    if (data.cards && Array.isArray(data.cards) && data.cards.length > 0) {
+      // Convert DB format to frontend format
+      allExceptions = data.cards.map((card, idx) => ({
+        exception_id: card.card_id,
+        exception_type: card.exception_type,
+        state: card.status,
+        summary: card.title,
+        details: {
+          reason: card.description,
+          ...card.evidence
+        },
+        assigned_to: card.assigned_to,
+        priority: card.evidence?.priority || 'NORMAL',
+        privacy_class: card.evidence?.privacy_class || 'P2',
+        version: 1,
+        created_at: card.created_at,
+        updated_at: card.resolved_at || card.created_at
+      }));
     } else {
       // Fallback to mock data for Phase 3 testing
       allExceptions = [

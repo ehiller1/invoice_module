@@ -64,8 +64,29 @@ async function loadRecommendations() {
     const res = await fetch(`${API}/api/churches/${CHURCH_ID}/recommendations`);
     const data = await res.json();
 
-    if (data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
-      allRecommendations = data.recommendations;
+    if (data.cards && Array.isArray(data.cards) && data.cards.length > 0) {
+      // Convert DB format to frontend format
+      allRecommendations = data.cards.map((card, idx) => ({
+        recommendation_id: card.card_id,
+        state: card.status,
+        title: card.title,
+        description: card.description,
+        candidates: card.evidence?.candidates || [],
+        selected_candidate: card.evidence?.selected_candidate || null,
+        rationale: card.evidence?.rationale || '',
+        impact_projection: card.evidence?.impact_projection || {
+          cash_impact: '',
+          mission_impact: '',
+          covenant_impact: ''
+        },
+        decision_deadline: card.evidence?.decision_deadline || new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+        decided_by: card.evidence?.decided_by || null,
+        decision: card.evidence?.decision || null,
+        privacy_class: card.evidence?.privacy_class || 'P2',
+        version: 1,
+        created_at: card.created_at,
+        updated_at: card.resolved_at || card.created_at
+      }));
     } else {
       // Fallback to mock data
       allRecommendations = [

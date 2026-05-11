@@ -96,11 +96,15 @@ app.include_router(_setup_wizard.router)
 try:
     from .routes import exceptions as _phase5_exceptions
     from .routes import questions as _phase5_questions
-    from .routes import policies as _phase5_policies
+    from .routes import policies as _phase5_policies_routes
     from .routes import reconciliation as _phase5_reconciliation
+    from .routes import recommendations as _phase5_recommendations
     app.include_router(_phase5_exceptions.router)
+    app.include_router(_phase5_exceptions.church_router)
     app.include_router(_phase5_questions.router)
-    app.include_router(_phase5_policies.router)
+    app.include_router(_phase5_policies_routes.church_router)
+    app.include_router(_phase5_policies_routes.action_router)
+    app.include_router(_phase5_recommendations.router)
     app.include_router(_phase5_reconciliation.router)
 except Exception as _phase5_err:  # pragma: no cover - defensive
     import logging as _l
