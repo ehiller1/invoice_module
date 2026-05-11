@@ -37,6 +37,8 @@ from ..decision_ledger import (
 )
 
 
+GENESIS_HASH = "0" * 64
+
 # Re-export for convenience
 DecisionLedgerEntry = LedgerEntry
 
@@ -147,12 +149,23 @@ def _row_to_entry(row: Dict[str, Any]) -> LedgerEntry:
         alternatives=list(alternatives) if isinstance(alternatives, list) else [],
         outcome=_DB_TO_OUTCOME.get(row["outcome"], DecisionOutcome.TABLED),
         disavowed_at=row.get("disavowed_at"),
+        entry_hash=row.get("entry_hash"),
+        prev_hash=row.get("prev_hash"),
     )
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+def _compute_ledger_hash(entry: LedgerEntry, prev_hash: str) -> str:
+    """Compute SHA-256 hash of ledger entry for tamper evidence chain."""
+    import hashlib
+    entry_dict = entry.model_dump(exclude={'entry_hash'})
+    entry_str = json.dumps(entry_dict, sort_keys=True, default=str)
+    combined = prev_hash + entry_str
+    return hashlib.sha256(combined.encode()).hexdigest()
+
 
 def append_entry(church_id: str, entry: LedgerEntry, job_id: Optional[str] = None) -> str:
     """Append an entry to the ledger. Returns the entry_id.
@@ -179,6 +192,17 @@ def append_entry(church_id: str, entry: LedgerEntry, job_id: Optional[str] = Non
     inference_json = json.dumps(payload.get("inference_chain") or [], default=str)
     alternatives_json = json.dumps(payload.get("alternatives") or [], default=str)
 
+    # Get previous entry's hash for hash chain
+    prev_result = execute_query(
+        "SELECT entry_hash FROM decision_ledger_entries WHERE church_id = %s ORDER BY created_at DESC LIMIT 1",
+        (church_pk,),
+        fetch_one=True,
+    )
+    prev_hash = prev_result["entry_hash"] if prev_result else GENESIS_HASH
+    entry.prev_hash = prev_hash
+    entry_hash = _compute_ledger_hash(entry, prev_hash)
+    entry.entry_hash = entry_hash
+
     with atomic_transaction() as conn:
         cur = conn.cursor()
         cur.execute(
@@ -187,12 +211,14 @@ def append_entry(church_id: str, entry: LedgerEntry, job_id: Optional[str] = Non
                 entry_id, church_id, job_id, decision_id,
                 category, authoring_actor, policy_invoked,
                 evidence_refs, inference_chain, conclusion,
-                alternatives, outcome, disavowed_at
+                alternatives, outcome, disavowed_at,
+                entry_hash, prev_hash
             ) VALUES (
                 %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s::jsonb, %s,
-                %s::jsonb, %s, %s
+                %s::jsonb, %s, %s,
+                %s, %s
             )
             """,
             (
@@ -209,6 +235,8 @@ def append_entry(church_id: str, entry: LedgerEntry, job_id: Optional[str] = Non
                 alternatives_json,
                 _outcome_to_db(entry.outcome),
                 entry.disavowed_at,
+                entry_hash,
+                prev_hash,
             ),
         )
         cur.close()

@@ -61,6 +61,10 @@ class LedgerEntry(BaseModel):
     disavowed_at: Optional[datetime] = None  # if principal disavowed this decision
     disavowal_reason: Optional[str] = None
 
+    # Hash chain (Wave 3.14: tamper evidence)
+    entry_hash: Optional[str] = None  # SHA-256 hash of this entry
+    prev_hash: Optional[str] = None   # SHA-256 hash of previous entry (GENESIS=0x64 for first)
+
     # Payload (for future use: structured reasoning that doesn't fit above)
     metadata: Dict[str, Any] = {}
 

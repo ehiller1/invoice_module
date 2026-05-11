@@ -22,7 +22,7 @@ if _env_file.exists():
     print(f"[EIME] Loaded {len(_env_vars)} env vars from {_env_file}", flush=True)
     print(f"[EIME] ANTHROPIC_API_KEY = {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:20]}...", flush=True)
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,16 +35,15 @@ from .models import (
     DocumentType, Fund, FundCategory, HITLDecisions, HITLLineDecision,
     ProcessingStatus, RestrictionClass,
 )
-# NOTE: Phase 1 DB-store migration (Imports & Basic Wiring).
-# - `tools.coa_store` retained at module level: db.coa_store does not yet
-#   expose `ensure_seed` or `semantic_search`. Endpoints that only use
-#   load/save/list_churches/upsert/delete are routed through `db.coa_store`
-#   via inline imports. Bulk migration of these calls is a later phase.
+# NOTE: Wave 2.9 DB-store migration (COA bulk migration COMPLETE).
+# - All COA method calls now route through `db.coa_store` (PostgreSQL-backed).
+#   The `from .tools import coa_store` import is retained for clarity but the
+#   symbol is no longer referenced in this file; method calls use `db.coa_store.*`.
 # - `tools.approval_audit` retained: no db equivalent yet (the eventual
 #   db.approval_audit_store change happens inside approval_audit.py, not here).
 # - `tools.approval_chain_resolver` retained for now; new code paths use
 #   `db.approval_store`.
-from .tools import coa_store
+from .tools import coa_store  # noqa: F401  retained per Wave 2.9 instructions
 from .tools.spreadsheet_parser import parse_spreadsheet
 from .tools import approval_chain_resolver, approval_audit
 from .integrations.email import tokens as email_tokens
@@ -126,7 +125,7 @@ except Exception as _phase8_err:  # pragma: no cover - defensive
 
 @app.on_event("startup")
 async def startup() -> None:
-    coa_store.ensure_seed()
+    db.coa_store.ensure_seed()
     # FR-05.5: launch reminder/escalation scheduler.
     try:
         approval_scheduler.start_scheduler()
@@ -163,7 +162,7 @@ def _json(data: Any, status_code: int = 200) -> JSONResponse:
 
 @app.get("/api/churches")
 async def list_churches() -> JSONResponse:
-    return _json(coa_store.list_churches())
+    return _json(db.coa_store.list_churches())
 
 
 class ChurchCreate(BaseModel):
@@ -176,7 +175,7 @@ class ChurchCreate(BaseModel):
 @app.post("/api/churches")
 async def create_church(body: ChurchCreate) -> JSONResponse:
     """Create a new church with a minimal COA skeleton."""
-    existing = coa_store.load_accounting_context(body.church_id)
+    existing = db.coa_store.load_accounting_context(body.church_id)
     if existing:
         raise HTTPException(409, f"Church '{body.church_id}' already exists")
     from datetime import date
@@ -212,13 +211,13 @@ async def create_church(body: ChurchCreate) -> JSONResponse:
                  fund_category=FundCategory.GENERAL_OPERATING),
         ],
     )
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"ok": True, "church_id": body.church_id})
 
 
 @app.get("/api/churches/{church_id}/context")
 async def get_context(church_id: str) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church COA not found")
     return _json(ctx.model_dump())
@@ -226,7 +225,7 @@ async def get_context(church_id: str) -> JSONResponse:
 
 @app.get("/api/churches/{church_id}/accounts")
 async def get_accounts(church_id: str) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     return _json([a.model_dump() for a in ctx.accounts])
@@ -234,7 +233,7 @@ async def get_accounts(church_id: str) -> JSONResponse:
 
 @app.get("/api/churches/{church_id}/funds")
 async def get_funds(church_id: str) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     return _json([f.model_dump() for f in ctx.funds])
@@ -251,23 +250,23 @@ class AccountUpsert(BaseModel):
 
 @app.post("/api/churches/{church_id}/accounts")
 async def upsert_account(church_id: str, body: AccountUpsert) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     ctx.accounts = [a for a in ctx.accounts if a.account_number != body.account_number]
     ctx.accounts.append(Account(**body.model_dump()))
     ctx.accounts.sort(key=lambda a: a.account_number)
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"ok": True})
 
 
 @app.delete("/api/churches/{church_id}/accounts/{account_number}")
 async def delete_account(church_id: str, account_number: str) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     ctx.accounts = [a for a in ctx.accounts if a.account_number != account_number]
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"ok": True})
 
 
@@ -283,22 +282,22 @@ class FundUpsert(BaseModel):
 
 @app.post("/api/churches/{church_id}/funds")
 async def upsert_fund(church_id: str, body: FundUpsert) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     ctx.funds = [f for f in ctx.funds if f.fund_id != body.fund_id]
     ctx.funds.append(Fund(**body.model_dump()))
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"ok": True})
 
 
 @app.delete("/api/churches/{church_id}/funds/{fund_id}")
 async def delete_fund(church_id: str, fund_id: str) -> JSONResponse:
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     ctx.funds = [f for f in ctx.funds if f.fund_id != fund_id]
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"ok": True})
 
 
@@ -314,7 +313,7 @@ class COAImport(BaseModel):
 @app.post("/api/churches/{church_id}/coa/import")
 async def import_coa(church_id: str, body: COAImport) -> JSONResponse:
     """Bulk-replace or merge a church's chart of accounts from JSON."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, f"Church '{church_id}' not found. Create it first via POST /api/churches")
 
@@ -363,7 +362,7 @@ async def import_coa(church_id: str, body: COAImport) -> JSONResponse:
             ctx.funds.append(fund)
             added_funds += 1
 
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({
         "ok": True,
         "accounts_imported": added_accounts,
@@ -376,7 +375,7 @@ async def import_coa(church_id: str, body: COAImport) -> JSONResponse:
 @app.post("/api/churches/{church_id}/coa/import-spreadsheet")
 async def import_coa_spreadsheet(church_id: str, file: UploadFile) -> JSONResponse:
     """Bulk import church accounts/funds from Excel or CSV spreadsheet."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, f"Church '{church_id}' not found. Create it first via POST /api/churches")
 
@@ -429,7 +428,7 @@ async def import_coa_spreadsheet(church_id: str, file: UploadFile) -> JSONRespon
             ctx.funds.append(fund)
             added_funds += 1
 
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({
         "ok": True,
         "accounts_imported": added_accounts,
@@ -441,7 +440,7 @@ async def import_coa_spreadsheet(church_id: str, file: UploadFile) -> JSONRespon
 
 @app.get("/api/churches/{church_id}/search")
 async def semantic_search(church_id: str, q: str, k: int = 5) -> JSONResponse:
-    results = coa_store.semantic_search(church_id, q, k=k)
+    results = db.coa_store.semantic_search(church_id, q, limit=k)
     return _json(results)
 
 
@@ -456,7 +455,7 @@ async def import_budget_spreadsheet(church_id: str, file: UploadFile) -> JSONRes
       - jan, feb, mar, ..., dec (optional — monthly amounts)
       - annual_budget / annual_total / annual (optional — annual figure)
     """
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, f"Church '{church_id}' not found.")
 
@@ -514,7 +513,7 @@ async def import_budget_spreadsheet(church_id: str, file: UploadFile) -> JSONRes
         uploaded_by=None,
         source_filename=file.filename,
     )
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
 
     return _json({
         "fiscal_year": ctx.fiscal_year,
@@ -528,7 +527,7 @@ async def import_budget_spreadsheet(church_id: str, file: UploadFile) -> JSONRes
 @app.get("/api/churches/{church_id}/budget")
 async def get_budget(church_id: str) -> JSONResponse:
     """Return the current budget plan + YTD actuals."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     if ctx.budget is None:
@@ -543,7 +542,7 @@ async def get_budget(church_id: str) -> JSONResponse:
 @app.get("/api/churches/{church_id}/budget/variance-report")
 async def variance_report(church_id: str) -> JSONResponse:
     """Compute live variance report against current YTD actuals."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     if ctx.budget is None:
@@ -620,7 +619,7 @@ async def ytd_reset(
         )
     if not body.confirm:
         raise HTTPException(400, "ytd-reset requires `confirm: true`")
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
 
@@ -632,7 +631,7 @@ async def ytd_reset(
         ctx.ytd_actuals = {}
     reset_at = datetime.utcnow().isoformat()
     ctx.warnings.append(f"YTD reset on {reset_at}; previous total ${previous_total}")
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({
         "previous_ytd_total": str(previous_total),
         "reset_at": reset_at,
@@ -650,7 +649,7 @@ async def year_end_reset(church_id: str, body: YearEndResetBody) -> JSONResponse
     """Roll over to the next fiscal year. Resets YTD; optionally retains plan."""
     if not body.confirm:
         raise HTTPException(400, "year-end-reset requires `confirm: true`")
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
 
@@ -675,7 +674,7 @@ async def year_end_reset(church_id: str, body: YearEndResetBody) -> JSONResponse
         f"Year-end reset to FY{body.next_fiscal_year} on {reset_at}; "
         f"previous YTD total ${previous_total}; rolled_forward={body.roll_forward_plan}"
     )
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({
         "ok": True,
         "next_fiscal_year": body.next_fiscal_year,
@@ -692,7 +691,7 @@ class ThresholdBody(BaseModel):
 @app.get("/api/churches/{church_id}/budget/projection")
 async def budget_projection(church_id: str) -> JSONResponse:
     """FR-03.3: project year-end balance for each budgeted account."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     if not ctx.budget:
@@ -707,11 +706,11 @@ async def set_warning_threshold(church_id: str, body: ThresholdBody) -> JSONResp
     """Set the church's budget warning threshold (0.0–1.0)."""
     if body.threshold < 0.0 or body.threshold > 1.0:
         raise HTTPException(422, "threshold must be in [0.0, 1.0]")
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, "Church not found")
     ctx.budget_warning_threshold = body.threshold
-    coa_store.save_accounting_context(ctx)
+    db.coa_store.save_accounting_context(ctx)
     return _json({"budget_warning_threshold": body.threshold})
 
 
@@ -2369,7 +2368,7 @@ async def plaid_create_link_token(church_id: str) -> JSONResponse:
     """Generate a Plaid Link token for the UI to open Plaid Link."""
     from .integrations import plaid_client
     try:
-        churches = coa_store.list_churches()
+        churches = db.coa_store.list_churches()
         church_name = next(
             (c.get("church_name", church_id) for c in churches if c.get("church_id") == church_id),
             church_id,
@@ -2711,7 +2710,7 @@ async def budget_variance_alias(church_id: str) -> JSONResponse:
 
     Returns variance report with year-forward projections per FR-03.3.
     """
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         raise HTTPException(404, f"Church not found: {church_id}")
     if ctx.budget is None:
@@ -2785,7 +2784,7 @@ async def coa_search_alias(q: str, church_id: str, k: int = 5) -> JSONResponse:
     if not q or not q.strip():
         return _json({"matches": [], "query": q})
     try:
-        results = coa_store.semantic_search(church_id, q.strip(), k=k)
+        results = db.coa_store.semantic_search(church_id, q.strip(), limit=k)
     except Exception as exc:
         return _json({"matches": [], "query": q, "error": str(exc)})
 
@@ -2810,7 +2809,7 @@ async def coa_search_alias(q: str, church_id: str, k: int = 5) -> JSONResponse:
 @app.get("/api/coa")
 async def coa_list_alias(church_id: str) -> JSONResponse:
     """List all GL accounts for a church (frontend convenience)."""
-    ctx = coa_store.load_accounting_context(church_id)
+    ctx = db.coa_store.load_accounting_context(church_id)
     if not ctx:
         return _json({"accounts": [], "funds": []})
     accounts = []
@@ -3074,7 +3073,9 @@ async def route_intent(body: Dict[str, Any]) -> JSONResponse:
     Phase 4: Simple keyword-based routing. Phase 5+: LLM classification via Claude API.
     """
     query = body.get("query", "").lower()
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
 
     # Simple keyword matching (Phase 4); Phase 5 will use LLM
     intents_map = {
@@ -3208,7 +3209,9 @@ async def answer_question(body: Dict[str, Any]) -> JSONResponse:
     """
     intent = body.get("intent")
     query = body.get("query", "")
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
     question_id = body.get("question_id")
     context = body.get("context", {})
 
@@ -3348,7 +3351,9 @@ async def cabinet_approve_decision(principal: str, body: Dict[str, Any]) -> JSON
     pending_id = body.get("pending_id")
     action = body.get("action")  # "approve", "reject", "abstain", "route", etc.
     reasoning = body.get("reasoning", "")
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
 
     # Phase 5: Would integrate with decision ledger
     return _json({
@@ -3375,7 +3380,9 @@ async def cabinet_disavow_override(principal: str, body: Dict[str, Any]) -> JSON
     """
     override_id = body.get("override_id")
     reason = body.get("reason", "")
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
 
     # Phase 5: Would validate disavowal eligibility, check time window
     return _json({
@@ -3422,7 +3429,9 @@ async def create_delegation(principal: str, body: Dict[str, Any]) -> JSONRespons
     target = body.get("target_agent_or_member")
     condition = body.get("trigger_condition")
     notify_level = body.get("notification_level", "escalation_only")
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
 
     if not all([delegation_type, decision_type, target]):
         return _json({"error": "Missing required fields"}, status_code=400)
@@ -3777,7 +3786,9 @@ async def acs_status(church_id: str) -> JSONResponse:
 @app.post("/api/integrations/acs/test")
 async def acs_test_connection(body: Dict[str, Any]) -> JSONResponse:
     """Test ACS Realm browser connection without storing credentials."""
-    church_id = body.get("church_id", "holy_comforter")
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
     base_url = body.get("base_url")
     username = body.get("username")
     password = body.get("password")
@@ -5247,6 +5258,19 @@ async def list_scenarios_endpoint(
     return result
 
 
+@app.get("/api/scenarios/list")
+async def list_scenarios_alias_endpoint(
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """Alias for GET /api/scenarios — frontend compatibility endpoint."""
+    from backend.membrane.scenario.simulator import list_scenarios
+
+    result = await list_scenarios(status=status, limit=limit, offset=offset)
+    return result
+
+
 @app.get("/api/scenarios/{scenario_id}")
 async def get_scenario_endpoint(scenario_id: str) -> Dict[str, Any]:
     """Retrieve a specific scenario by ID.
@@ -5390,6 +5414,22 @@ async def suggest_gl_mapping_endpoint(
         vendor_category=vendor_category,
     )
     return result
+
+
+@app.get("/api/churches/{church_id}/receipts")
+async def list_church_receipts_endpoint(
+    church_id: str,
+) -> list:
+    """List receipts for a church (recent captures).
+
+    Args:
+        church_id: Church identifier
+
+    Returns:
+        List of receipt objects (empty until receipt storage backend is implemented)
+    """
+    # Receipt storage backend not yet implemented; return empty list to unblock frontend.
+    return []
 
 
 @app.get("/api/vendors/{vendor_name}/info")

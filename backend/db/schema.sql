@@ -360,7 +360,9 @@ CREATE TABLE decision_ledger_entries (
     alternatives JSONB,  -- Considered alternatives
     outcome decision_outcome NOT NULL,
     disavowed_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entry_hash VARCHAR(64),
+    prev_hash VARCHAR(64)
 );
 CREATE INDEX idx_decision_entries_entry_id ON decision_ledger_entries(entry_id);
 CREATE INDEX idx_decision_entries_church_id ON decision_ledger_entries(church_id);
@@ -368,6 +370,10 @@ CREATE INDEX idx_decision_entries_job_id ON decision_ledger_entries(church_id, j
 CREATE INDEX idx_decision_entries_category ON decision_ledger_entries(church_id, category);
 CREATE INDEX idx_decision_entries_actor ON decision_ledger_entries(church_id, authoring_actor);
 CREATE INDEX idx_decision_entries_created ON decision_ledger_entries(church_id, created_at);
+
+-- Wave 3.14: hash chain columns for tamper evidence (idempotent migration)
+ALTER TABLE decision_ledger_entries ADD COLUMN IF NOT EXISTS entry_hash VARCHAR(64);
+ALTER TABLE decision_ledger_entries ADD COLUMN IF NOT EXISTS prev_hash VARCHAR(64);
 
 -- 20. Approval Audit Events
 CREATE TABLE approval_audit_events (
