@@ -9,41 +9,27 @@ from pathlib import Path
 
 import pytest
 
+from backend.models.schemas import JEStatus
+from backend.tests.factories import JournalEntryFactory, VendorFactory
+
 
 # ---- helpers ----
 
 def _make_je(amount="100.00", entry_id="JE-TEST-001"):
-    from backend.models.schemas import (
-        JournalEntry, JournalEntryLine, JEStatus,
-    )
-    amt = Decimal(amount)
-    je = JournalEntry(
+    """Create a test JournalEntry.
+
+    DEPRECATED: Use JournalEntryFactory.build() instead.
+    Kept for backward compatibility.
+    """
+    return JournalEntryFactory.build(
         entry_id=entry_id,
         church_id="testch",
-        fiscal_year=2026,
-        accounting_period="2026-05",
-        entry_date=date(2026, 5, 6),
+        debit_amount=amount,
+        status=JEStatus.APPROVED,
         reference="INV-001",
         vendor_name="Acme Vendor",
         description="Test JE",
-        status=JEStatus.APPROVED,
-        lines=[
-            JournalEntryLine(
-                sequence=1, account_number="7100", account_name="Office Supplies",
-                fund_id="GEN", fund_name="General", debit=amt, credit=Decimal("0"),
-                memo="test",
-            ),
-            JournalEntryLine(
-                sequence=2, account_number="2010", account_name="Accounts Payable",
-                fund_id="GEN", fund_name="General", debit=Decimal("0"), credit=amt,
-                memo="test",
-            ),
-        ],
-        total_debits=amt,
-        total_credits=amt,
-        balanced=True,
     )
-    return je
 
 
 @pytest.fixture
@@ -61,15 +47,13 @@ def tmp_payment_data(tmp_path, monkeypatch):
 # ===== Vendor store =====
 
 def test_vendor_store_round_trip(tmp_payment_data):
-    from backend.models.schemas import Vendor, PaymentMethod
+    from backend.models.schemas import PaymentMethod
     from backend.tools import vendor_store
 
-    v = Vendor(
+    v = VendorFactory.build(
         vendor_id="V001",
         church_id="testch",
         name="Acme Vendor",
-        payment_methods=[PaymentMethod.ACH, PaymentMethod.CHECK],
-        preferred_method=PaymentMethod.ACH,
         ach_routing="123456789",
         ach_account_last4="1234",
     )
@@ -86,15 +70,11 @@ def test_vendor_store_round_trip(tmp_payment_data):
 # ===== Recommender =====
 
 def test_recommend_payment_method_uses_vendor_preference():
-    from backend.models.schemas import Vendor, PaymentMethod
+    from backend.models.schemas import PaymentMethod
     from backend.tools.payment_recommender import recommend_payment_method
 
     je = _make_je()
-    v = Vendor(
-        vendor_id="V1", church_id="testch", name="Acme",
-        payment_methods=[PaymentMethod.ACH, PaymentMethod.CHECK],
-        preferred_method=PaymentMethod.ACH,
-    )
+    v = VendorFactory.build(vendor_id="V1", church_id="testch", name="Acme")
     rec = recommend_payment_method(je, v)
     assert rec["recommended"] == "ACH"
     assert "Acme" in rec["rationale"]

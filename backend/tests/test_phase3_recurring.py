@@ -9,38 +9,20 @@ from pathlib import Path
 
 import pytest
 
+from backend.tests.factories import JournalEntryFactory
+
 
 def _je_template(amount="100.00"):
-    """Return a JournalEntry-shaped dict suitable as a template."""
-    amt = Decimal(amount)
-    return {
-        "entry_id": "TPL-001",
-        "church_id": "testch",
-        "fiscal_year": 2026,
-        "accounting_period": "2026-05",
-        "entry_date": "2026-05-06",
-        "reference": "RECUR",
-        "vendor_name": "Recurring Payee",
-        "description": "Monthly rent",
-        "status": "DRAFT",
-        "lines": [
-            {
-                "sequence": 1, "account_number": "7100",
-                "account_name": "Office Supplies", "fund_id": "GEN",
-                "fund_name": "General", "debit": str(amt),
-                "credit": "0", "memo": "rent",
-            },
-            {
-                "sequence": 2, "account_number": "2010",
-                "account_name": "Accounts Payable", "fund_id": "GEN",
-                "fund_name": "General", "debit": "0",
-                "credit": str(amt), "memo": "rent",
-            },
-        ],
-        "total_debits": str(amt),
-        "total_credits": str(amt),
-        "balanced": True,
-    }
+    """Return a JournalEntry-shaped dict suitable as a template.
+
+    DEPRECATED: Use JournalEntryFactory.build_recurring_template() instead.
+    Kept for backward compatibility with existing tests.
+    """
+    return JournalEntryFactory.build_recurring_template(
+        amount=amount,
+        church_id="testch",
+        description="Monthly rent",
+    )
 
 
 @pytest.fixture
