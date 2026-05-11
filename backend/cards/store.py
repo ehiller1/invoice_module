@@ -37,21 +37,32 @@ class CardStore:
         """Compute chained hash: hash(current_card + prior_hash)."""
         return compute_chain_hash(card_dict, prior_hash)
 
-    def write(self, card: Card, chain: bool = True) -> str:
-        """Write a card to store.
+    def write(self, card: Card, chain: bool = True, prior_hash: Optional[str] = None) -> str:
+        """Write a card to store with optional concurrent write protection.
 
         Args:
             card: Card instance (MemoryCard, PlanCard, DecisionPacket)
             chain: If True, include SHA-256 chain hash for immutability
+            prior_hash: Expected prior hash for optimistic locking (detects concurrent writes)
 
         Returns:
             card_id
+
+        Raises:
+            ValueError: If prior_hash is provided and doesn't match current chain state
         """
         # Serialize card to dict (use model_dump with mode='json' for Pydantic v2)
         # This automatically converts Decimal to string
         card_dict = card.model_dump(mode='json')
         card_dict["created_at"] = card.created_at.isoformat()
         card_dict["updated_at"] = card.updated_at.isoformat()
+
+        # Concurrent write protection: verify expected prior hash
+        if chain and prior_hash and self._last_hash != prior_hash:
+            raise ValueError(
+                f"Concurrent write detected: expected prior_hash {prior_hash}, "
+                f"but current chain state is {self._last_hash}"
+            )
 
         # Add hashes for immutability
         if chain:
@@ -64,6 +75,7 @@ class CardStore:
                 card_dict["_chain_hash"] = self._compute_chain_hash(
                     clean_dict, self._last_hash
                 )
+                card_dict["_prior_hash"] = self._last_hash
             self._last_hash = card_dict.get("_chain_hash", card_dict["_hash"])
 
         # Append to JSONL
@@ -251,6 +263,57 @@ class CardStore:
                 prior_hash = stored_chain_hash or stored_hash
 
         return True
+
+    def detect_concurrent_writes(self) -> list[dict]:
+        """Detect entries with broken chain continuity (concurrent writes).
+
+        Returns:
+            List of entries where _prior_hash doesn't match previous entry's hash
+        """
+        anomalies = []
+        if not self.store_file.exists():
+            return anomalies
+
+        prior_hash = None
+        with open(self.store_file, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                card_dict = json.loads(line)
+                stored_prior_hash = card_dict.get("_prior_hash")
+
+                # Check if _prior_hash matches our expected chain state
+                if stored_prior_hash and prior_hash and stored_prior_hash != prior_hash:
+                    anomalies.append({
+                        "card_id": card_dict.get("card_id"),
+                        "expected_prior_hash": prior_hash,
+                        "stored_prior_hash": stored_prior_hash,
+                        "concurrent_write": True,
+                    })
+
+                # Update prior hash for next iteration
+                prior_hash = card_dict.get("_chain_hash") or card_dict.get("_hash")
+
+        return anomalies
+
+    def get_current_chain_hash(self) -> Optional[str]:
+        """Get the current chain hash (hash of last card written).
+
+        Returns:
+            Current chain hash or None if store is empty
+        """
+        if not self.store_file.exists():
+            return None
+
+        last_hash = None
+        with open(self.store_file, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                card_dict = json.loads(line)
+                last_hash = card_dict.get("_chain_hash") or card_dict.get("_hash")
+
+        return last_hash
 
     def all_cards(self) -> list[dict]:
         """Get all cards in insertion order.
