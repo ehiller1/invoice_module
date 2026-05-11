@@ -4,10 +4,11 @@ Match pledges/commitments against receipts and track fulfillment.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any, Optional
 
+from backend.cards.ids import validate_id_component
 from backend.cards.schemas import MemoryCard
 from backend.cards.store import get_card_store
 
@@ -37,6 +38,7 @@ async def create_pledge(
     Returns:
         Pledge card with ID and metadata
     """
+    validate_id_component(pledge_id, field="pledge_id")
     card_store = get_card_store()
 
     pledge_card = MemoryCard(
@@ -93,17 +95,8 @@ async def match_pledge_to_receipt(
     Returns:
         Match record with pledge-to-cash link
     """
+    validate_id_component(pledge_id, field="pledge_id")
     card_store = get_card_store()
-
-    # Create match record
-    match_card = MemoryCard(
-        card_id=f"pledge-match-{pledge_id}-{receipt_date}",
-        principal="pledge-engine",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        content=f"Matched ${receipt_amount} to pledge {pledge_id}",
-        confidence=0.90,
-    )
 
     match_data = {
         "pledge_id": pledge_id,
@@ -113,6 +106,16 @@ async def match_pledge_to_receipt(
         "match_status": "matched",
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+    match_card = MemoryCard(
+        card_id=f"pledge-match-{pledge_id}-{receipt_date}",
+        principal="pledge-engine",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        content=f"Matched ${receipt_amount} to pledge {pledge_id}",
+        confidence=0.90,
+        metadata=match_data,
+    )
 
     card_store.write(match_card, chain=True)
 
@@ -157,15 +160,15 @@ async def get_pledge_fulfillment(
             "outstanding": 0.0,
         }
 
-    # Get matches from pledge-engine
+    # Get match cards for this pledge (card_id prefix: pledge-match-{pledge_id}-)
     match_cards = card_store.query_by_principal("pledge-engine")
     pledge_matches = [
         m for m in match_cards
-        if pledge_id in str(m.get("content", ""))
+        if str(m.get("card_id", "")).startswith(f"pledge-match-{pledge_id}-")
     ]
 
     matched_total = sum(
-        Decimal(str(m.get("amount", 0)))
+        Decimal(str(m.get("metadata", {}).get("receipt_amount", 0)))
         for m in pledge_matches
     )
 
@@ -199,45 +202,72 @@ async def list_pledges(
     """
     card_store = get_card_store()
 
-    # Query pledges
+    # Query pledges (exclude match records like "pledge-match-...")
     all_cards = card_store.query_by_principal("pledge-engine")
-    pledge_cards = [c for c in all_cards if "pledge" in str(c.get("card_id", "")).lower()]
+    pledge_cards = [
+        c for c in all_cards
+        if str(c.get("card_id", "")).startswith("pledge-")
+        and not str(c.get("card_id", "")).startswith("pledge-match-")
+    ]
 
-    # Filter by status if specified
+    # Filter by status if specified (requires per-pledge fulfillment check)
     if status:
-        pledge_cards = [p for p in pledge_cards if _get_pledge_status(p) == status]
+        filtered = []
+        for p in pledge_cards:
+            pledge_id = p.get("metadata", {}).get("pledge_id")
+            if not pledge_id:
+                continue
+            pledge_status = await _resolve_pledge_status(p, pledge_id)
+            if pledge_status == status:
+                filtered.append(p)
+        pledge_cards = filtered
 
     total = len(pledge_cards)
     pledges = pledge_cards[offset : offset + limit]
+
+    pledges_out = []
+    for c in pledges:
+        meta = c.get("metadata", {})
+        pid = meta.get("pledge_id") or c.get("card_id", "").replace("pledge-", "")
+        pledges_out.append({
+            "pledge_id": pid,
+            "donor_name": meta.get("donor_name"),
+            "amount": meta.get("amount"),
+            "purpose": meta.get("purpose"),
+            "pledge_date": meta.get("pledge_date"),
+            "expected_receipt_date": meta.get("expected_receipt_date"),
+            "status": await _resolve_pledge_status(c, pid),
+            "created_at": c.get("created_at"),
+        })
 
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
-        "pledges": [
-            {
-                "pledge_id": c.get("card_id"),
-                "content": c.get("content"),
-                "created_at": c.get("created_at"),
-            }
-            for c in pledges
-        ],
+        "pledges": pledges_out,
     }
 
 
 # ===== Helper Functions =====
 
 
-def _get_pledge_status(pledge_card: Dict[str, Any]) -> str:
-    """Get pledge status from card."""
-    created_at = pledge_card.get("created_at")
-    if isinstance(created_at, str):
+async def _resolve_pledge_status(pledge_card: Dict[str, Any], pledge_id: str) -> str:
+    """Resolve pledge status from fulfillment percentage and expected_receipt_date.
+
+    Returns one of: "fulfilled", "overdue", "pending".
+    """
+    fulfillment = await get_pledge_fulfillment(pledge_id)
+    if fulfillment.get("fulfillment_pct", 0.0) >= 100.0:
+        return "fulfilled"
+
+    meta = pledge_card.get("metadata", {})
+    expected = meta.get("expected_receipt_date")
+    if expected:
         try:
-            pledge_date = datetime.fromisoformat(created_at)
-            if datetime.utcnow() - pledge_date > timedelta(days=365):
+            expected_dt = datetime.fromisoformat(expected)
+            if datetime.utcnow() > expected_dt:
                 return "overdue"
         except (ValueError, AttributeError):
             pass
 
-    # Would check fulfillment percentage from card data
     return "pending"

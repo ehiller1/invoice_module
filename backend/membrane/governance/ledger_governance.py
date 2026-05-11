@@ -5,7 +5,7 @@ Enables guider learning from historical verdicts and policy feedback loops.
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from backend.cards.store import get_card_store
 from backend.decision_ledger import DecisionCategory

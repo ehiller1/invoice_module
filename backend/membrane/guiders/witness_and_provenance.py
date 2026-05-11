@@ -1,7 +1,7 @@
 """Witness & Provenance guider — provenance + redaction + risk traces."""
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from .base import Decision, Guider, PerturbationLike, Verdict
 

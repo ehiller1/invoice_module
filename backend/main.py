@@ -2610,12 +2610,12 @@ async def plaid_auto_match(church_id: str, account_id: Optional[str] = None) -> 
     return _json(report)
 
 
-@app.get("/api/churches/{church_id}/exceptions")
-async def list_exceptions(church_id: str) -> JSONResponse:
+@app.get("/api/churches/{church_id}/reconciliation-exceptions")
+async def list_reconciliation_exceptions(church_id: str) -> JSONResponse:
     """Canonical inbox: items the structural matcher could not pair.
 
-    Phase 5c surface. The reconciliation destination page is deprecated;
-    callers should use this endpoint to render the exceptions inbox.
+    Phase 5c surface. For exception cards requiring human adjudication,
+    use /api/churches/{church_id}/exceptions instead.
     """
     from .events import structural_match
     items = structural_match.list_exceptions(church_id)
@@ -2952,38 +2952,53 @@ async def council_queues(church_id: str = "holy_comforter") -> JSONResponse:
 
 
 @app.get("/api/churches/{church_id}/exceptions")
-async def list_exceptions(church_id: str) -> JSONResponse:
+async def list_exceptions(church_id: str, status: str = "open") -> JSONResponse:
     """List ExceptionCard items requiring human adjudication (FRD §16, §9.1).
 
-    Phase 3: Backend will query persisted ExceptionCard records.
-    Currently returns mock data with expected schema.
+    Queries CardStore-backed exception records.
     """
-    # TODO: Query real ExceptionCard records from database
-    # Mock data structure for Phase 3 testing
+    from backend.membrane.stores.exceptions import ExceptionCardStore
+
+    exceptions, total = await ExceptionCardStore.list_by_status(church_id, status=status)
+    open_count = len([e for e in exceptions if e.get("status") == "open"])
+
     return _json({
         "church_id": church_id,
-        "exceptions": [],
-        "total_count": 0,
-        "open_count": 0,
-        "in_review_count": 0,
-        "message": "Exception queue endpoint ready for database wiring"
+        "exceptions": exceptions,
+        "total_count": total,
+        "open_count": open_count,
+        "status_filter": status,
+        "as_of": datetime.utcnow().isoformat(),
     })
 
 
 @app.get("/api/churches/{church_id}/policies")
-async def list_policies(church_id: str) -> JSONResponse:
+async def list_policies(
+    church_id: str,
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> JSONResponse:
     """List PolicyCard items (governance decisions awaiting votes).
 
-    Phase 3: Backend will query persisted PolicyCard records.
-    Currently returns mock data with expected schema.
+    Queries CardStore-backed policy records.
     """
-    # TODO: Query real PolicyCard records from database
+    from backend.membrane.stores.policies import PolicyCardStore
+
+    policies, total = await PolicyCardStore.list_by_status(
+        church_id, status=status, limit=limit, offset=offset
+    )
+    open_count = len([p for p in policies if p.get("status") in ("draft", "active")])
+
     return _json({
         "church_id": church_id,
-        "policies": [],
-        "total_count": 0,
-        "open_count": 0,
-        "message": "Policy queue endpoint ready for database wiring"
+        "policies": policies,
+        "total_count": total,
+        "open_count": open_count,
+        "limit": limit,
+        "offset": offset,
+        "status_filter": status,
+        "as_of": datetime.utcnow().isoformat(),
     })
 
 
@@ -4595,47 +4610,44 @@ async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONRe
 
 @app.get("/api/compliance/status")
 async def get_compliance_status(church_id: str = "holy_comforter") -> JSONResponse:
-    """Live compliance position: covenants, GAAP, tax, policies, materiality."""
+    """Live compliance position: covenants, GAAP, tax, policies, materiality.
+
+    Policy section is sourced from the membrane (real data). Covenants/GAAP/tax/
+    materiality sections are still placeholder until those subsystems are wired.
+    """
+    from backend.membrane.compliance.continuous_compliance import get_compliance_report
+    from backend.membrane.pledge.policy_management import list_policies
+
+    report = await get_compliance_report(period="weekly")
+    policies = await list_policies(limit=1000)
+    active = sum(1 for p in policies.get("policies", []) if p.get("status") == "active")
+
     return _json({
         "church_id": church_id,
         "as_of": datetime.now().isoformat(),
-        "covenants": [
-            {
-                "name": "Total Debt < $5M",
-                "current_position": 3200000,
-                "threshold": 5000000,
-                "trajectory_6m": 3450000,
-                "p_breach_6m": 0.08,
-                "status": "green",
-                "recovery_levers": [
-                    {"action": "Reduce capital spend by $200K", "impact": "-$200K", "timeline": "Q2"},
-                    {"action": "Accelerate receivables 15 days", "impact": "+$150K", "timeline": "Q2"}
-                ]
-            }
-        ],
+        "covenants": [],  # TODO: wire to covenant tracking subsystem
         "gaap_conformance": {
-            "status": "compliant",
+            "status": "unknown",
             "violations": [],
-            "last_check": "2026-05-02T10:00:00Z"
+            "last_check": None,
+            "note": "GAAP conformance checks not yet implemented",
         },
         "tax_position": {
-            "status": "compliant",
-            "audit_risk": "low",
-            "materiality_threshold": 50000,
-            "uncertain_positions": []
+            "status": "unknown",
+            "note": "Tax position checks not yet implemented",
         },
         "policies": {
-            "active_policies": 15,
-            "violations": 0,
-            "drift_alerts": 1
+            "active_policies": active,
+            "violations": report.get("total_violations", 0),
+            "blocked_transactions": report.get("blocked_transactions", 0),
+            "warning_transactions": report.get("warning_transactions", 0),
+            "compliance_rate": report.get("compliance_rate"),
+            "compliance_rate_note": report.get("compliance_rate_note"),
+            "top_violation_types": report.get("top_violation_types", []),
         },
         "materiality": {
-            "audit_materiality": 100000,
-            "performance_materiality": 75000,
-            "consumed_ytd": 12500,
-            "remaining": 62500,
-            "status": "green"
-        }
+            "note": "Materiality tracking not yet implemented",
+        },
     })
 
 
@@ -5311,24 +5323,20 @@ async def extract_vendor_info_endpoint(
 
 
 # ─── Phase 17: Pledge Matching + Policy Management ────────────────────
+class CreatePledgeRequest(BaseModel):
+    pledge_id: str
+    donor_name: str
+    amount: float
+    purpose: str
+    pledge_date: str
+    expected_receipt_date: Optional[str] = None
+
+
 @app.post("/api/pledges")
-async def create_pledge_endpoint(
-    pledge_id: str,
-    donor_name: str,
-    amount: float,
-    purpose: str,
-    pledge_date: str,
-    expected_receipt_date: Optional[str] = None,
-) -> Dict[str, Any]:
+async def create_pledge_endpoint(req: CreatePledgeRequest) -> Dict[str, Any]:
     """Create a new pledge.
 
-    Args:
-        pledge_id: Unique pledge identifier
-        donor_name: Donor name
-        amount: Pledge amount
-        purpose: Intended use
-        pledge_date: Date pledge was made
-        expected_receipt_date: Expected receipt date
+    Body: CreatePledgeRequest JSON.
 
     Returns:
         Pledge record
@@ -5337,12 +5345,12 @@ async def create_pledge_endpoint(
     from backend.membrane.pledge.pledge_matching import create_pledge
 
     result = await create_pledge(
-        pledge_id=pledge_id,
-        donor_name=donor_name,
-        amount=Decimal(str(amount)),
-        purpose=purpose,
-        pledge_date=pledge_date,
-        expected_receipt_date=expected_receipt_date,
+        pledge_id=req.pledge_id,
+        donor_name=req.donor_name,
+        amount=Decimal(str(req.amount)),
+        purpose=req.purpose,
+        pledge_date=req.pledge_date,
+        expected_receipt_date=req.expected_receipt_date,
     )
     return result
 
@@ -5385,22 +5393,22 @@ async def get_pledge_fulfillment_endpoint(pledge_id: str) -> Dict[str, Any]:
     return result
 
 
+class CreatePolicyRequest(BaseModel):
+    policy_id: str
+    title: str
+    description: str
+    effective_date: str
+    enforcement_level: str = "warning"
+    policy_rules: Dict[str, Any] = {}
+
+
 @app.post("/api/policies")
-async def create_policy_endpoint(
-    policy_id: str,
-    title: str,
-    description: str,
-    effective_date: str,
-    enforcement_level: str = "warning",
-) -> Dict[str, Any]:
+async def create_policy_endpoint(req: CreatePolicyRequest) -> Dict[str, Any]:
     """Create a new financial policy.
 
-    Args:
-        policy_id: Unique policy identifier
-        title: Policy title
-        description: Policy description
-        effective_date: Date policy becomes effective
-        enforcement_level: warning or blocking
+    Body: CreatePolicyRequest JSON. `policy_rules` may include
+    `amount_limit`, `department_limits`, `restricted_accounts`,
+    `restricted_transaction_types`.
 
     Returns:
         Policy record
@@ -5408,12 +5416,12 @@ async def create_policy_endpoint(
     from backend.membrane.pledge.policy_management import create_policy
 
     result = await create_policy(
-        policy_id=policy_id,
-        title=title,
-        description=description,
-        policy_rules={},
-        effective_date=effective_date,
-        enforcement_level=enforcement_level,
+        policy_id=req.policy_id,
+        title=req.title,
+        description=req.description,
+        policy_rules=req.policy_rules,
+        effective_date=req.effective_date,
+        enforcement_level=req.enforcement_level,
     )
     return result
 
@@ -5424,7 +5432,9 @@ async def list_policies_endpoint(
     limit: int = 20,
     offset: int = 0,
 ) -> Dict[str, Any]:
-    """List policies with optional filtering.
+    """List policies across all churches with optional filtering.
+
+    Use /api/churches/{church_id}/policies for church-scoped queries.
 
     Args:
         status: Optional status filter
@@ -5440,55 +5450,27 @@ async def list_policies_endpoint(
     return result
 
 
-@app.post("/api/policies/{policy_id}/vote")
-async def vote_on_policy_endpoint(
-    policy_id: str,
-    voter_id: str,
-    vote: str,  # approve, reject, abstain
-    rationale: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Record a vote on a policy.
+# POST /api/policies/{policy_id}/vote — handled by backend.routes.policies (Phase 5 router),
+# which routes through the membrane policy_management.vote_on_policy. See routes/policies.py.
 
-    Args:
-        policy_id: Policy identifier
-        voter_id: Voter identifier
-        vote: approve, reject, or abstain
-        rationale: Optional voting rationale
 
-    Returns:
-        Vote record
-    """
-    from backend.membrane.pledge.policy_management import vote_on_policy
-
-    result = await vote_on_policy(policy_id, voter_id, vote, rationale)
-    return result
+class CheckComplianceRequest(BaseModel):
+    transaction_amount: float
+    account: str
+    department: str
+    transaction_type: str = "general"
 
 
 @app.post("/api/compliance/check")
-async def check_compliance_endpoint(
-    transaction_amount: float,
-    account: str,
-    department: str,
-    transaction_type: str,
-) -> Dict[str, Any]:
-    """Check transaction compliance with policies.
-
-    Args:
-        transaction_amount: Amount of transaction
-        account: GL account
-        department: Department code
-        transaction_type: Type of transaction
-
-    Returns:
-        Compliance check result
-    """
+async def check_compliance_endpoint(req: CheckComplianceRequest) -> Dict[str, Any]:
+    """Check transaction compliance with active policies."""
     from backend.membrane.pledge.policy_management import check_policy_compliance
 
     result = await check_policy_compliance(
-        transaction_amount=transaction_amount,
-        account=account,
-        department=department,
-        transaction_type=transaction_type,
+        transaction_amount=req.transaction_amount,
+        account=req.account,
+        department=req.department,
+        transaction_type=req.transaction_type,
     )
     return result
 

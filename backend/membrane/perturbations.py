@@ -14,7 +14,7 @@ signal must remain inside the local membrane.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict
 
 PRIVACY_CLASSES = ("P0", "P1")

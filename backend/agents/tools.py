@@ -1,8 +1,11 @@
 """CrewAI tools - wrappers around EIME backend functions."""
 
+import logging
 from typing import Dict, Any, Optional, List
 from crewai.tools import tool
 import json
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -114,27 +117,32 @@ def match_transactions(church_id: str, transaction_ids: List[str]) -> Dict[str, 
 
 
 @tool("create_exception_card")
-def create_exception_card(church_id: str, exception_type: str, title: str, description: str, evidence: Dict[str, Any]) -> str:
+async def create_exception_card(church_id: str, exception_type: str, title: str, description: str, evidence: Dict[str, Any]) -> str:
     """Flag a transaction as an exception for human review.
-    
+
+    Writes to CardStore as single source of truth for all queries.
+
     Args:
         church_id: Church identifier
         exception_type: Type of exception (e.g., "RECONCILIATION", "AMBIGUOUS_VENDOR")
         title: Short title for the exception
         description: Detailed description
         evidence: JSON evidence (e.g., {"txn_id": "...", "confidence": 0.45})
-    
+
     Returns:
         Exception card ID
     """
-    from backend.db.card_store import create_exception_card as create
-    return create(
+    from backend.membrane.stores.exceptions import ExceptionCardStore
+
+    card_id = await ExceptionCardStore.create(
         church_id,
         exception_type,
         title,
         description,
         evidence=evidence,
     )
+
+    return card_id
 
 
 # ============================================================================
@@ -144,12 +152,12 @@ def create_exception_card(church_id: str, exception_type: str, title: str, descr
 @tool("check_fund_restriction")
 def check_fund_restriction(church_id: str, fund_id: str, actor_role: Optional[str] = None) -> Dict[str, Any]:
     """Check if a fund posting violates donor restrictions.
-    
+
     Args:
         church_id: Church identifier
         fund_id: Fund identifier
         actor_role: Role of the actor attempting the action (for override checks)
-    
+
     Returns:
         {violation: bool, type: 'HARD'|'SOFT'|None, reason: str, override_role: str|None}
     """
@@ -158,26 +166,33 @@ def check_fund_restriction(church_id: str, fund_id: str, actor_role: Optional[st
 
 
 @tool("create_policy_card")
-def create_policy_card(church_id: str, policy_id: str, title: str, description: str) -> str:
+async def create_policy_card(church_id: str, policy_id: str, title: str, description: str) -> str:
     """Create a policy card requiring human approval.
-    
+
+    Writes to CardStore as single source of truth for all queries.
+
     Args:
         church_id: Church identifier
         policy_id: Policy identifier
         title: Card title
         description: Policy violation description
-    
+
     Returns:
         Policy card ID
     """
-    from backend.db.card_store import create_policy_card as create
-    return create(
+    from backend.membrane.stores.policies import PolicyCardStore
+
+    card_id = await PolicyCardStore.create(
         church_id,
         policy_id,
         title,
         description,
-        requires_vote=False,
+        policy_rules={},
+        effective_date="",
+        enforcement_level="warning",
     )
+
+    return card_id
 
 
 # ============================================================================
@@ -187,10 +202,10 @@ def create_policy_card(church_id: str, policy_id: str, title: str, description: 
 @tool("get_recurring_tolerance")
 def get_recurring_tolerance(recurring_id: str) -> Dict[str, Any]:
     """Get learned tolerance bounds for a recurring vendor.
-    
+
     Args:
         recurring_id: Recurring entry identifier
-    
+
     Returns:
         {tolerance_low, tolerance_high, acceptance_count, rejection_count, acceptance_rate}
     """
@@ -207,11 +222,11 @@ def get_recurring_tolerance(recurring_id: str) -> Dict[str, Any]:
 @tool("should_auto_post")
 def should_auto_post(recurring_id: str, proposed_amount: float) -> Dict[str, Any]:
     """Check if a recurring JE amount should auto-post based on tolerance.
-    
+
     Args:
         recurring_id: Recurring entry identifier
         proposed_amount: Proposed transaction amount
-    
+
     Returns:
         {should_auto_post: bool, reason: str, bounds: {...}}
     """
@@ -261,13 +276,13 @@ def post_je_to_acs(je_id: str, church_id: str) -> Dict[str, Any]:
 @tool("record_feedback")
 def record_feedback(recurring_id: str, accepted: bool, tolerance_low: float, tolerance_high: float) -> None:
     """Record user acceptance/rejection feedback for a recurring JE.
-    
+
     Args:
         recurring_id: Recurring entry identifier
         accepted: True if user approved, False if rejected
         tolerance_low: Current lower tolerance bound
         tolerance_high: Current upper tolerance bound
-    
+
     Returns:
         None
     """

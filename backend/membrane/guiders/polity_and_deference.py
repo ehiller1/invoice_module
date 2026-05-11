@@ -1,7 +1,7 @@
 """Polity & Deference guider — authority / RBAC / approval routing."""
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional
+from typing import Callable, List, Optional
 
 from .base import Decision, Guider, PerturbationLike, Verdict
 

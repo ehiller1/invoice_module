@@ -44,7 +44,7 @@ def evaluate_cascade_verdict_for_job(
                         # Create minimal signal for cascade evaluation
                         signal = _create_minimal_signal(signal_name, job)
                         try:
-                            result = cascade.evaluate(signal)
+                            result = cascade.evaluate(signal.model_dump())
                             if result.final_decision == Decision.BLOCK:
                                 return Decision.BLOCK
                             if result.final_decision == Decision.ESCALATE:
@@ -66,33 +66,33 @@ def evaluate_cascade_verdict_for_job(
 
 def _create_minimal_signal(signal_name: str, job: Any) -> ImpactSignal:
     """Create a minimal ImpactSignal for cascade evaluation."""
-    from ..perturbations import perturbation_registry
+    from ..perturbations import get_perturbation
     from ..transport.channels import Channel
 
-    # Get perturbation metadata
-    try:
-        perturbation = perturbation_registry.get(signal_name)
-    except Exception:
-        perturbation = None
-
-    # Map signal name to channel
+    # Map signal name to the correct Channel constant
     channel_map = {
-        "INVOICE_INGESTED": Channel.INVOICE_INGESTED,
-        "MAPPING_CONFIDENCE_LOW": Channel.MAPPING_CONFIDENCE_LOW,
-        "BUDGET_OVERAGE_RISK": Channel.BUDGET_OVERAGE_RISK,
-        "FUND_RESTRICTION_VIOLATION": Channel.FUND_RESTRICTION_VIOLATION,
-        "POLICY_VIOLATION": Channel.POLICY_VIOLATION,
-        "JOURNAL_ENTRY_READY": Channel.JOURNAL_ENTRY_READY,
+        "INVOICE_INGESTED": Channel.IMPACT_PROPOSED_INVOICE_INGESTED,
+        "MAPPING_CONFIDENCE_LOW": Channel.IMPACT_PROPOSED_JE_DRAFTED,
+        "BUDGET_OVERAGE_RISK": Channel.IMPACT_ADVISORY_BUDGET_THRESHOLD,
+        "FUND_RESTRICTION_VIOLATION": Channel.IMPACT_ADVISORY_RESTRICTION_REJECTED,
+        "POLICY_VIOLATION": Channel.IMPACT_PROPOSED_JE_DRAFTED,
+        "JOURNAL_ENTRY_READY": Channel.IMPACT_PROPOSED_JE_DRAFTED,
     }
+
+    # Get perturbation metadata from registry
+    try:
+        perturbation = get_perturbation(signal_name)
+    except (KeyError, Exception):
+        perturbation = None
 
     signal = ImpactSignal(
         signal_id=perturbation.id if perturbation else 59,
         signal_name=signal_name,
         event_id=f"eval-{job.job_id}-{uuid4().hex[:8]}",
         occurred_at=job.updated_at or datetime.utcnow(),
-        privacy_class=perturbation.privacy_class if perturbation else "P1",
+        privacy_class=perturbation.privacy_class if perturbation else "P1",  # type: ignore[arg-type]
         crosses_membrane=perturbation.crosses_membrane if perturbation else True,
-        target_channel=channel_map.get(signal_name, Channel.INVOICE_INGESTED),
+        target_channel=channel_map.get(signal_name, Channel.IMPACT_PROPOSED_INVOICE_INGESTED),
         payload={
             "job_id": job.job_id,
             "church_id": job.church_id,

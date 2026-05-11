@@ -8,7 +8,7 @@ Three-agent crew:
 
 import asyncio
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from crewai import Agent, Task, Crew, Process
 
@@ -130,7 +130,7 @@ class NBACrewFactory:
         crew = Crew(
             agents=[analyst, recommender, risk_assessor],
             tasks=[analysis_task, recommendation_task, risk_task],
-            process=Process.SEQUENTIAL,
+            process=Process.sequential,
             verbose=True,
         )
 
@@ -140,7 +140,7 @@ class NBACrewFactory:
     async def invoke_crew(
         trigger_type: str,
         context: dict,
-        tools: list = None,
+        tools: Optional[List] = None,
     ) -> dict:
         """Invoke NBA crew asynchronously.
 

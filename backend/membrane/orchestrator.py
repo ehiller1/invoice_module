@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from .envelope import ImpactSignal
 from .guiders.base import Decision
@@ -163,7 +163,7 @@ class MembraneOrchestrator:
 
         # ---- Cascade ----
         try:
-            cascade_result = self.cascade.evaluate(signal)
+            cascade_result = self.cascade.evaluate(signal.model_dump())
         except Exception as exc:
             logger.exception("cascade failed for %s", signal_name)
             result.error = f"cascade_failed: {exc!r}"

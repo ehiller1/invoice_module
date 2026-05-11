@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from ..guiders.base import Decision, Verdict
+from ..guiders.base import Decision
 
 
 class ApprovalRole(str, Enum):

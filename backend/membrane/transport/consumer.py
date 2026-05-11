@@ -9,7 +9,7 @@ Subclasses override `handle(message)`. The base class:
 from __future__ import annotations
 
 import asyncio
-from typing import Optional, Set, Tuple
+from typing import Set, Tuple
 
 from .base import MessageTransport, ReceivedMessage
 

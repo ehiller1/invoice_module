@@ -1,8 +1,8 @@
 """Phase 5: Policies Queue action endpoints.
 
 POST /api/policies/{id}/vote
-  Body: {voter_id, value: "YES"|"NO"|"ABSTAIN", church_id?}
-  Returns the updated tally and quorum status.
+  Body: {voter_id?, value|vote: "approve"|"reject"|"abstain", rationale?, church_id?}
+  Routes through the membrane policy_management module (canonical store).
 """
 from __future__ import annotations
 
@@ -11,11 +11,12 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
-from ..tools import policy_store
+from ..membrane.pledge.policy_management import vote_on_policy as _vote_on_policy
 
 router = APIRouter(prefix="/api/policies", tags=["policies-queue"])
 
 _DEFAULT_CHURCH = os.environ.get("EMBARK_DEFAULT_CHURCH", "holy_comforter")
+_DEFAULT_VOTER = os.environ.get("EMBARK_DEFAULT_VOTER", "anonymous")
 
 
 @router.post("/{policy_id}/vote")
@@ -25,22 +26,20 @@ async def vote_on_policy(
     church_id: Optional[str] = Query(default=None),
 ) -> Dict[str, Any]:
     body = body or {}
-    ch = church_id or body.get("church_id") or _DEFAULT_CHURCH
-    voter_id = body.get("voter_id") or body.get("actor")
+    _ = church_id or body.get("church_id") or _DEFAULT_CHURCH  # reserved for multi-tenant
+    voter_id = body.get("voter_id") or body.get("actor") or _DEFAULT_VOTER
     value = body.get("value") or body.get("vote")
-    if not voter_id or not value:
-        raise HTTPException(status_code=400, detail="missing 'voter_id' or 'value' in body")
+    rationale = body.get("rationale")
+    if not value:
+        raise HTTPException(status_code=400, detail="missing 'vote' or 'value' in body")
 
     try:
-        rec = policy_store.record_vote(ch, policy_id, voter_id=voter_id, value=value)
+        rec = await _vote_on_policy(policy_id, voter_id, value, rationale)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    quorum = policy_store.check_quorum(ch, policy_id)
     return {
         "ok": True,
         "policy_id": policy_id,
-        "tally": (rec or {}).get("tally"),
-        "status": (rec or {}).get("status"),
-        "quorum": quorum,
+        "vote": rec,
     }

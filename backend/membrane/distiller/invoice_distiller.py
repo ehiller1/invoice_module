@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import Any, Dict, Mapping, Optional
 
 from .base import Distiller
-from ..envelope import ImpactSignal
 
 
 _FIELD_WHITELIST: Dict[str, tuple] = {

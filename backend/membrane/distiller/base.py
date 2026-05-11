@@ -7,23 +7,25 @@ introduced in later phases (one per perturbation family).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
-
-from backend.membrane.envelope import ImpactSignal
+from typing import Any, Dict, Mapping, Optional
 
 
 class Distiller(ABC):
-    """Abstract transformer: raw event -> ImpactSignal.
+    """Abstract transformer: raw event -> distilled payload dict.
 
     Subclasses MUST implement `distill`. They should:
       * select an appropriate Perturbation from the registry,
       * scrub or redact sensitive fields per privacy_class,
-      * return a fully-formed ImpactSignal validated against schema v1.
+      * return a dict of safe, whitelisted fields.
+
+    The dict is wrapped into a full ImpactSignal by the orchestrator, which
+    supplies the remaining envelope fields (signal_id, event_id, occurred_at,
+    target_channel, source, etc.) from the perturbation registry.
     """
 
     @abstractmethod
-    def distill(self, raw_event: Any) -> ImpactSignal:  # pragma: no cover - abstract
-        """Transform a raw event into a validated ImpactSignal envelope."""
+    def distill(self, raw_event: Any, context: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:  # pragma: no cover - abstract
+        """Extract and whitelist safe fields from a raw event."""
         raise NotImplementedError
 
 

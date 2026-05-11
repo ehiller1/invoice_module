@@ -14,6 +14,69 @@ from backend.membrane.transport.base import MessageTransport
 logger = logging.getLogger(__name__)
 
 
+async def base_cabinet_runner(
+    transport: MessageTransport,
+    channels: list[str],
+    group_name: str,
+    consumer_name: str,
+    handler: Callable,
+    poll_interval: int = 30,
+    on_error: str = "continue",
+) -> None:
+    """Base runner for cabinet members — standardized consume-ack loop.
+
+    Args:
+        transport: MessageTransport for channel subscription
+        channels: List of channels to subscribe to
+        group_name: Consumer group name (e.g., "queue-guardian-group")
+        consumer_name: This consumer's name within the group
+        handler: Async callable(message_payload) to handle incoming messages
+        poll_interval: Seconds between polls (default 30)
+        on_error: "continue" (log and continue) or "raise" (crash on error)
+    """
+    logger.info(f"{consumer_name} started, monitoring {len(channels)} channel(s)")
+
+    # Subscribe to all channels
+    for channel in channels:
+        await transport.ensure_group(channel, group_name)
+
+    while True:
+        try:
+            # Consume messages from all channels
+            for channel in channels:
+                messages = await transport.consume_batch(
+                    channel,
+                    group_name,
+                    consumer_name,
+                    count=10,
+                    block_ms=1000,
+                )
+
+                for msg in messages:
+                    try:
+                        # Call handler for this message
+                        await handler(msg.payload)
+                        # Acknowledge success
+                        await transport.ack(channel, group_name, msg.id)
+                    except Exception as handler_error:
+                        logger.error(
+                            f"{consumer_name} handler error: {handler_error}",
+                            exc_info=True,
+                        )
+                        # Do NOT ack - message will be reprocessed
+                        if on_error == "raise":
+                            raise
+
+            await asyncio.sleep(poll_interval)
+
+        except Exception as e:
+            logger.error(f"{consumer_name} runner error: {e}", exc_info=True)
+            if on_error == "raise":
+                raise
+            # on_error == "continue" - just log and retry
+            await asyncio.sleep(poll_interval)
+
+
 @dataclass
 class CabinetMember:
     """Cabinet member definition."""

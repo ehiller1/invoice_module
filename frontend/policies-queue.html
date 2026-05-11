@@ -238,10 +238,11 @@ function formatDate(dateStr) {
 
 async function votePolicy(policyId, vote) {
   try {
+    const voterId = (window.CURRENT_USER && window.CURRENT_USER.id) || 'web-user';
     const res = await fetch(`${API}/api/policies/${policyId}/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vote })
+      body: JSON.stringify({ vote, voter_id: voterId })
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     alert(`Vote recorded: ${vote}`);
