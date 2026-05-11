@@ -82,7 +82,7 @@
 
       <div id="eime-chat-messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50">
         <div class="text-xs text-slate-400 text-center py-8">
-          Ask about invoices, budget, GL accounts, or church accounting policy.
+          Ask about a bill, the budget, a giving record, or anything else on this page.
         </div>
       </div>
 

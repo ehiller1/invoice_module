@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Event Registry — Books</title>
+    <title>Activity Log — Books</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -12,40 +12,40 @@
         <div class="p-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Event Registry</h1>
-                <p class="text-gray-600">Ground truth: every economic event captured with provenance, dimensions, and confidence</p>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Activity Log</h1>
+                <p class="text-gray-600">Every transaction the system has recorded &mdash; where it came from, what it was for, and how confident we are about it.</p>
             </div>
 
             <!-- Search & Filters -->
             <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Type of Transaction</label>
                         <select id="filterEventType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                            <option value="">All Events</option>
-                            <option value="invoice_received">Invoice Received</option>
-                            <option value="cash_receipt">Cash Receipt</option>
-                            <option value="payment_made">Payment Made</option>
-                            <option value="expense">Expense</option>
+                            <option value="">All Types</option>
+                            <option value="invoice_received">Bill Received</option>
+                            <option value="cash_receipt">Money Received</option>
+                            <option value="payment_made">Payment Sent</option>
+                            <option value="expense">Expense Recorded</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">GL Account</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
                         <input type="text" id="filterAccount" placeholder="e.g. 6100" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Dimension</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tag</label>
                         <select id="filterDimension" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                            <option value="">All Dimensions</option>
+                            <option value="">All Tags</option>
                             <option value="project">Project</option>
-                            <option value="customer">Customer</option>
-                            <option value="function">Function</option>
-                            <option value="geography">Geography</option>
+                            <option value="customer">Donor/Customer</option>
+                            <option value="function">Ministry/Function</option>
+                            <option value="geography">Location</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Value</label>
-                        <input type="text" id="filterValue" placeholder="filter value" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                        <input type="text" id="filterValue" placeholder="search value" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     </div>
                 </div>
                 <div class="mt-4 flex gap-2">
@@ -61,7 +61,7 @@
             <!-- Events List -->
             <div class="bg-white rounded-lg shadow-sm overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-900">Economic Events</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">All Transactions</h2>
                 </div>
                 <div id="eventsList" class="divide-y divide-gray-200">
                     <div class="p-6 text-center text-gray-500">Loading events...</div>
@@ -83,23 +83,23 @@
                 <div class="p-6">
                     <!-- Provenance Section -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Provenance</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Where This Came From</h3>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p class="text-sm font-medium text-gray-600">Source System</p>
+                                    <p class="text-sm font-medium text-gray-600">Source</p>
                                     <p id="provenanceSource" class="text-sm text-gray-900">-</p>
                                 </div>
                                 <div>
-                                    <p class="text-sm font-medium text-gray-600">Document ID</p>
+                                    <p class="text-sm font-medium text-gray-600">Document Reference</p>
                                     <p id="provenanceDocId" class="text-sm text-gray-900">-</p>
                                 </div>
                                 <div>
-                                    <p class="text-sm font-medium text-gray-600">Confidence</p>
+                                    <p class="text-sm font-medium text-gray-600">How Sure</p>
                                     <p id="provenanceConfidence" class="text-sm text-gray-900">-</p>
                                 </div>
                                 <div>
-                                    <p class="text-sm font-medium text-gray-600">Document</p>
+                                    <p class="text-sm font-medium text-gray-600">Original Document</p>
                                     <a id="provenanceDocLink" href="#" class="text-sm text-blue-600 hover:text-blue-700 underline">View →</a>
                                 </div>
                             </div>
@@ -108,7 +108,7 @@
 
                     <!-- Economic Substance Section -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Economic Substance</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">What Actually Happened</h3>
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <div id="economicSubstance" class="space-y-2 text-sm"></div>
                         </div>
@@ -116,7 +116,7 @@
 
                     <!-- Dimensions Section -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Semantic Dimensions</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Tags &amp; Categories</h3>
                         <div class="grid grid-cols-2 gap-4">
                             <div id="dimensionsList" class="col-span-2 space-y-2"></div>
                         </div>
@@ -124,7 +124,7 @@
 
                     <!-- Lineage Section -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Agent Lineage</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Who Touched This</h3>
                         <div class="space-y-2">
                             <div id="lineageChart" class="space-y-3"></div>
                         </div>
@@ -132,7 +132,7 @@
 
                     <!-- Overall Confidence -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p class="text-sm font-medium text-gray-600 mb-2">Overall Confidence Score</p>
+                        <p class="text-sm font-medium text-gray-600 mb-2">How Sure Are We Overall</p>
                         <div class="flex items-center gap-3">
                             <div id="confidenceBar" class="flex-1 bg-gray-200 rounded-full h-2"></div>
                             <span id="confidenceText" class="text-lg font-bold text-blue-600">-</span>
@@ -252,25 +252,6 @@
             document.getElementById('eventModal').classList.add('hidden');
         }
 
-        document.getElementById('btnFilter').addEventListener('click', () => {
-            const eventType = document.getElementById('filterEventType').value;
-            const account = document.getElementById('filterAccount').value;
-            const filtered = currentEvents.filter(e => {
-                if (eventType && e.event_type !== eventType) return false;
-                if (account && e.dimensions.account !== account) return false;
-                return true;
-            });
-            renderEvents(filtered);
-        });
-
-        document.getElementById('btnClear').addEventListener('click', () => {
-            document.getElementById('filterEventType').value = '';
-            document.getElementById('filterAccount').value = '';
-            document.getElementById('filterDimension').value = '';
-            document.getElementById('filterValue').value = '';
-            renderEvents(currentEvents);
-        });
-
         // Initialize on page mount
         async function onMounted() {
             await loadEvents();
@@ -278,12 +259,40 @@
                 page: 'event-registry',
                 payload: { churchId: CHURCH_ID }
             });
+
+            // Attach event listeners after DOM is mounted
+            const btnFilter = document.getElementById('btnFilter');
+            if (btnFilter) {
+                btnFilter.addEventListener('click', () => {
+                    const eventType = document.getElementById('filterEventType').value;
+                    const account = document.getElementById('filterAccount').value;
+                    const filtered = currentEvents.filter(e => {
+                        if (eventType && e.event_type !== eventType) return false;
+                        if (account && e.dimensions.account !== account) return false;
+                        return true;
+                    });
+                    renderEvents(filtered);
+                });
+            }
+
+            const btnClear = document.getElementById('btnClear');
+            if (btnClear) {
+                btnClear.addEventListener('click', () => {
+                    document.getElementById('filterEventType').value = '';
+                    document.getElementById('filterAccount').value = '';
+                    document.getElementById('filterDimension').value = '';
+                    document.getElementById('filterValue').value = '';
+                    renderEvents(currentEvents);
+                });
+            }
         }
 
         // Start the shell and load events
         EIMEShell.mount({
-            onMounted: onMounted,
-            navAttribute: 'data-nav'
+            activeNav: 'event-registry',
+            pageTitle: 'Event Registry',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted: onMounted
         });
     </script>
 </body>

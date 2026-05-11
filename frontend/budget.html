@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>EIME — Budget Tracking</title>
+<title>Budget vs Actual — Books</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -28,8 +28,8 @@
 <div class="max-w-7xl mx-auto p-6">
   <div class="flex items-center justify-between mb-6">
     <div>
-      <h1 class="text-3xl font-bold text-slate-900 mb-2">Budget Tracking</h1>
-      <p class="text-slate-600">Monitor GL lines, track spending, and project year-end positions</p>
+      <h1 class="text-3xl font-bold text-slate-900 mb-2">Budget vs Actual</h1>
+      <p class="text-slate-600">How you're tracking against budget, line by line. See what's on pace, what's over, and where the year is heading.</p>
     </div>
     <div class="flex gap-2">
       <button onclick="showImportModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">📥 Import Budget</button>
@@ -43,7 +43,7 @@
       <p class="text-3xl font-bold text-slate-900" id="total-budget">$0</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">YTD Spent</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">Spent This Year</p>
       <p class="text-3xl font-bold text-orange-600" id="ytd-spent">$0</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
@@ -53,7 +53,7 @@
   </div>
 
   <div class="bg-white rounded-lg border border-slate-200 p-6">
-    <h2 class="text-lg font-semibold text-slate-900 mb-4">GL Line Balances</h2>
+    <h2 class="text-lg font-semibold text-slate-900 mb-4">Account Balances</h2>
     <div id="budget-lines" class="space-y-3"></div>
   </div>
 
@@ -92,7 +92,7 @@
       <h2 class="text-2xl font-bold text-slate-900 mb-4">Budget Administration</h2>
       <div class="space-y-3 mb-6">
         <button onclick="resetYTD()" class="w-full px-4 py-3 bg-amber-100 text-amber-900 rounded-lg hover:bg-amber-200 text-left font-medium">
-          Reset YTD Actuals to Zero
+          Reset Year-to-Date Actuals to Zero
         </button>
         <button onclick="yearEndRollover()" class="w-full px-4 py-3 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 text-left font-medium">
           Year-End Rollover

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accrual & Amortization — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Accrual & Amortization</h1>
+      <p class="text-sm text-slate-500">Estimate period-end accruals and amortization schedules automatically.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="loadAccruals()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="loadAccruals()" class="text-sm text-navy-700 hover:underline">Refresh</button>
+    </div>
+  </header>
+
+  <div class="flex flex-col h-full">
+    <!-- Tabs -->
+    <div class="bg-white border-b border-slate-200 px-8 flex gap-6 flex-shrink-0">
+      <button onclick="switchTab('accruals')" id="tab-accruals" class="py-3 px-2 font-medium text-navy-700 border-b-2 border-navy-700 text-sm">
+        Accruals
+      </button>
+      <button onclick="switchTab('amortization')" id="tab-amortization" class="py-3 px-2 font-medium text-slate-500 border-b-2 border-transparent text-sm hover:text-slate-700">
+        Amortization
+      </button>
+      <button onclick="switchTab('schedule')" id="tab-schedule" class="py-3 px-2 font-medium text-slate-500 border-b-2 border-transparent text-sm hover:text-slate-700">
+        Estimate Schedule
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="overflow-y-auto flex-1 px-8 py-6 space-y-6">
+      <!-- Accruals Tab -->
+      <div id="content-accruals" class="space-y-4">
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Accrual Type</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">GL Account</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Period End</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Estimated Amount</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Utilities Accrual</td>
+                <td class="px-4 py-3 text-sm text-slate-600">7200 Utilities</td>
+                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$1,245.50</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Draft</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Payroll Accrual</td>
+                <td class="px-4 py-3 text-sm text-slate-600">6100 Salaries & Wages</td>
+                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$8,320.00</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Draft</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Insurance Accrual</td>
+                <td class="px-4 py-3 text-sm text-slate-600">7100 Insurance</td>
+                <td class="px-4 py-3 text-sm text-slate-600">May 31, 2026</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$850.00</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Posted</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Amortization Tab -->
+      <div id="content-amortization" class="hidden space-y-4">
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Asset Description</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Original Cost</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Useful Life</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Monthly Expense</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">% Complete</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">HVAC System</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$45,000</td>
+                <td class="px-4 py-3 text-sm text-slate-600">15 years</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$250</td>
+                <td class="px-4 py-3 text-sm">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 bg-slate-200 rounded h-2">
+                      <div class="bg-blue-600 h-2 rounded" style="width: 35%"></div>
+                    </div>
+                    <span class="text-xs font-medium">35%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Office Equipment</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$18,000</td>
+                <td class="px-4 py-3 text-sm text-slate-600">7 years</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$214</td>
+                <td class="px-4 py-3 text-sm">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 bg-slate-200 rounded h-2">
+                      <div class="bg-blue-600 h-2 rounded" style="width: 62%"></div>
+                    </div>
+                    <span class="text-xs font-medium">62%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Building Roof</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$85,000</td>
+                <td class="px-4 py-3 text-sm text-slate-600">25 years</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$283</td>
+                <td class="px-4 py-3 text-sm">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 bg-slate-200 rounded h-2">
+                      <div class="bg-blue-600 h-2 rounded" style="width: 18%"></div>
+                    </div>
+                    <span class="text-xs font-medium">18%</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Schedule Tab -->
+      <div id="content-schedule" class="hidden space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 class="font-semibold text-blue-900 text-sm mb-2">📅 Estimation Schedule</h3>
+          <p class="text-sm text-blue-800 mb-3">Automatic accruals and amortization are estimated on these dates:</p>
+          <ul class="text-sm text-blue-800 space-y-2">
+            <li class="flex items-center gap-2">
+              <span class="text-lg">📍</span>
+              <span><strong>Month-End Close (15th):</strong> Utilities, payroll, and monthly operating accruals estimated</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-lg">📍</span>
+              <span><strong>Quarter-End Close (45th):</strong> Amortization schedules reviewed and rebalanced if needed</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-lg">📍</span>
+              <span><strong>Year-End Audit (December 31):</strong> Full accrual review + analyst adjustment log</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 class="font-semibold text-slate-800 text-sm mb-3">Last Estimation Run</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-slate-600">Timestamp:</span>
+              <span class="font-mono text-slate-800">2026-05-09 17:30:45 UTC</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-600">Items Estimated:</span>
+              <span class="font-mono text-slate-800">5</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-600">Total Amount:</span>
+              <span class="font-mono text-slate-800">$10,947.50</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+
+async function init() {
+  await EIMEShell.mount({
+    activeNav: 'coa',
+    pageTitle: 'Accrual & Amortization',
+    centerContent: document.getElementById('page-center-content').innerHTML
+  });
+
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    window.eime.setContext({
+      page: 'accrual-amortization',
+      payload: { church_id: activeChurch }
+    });
+    await loadAccruals();
+  }
+}
+
+async function loadAccruals() {
+  activeChurch = document.getElementById('church-selector').value;
+  window.eime.setContext({
+    page: 'accrual-amortization',
+    payload: { church_id: activeChurch }
+  });
+}
+
+function switchTab(tab) {
+  document.getElementById('content-accruals').classList.add('hidden');
+  document.getElementById('content-amortization').classList.add('hidden');
+  document.getElementById('content-schedule').classList.add('hidden');
+
+  document.getElementById('tab-accruals').classList.remove('border-navy-700', 'text-navy-700');
+  document.getElementById('tab-amortization').classList.remove('border-navy-700', 'text-navy-700');
+  document.getElementById('tab-schedule').classList.remove('border-navy-700', 'text-navy-700');
+
+  document.getElementById('tab-accruals').classList.add('text-slate-500', 'border-transparent');
+  document.getElementById('tab-amortization').classList.add('text-slate-500', 'border-transparent');
+  document.getElementById('tab-schedule').classList.add('text-slate-500', 'border-transparent');
+
+  document.getElementById(`content-${tab}`).classList.remove('hidden');
+  document.getElementById(`tab-${tab}`).classList.add('border-navy-700', 'text-navy-700');
+  document.getElementById(`tab-${tab}`).classList.remove('text-slate-500', 'border-transparent');
+}
+
+window.switchTab = switchTab;
+window.loadAccruals = loadAccruals;
+
+init();
+</script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Adversarial Findings — Books</title>
+    <title>Flagged Items — Books</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -11,8 +11,8 @@
         <div class="p-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Adversarial Findings</h1>
-                <p class="text-gray-600">Continuous internal audit: technically valid transactions that are pattern-anomalous, suspicious, or aggressive. The agent that disagrees with itself.</p>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Flagged Items</h1>
+                <p class="text-gray-600">Transactions that look unusual &mdash; bigger than normal, from an odd vendor, or different from your usual patterns. Worth a second look.</p>
             </div>
 
             <!-- Filters -->
@@ -28,13 +28,13 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Finding Type</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Type of Flag</label>
                         <select id="filterType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                             <option value="">All Types</option>
-                            <option value="vendor_pricing_anomaly">Vendor Pricing Drift</option>
-                            <option value="je_anomaly">JE Pattern Anomaly</option>
-                            <option value="override_pattern">Override Pattern</option>
-                            <option value="related_party">Related Party</option>
+                            <option value="vendor_pricing_anomaly">Vendor charged more than usual</option>
+                            <option value="je_anomaly">Unusual transaction pattern</option>
+                            <option value="override_pattern">Someone overrode the system</option>
+                            <option value="related_party">Possible related party</option>
                         </select>
                     </div>
                     <div>
@@ -375,8 +375,10 @@
         }
 
         EIMEShell.mount({
-            onMounted: onMounted,
-            navAttribute: 'data-nav'
+            activeNav: 'adversarial-audit',
+            pageTitle: 'Adversarial Findings',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted: onMounted
         });
     </script>
 </body>

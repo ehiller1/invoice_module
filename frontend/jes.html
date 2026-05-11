@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>EIME — Journal Entries</title>
+<title>Journal Entries — Books</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="/eime-bus.js"></script>
 <script src="/eime-shell.js"></script>
@@ -16,10 +16,10 @@
   <div class="border-b mb-4 flex items-center justify-between gap-4">
     <nav class="flex gap-4 overflow-x-auto flex-1 min-w-0">
       <button class="je-tab flex-shrink-0" data-state="DRAFT">Drafts <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
-      <button class="je-tab flex-shrink-0" data-state="OPEN">Open <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
-      <button class="je-tab flex-shrink-0" data-state="PENDING_TREASURER">Pending Treasurer <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="OPEN">In Review <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="PENDING_TREASURER">Awaiting Treasurer <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
       <button class="je-tab flex-shrink-0" data-state="APPROVED">Approved <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
-      <button class="je-tab flex-shrink-0" data-state="POSTED">Posted <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
+      <button class="je-tab flex-shrink-0" data-state="POSTED">Recorded <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
       <button class="je-tab flex-shrink-0" data-state="REJECTED">Rejected <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
       <button class="je-tab flex-shrink-0" data-state="RECURRING">Recurring <span class="je-tab-count ml-1 bg-slate-200 text-slate-700 text-xs rounded-full px-1.5"></span></button>
     </nav>
@@ -50,11 +50,11 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="text-sm font-semibold text-slate-700 mb-1 block">Debit Account</label>
-          <input type="text" id="rec-debit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="GL code" />
+          <input type="text" id="rec-debit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="account number" />
         </div>
         <div>
           <label class="text-sm font-semibold text-slate-700 mb-1 block">Credit Account</label>
-          <input type="text" id="rec-credit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="GL code" />
+          <input type="text" id="rec-credit" class="w-full px-3 py-2 border border-slate-300 rounded-lg" placeholder="account number" />
         </div>
       </div>
       <div class="grid grid-cols-2 gap-4">
@@ -289,12 +289,12 @@ function renderJeCard(je, state) {
   if (state === 'DRAFT') actions.push({ label: 'Submit for Review', toState: 'OPEN', role: currentRole });
   if (state === 'OPEN') actions.push({ label: 'Send to Treasurer', toState: 'PENDING_TREASURER', role: currentRole });
   if (state === 'PENDING_TREASURER') {
-    actions.push({ label: 'Approve to Post', toState: 'APPROVED', role: currentRole });
+    actions.push({ label: 'Approve &amp; Send', toState: 'APPROVED', role: currentRole });
     actions.push({ label: 'Reject', toState: 'REJECTED', role: currentRole });
   }
   if (state === 'APPROVED') {
     actions.push({ label: 'Create Payment', toState: null, role: currentRole, isPayment: true });
-    actions.push({ label: 'Post to ACS Realm', toState: 'POSTED', role: currentRole, isPost: true });
+    actions.push({ label: 'Record in ACS', toState: 'POSTED', role: currentRole, isPost: true });
   }
 
   const memoText = je.description || je.memo || 'Journal Entry';

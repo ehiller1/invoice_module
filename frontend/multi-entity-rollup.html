@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Entity Rollup — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Multi-Entity Rollup</h1>
+      <p class="text-sm text-slate-500">Consolidate finances across multiple churches and entities.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="rollup-period" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none">
+        <option value="2026-05">May 2026 (YTD)</option>
+        <option value="2026-04">April 2026 (YTD)</option>
+        <option value="2025">2025 (Full Year)</option>
+      </select>
+      <button onclick="generateRollup()" class="text-sm text-navy-700 hover:underline">Generate</button>
+    </div>
+  </header>
+
+  <div class="flex flex-col h-full">
+    <!-- Entity Selection -->
+    <div class="px-8 py-6 border-b border-slate-200 bg-slate-50">
+      <h3 class="text-sm font-semibold text-slate-800 mb-3">Select Entities to Consolidate</h3>
+      <div class="flex flex-wrap gap-2">
+        <label class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-blue-50">
+          <input type="checkbox" checked class="rounded" />
+          <span class="text-sm text-slate-700">Holy Comforter Church</span>
+        </label>
+        <label class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-blue-50">
+          <input type="checkbox" checked class="rounded" />
+          <span class="text-sm text-slate-700">St. Mary's Parish</span>
+        </label>
+        <label class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-blue-50">
+          <input type="checkbox" class="rounded" />
+          <span class="text-sm text-slate-700">Community Outreach Ministry</span>
+        </label>
+        <label class="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-blue-50">
+          <input type="checkbox" checked class="rounded" />
+          <span class="text-sm text-slate-700">Youth Education Fund</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Rollup Table -->
+    <div class="overflow-y-auto flex-1 px-8 py-6">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Consolidated Results (May 2026 YTD)</h3>
+
+      <div class="space-y-4">
+        <!-- Summary -->
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <p class="text-xs text-slate-600 font-medium mb-2">Total Revenue</p>
+            <p class="text-2xl font-bold text-green-600">$487,250</p>
+            <p class="text-xs text-slate-500 mt-1">4 entities</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <p class="text-xs text-slate-600 font-medium mb-2">Total Expenses</p>
+            <p class="text-2xl font-bold text-red-600">$342,100</p>
+            <p class="text-xs text-slate-500 mt-1">4 entities</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <p class="text-xs text-slate-600 font-medium mb-2">Net Income</p>
+            <p class="text-2xl font-bold text-blue-600">$145,150</p>
+            <p class="text-xs text-slate-500 mt-1">29.8% margin</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <p class="text-xs text-slate-600 font-medium mb-2">Consolidation Adjustments</p>
+            <p class="text-2xl font-bold text-slate-700">($8,500)</p>
+            <p class="text-xs text-slate-500 mt-1">Inter-entity eliminations</p>
+          </div>
+        </div>
+
+        <!-- Entity Detail -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Entity</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Revenue</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Expenses</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Net Income</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">% of Total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm font-medium text-slate-800">Holy Comforter Church</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$245,000</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$165,200</td>
+                <td class="px-4 py-3 text-sm font-mono text-green-700 font-semibold">$79,800</td>
+                <td class="px-4 py-3 text-sm text-slate-700">50.3%</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm font-medium text-slate-800">St. Mary's Parish</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$128,500</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$95,300</td>
+                <td class="px-4 py-3 text-sm font-mono text-green-700 font-semibold">$33,200</td>
+                <td class="px-4 py-3 text-sm text-slate-700">26.4%</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm font-medium text-slate-800">Youth Education Fund</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$113,750</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-700">$81,600</td>
+                <td class="px-4 py-3 text-sm font-mono text-green-700 font-semibold">$32,150</td>
+                <td class="px-4 py-3 text-sm text-slate-700">23.3%</td>
+              </tr>
+              <tr class="bg-slate-50 font-semibold">
+                <td class="px-4 py-3 text-sm text-slate-900">CONSOLIDATED TOTAL</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-900">$487,250</td>
+                <td class="px-4 py-3 text-sm font-mono text-slate-900">$342,100</td>
+                <td class="px-4 py-3 text-sm font-mono text-green-700">$145,150</td>
+                <td class="px-4 py-3 text-sm text-slate-900">100%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Consolidation Notes -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 class="font-semibold text-amber-900 text-sm mb-2">📌 Consolidation Method</h3>
+          <ul class="text-sm text-amber-800 space-y-1">
+            <li>• <strong>Full Consolidation:</strong> Holy Comforter Church + St. Mary's Parish (parent-subsidiary structure)</li>
+            <li>• <strong>Proportional Consolidation:</strong> Youth Education Fund (50% ownership)</li>
+            <li>• <strong>Equity Method:</strong> Community Outreach Ministry (non-consolidated investment)</li>
+            <li>• <strong>Inter-Entity Eliminations:</strong> $8,500 (loans between entities removed)</li>
+          </ul>
+        </div>
+
+        <!-- Export Options -->
+        <div class="bg-white border border-slate-200 rounded-lg p-4 flex gap-3">
+          <button class="px-4 py-2 bg-navy-600 text-white rounded-lg text-sm font-medium hover:bg-navy-700">📥 Export to Excel</button>
+          <button class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200">📄 Export to PDF</button>
+          <button class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200">🔗 Copy Consolidation Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+async function init() {
+  await EIMEShell.mount({
+    activeNav: 'council',
+    pageTitle: 'Multi-Entity Rollup',
+    centerContent: document.getElementById('page-center-content').innerHTML
+  });
+
+  window.eime.setContext({
+    page: 'multi-entity-rollup',
+    payload: { }
+  });
+}
+
+function generateRollup() {
+  const period = document.getElementById('rollup-period').value;
+  alert(`Generated consolidation for ${period}\n\nConsolidating:\n• Holy Comforter Church\n• St. Mary's Parish\n• Youth Education Fund`);
+}
+
+window.generateRollup = generateRollup;
+
+init();
+</script>
+
+</body>
+</html>

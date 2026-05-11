@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Continuous Reconciliation — Books</title>
+    <title>Reconcile Bank — Books</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -12,8 +12,8 @@
         <div class="p-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Continuous Reconciliation</h1>
-                <p class="text-gray-600">Real-time reconciliation status across all sub-ledgers. Only genuine exceptions shown (pattern anomalies, not rounding errors).</p>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Reconcile Bank</h1>
+                <p class="text-gray-600">Match your books to the bank statement. We show you only the items that don't auto-match &mdash; the rest are already handled.</p>
             </div>
 
             <!-- Last Updated -->
@@ -24,19 +24,19 @@
             <!-- Summary Cards -->
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                 <div id="cardCash" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-                    <p class="text-sm font-medium text-gray-600 mb-2">Cash</p>
+                    <p class="text-sm font-medium text-gray-600 mb-2">Bank Balance</p>
                     <p class="text-2xl font-bold text-gray-900">$<span id="cashAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="cashStatus" class="font-medium">-</span></p>
                 </div>
                 <div id="cardAR" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-                    <p class="text-sm font-medium text-gray-600 mb-2">Accounts Receivable</p>
+                    <p class="text-sm font-medium text-gray-600 mb-2">Money Owed to Us</p>
                     <p class="text-2xl font-bold text-gray-900">$<span id="arAmount">-</span></p>
-                    <p class="text-xs text-gray-500 mt-2"><span id="arExceptions" class="font-medium">0</span> exceptions</p>
+                    <p class="text-xs text-gray-500 mt-2"><span id="arExceptions" class="font-medium">0</span> issues</p>
                 </div>
                 <div id="cardAP" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
-                    <p class="text-sm font-medium text-gray-600 mb-2">Accounts Payable</p>
+                    <p class="text-sm font-medium text-gray-600 mb-2">Bills We Owe</p>
                     <p class="text-2xl font-bold text-gray-900">$<span id="apAmount">-</span></p>
-                    <p class="text-xs text-gray-500 mt-2"><span id="apExceptions" class="font-medium">0</span> exceptions</p>
+                    <p class="text-xs text-gray-500 mt-2"><span id="apExceptions" class="font-medium">0</span> issues</p>
                 </div>
                 <div id="cardPayroll" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Payroll</p>
@@ -44,7 +44,7 @@
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="payrollStatus" class="font-medium">-</span></p>
                 </div>
                 <div id="cardInterco" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-gray-500">
-                    <p class="text-sm font-medium text-gray-600 mb-2">Intercompany</p>
+                    <p class="text-sm font-medium text-gray-600 mb-2">Between Funds</p>
                     <p class="text-2xl font-bold text-gray-900">$<span id="intercoAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="intercoStatus" class="font-medium">-</span></p>
                 </div>
@@ -54,16 +54,16 @@
             <div class="mb-6 border-b border-gray-200">
                 <div class="flex gap-4 overflow-x-auto">
                     <button onclick="switchReconcTab('cash')" id="tabReconcCash" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm whitespace-nowrap">
-                        Cash
+                        Bank
                     </button>
                     <button onclick="switchReconcTab('ar')" id="tabReconcAR" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        AR
+                        Money Owed
                     </button>
                     <button onclick="switchReconcTab('ap')" id="tabReconcAP" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        AP
+                        Bills We Owe
                     </button>
                     <button onclick="switchReconcTab('aging')" id="tabReconcAging" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        Aging Analysis
+                        How Old?
                     </button>
                 </div>
             </div>
@@ -71,14 +71,14 @@
             <!-- Cash Tab -->
             <div id="tabContentCash" class="space-y-6">
                 <div class="bg-white rounded-lg shadow-sm p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Cash Reconciliation</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Books vs. Bank</h2>
                     <div class="grid grid-cols-3 gap-4 mb-6">
                         <div>
-                            <p class="text-sm font-medium text-gray-600">Expected (GL)</p>
+                            <p class="text-sm font-medium text-gray-600">What Books Say</p>
                             <p class="text-2xl font-bold text-gray-900">$<span id="cashExpected">-</span></p>
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-gray-600">Actual (Bank)</p>
+                            <p class="text-sm font-medium text-gray-600">What Bank Says</p>
                             <p class="text-2xl font-bold text-gray-900">$<span id="cashActual">-</span></p>
                         </div>
                         <div>
@@ -93,7 +93,7 @@
             <!-- AR Tab -->
             <div id="tabContentAR" class="hidden space-y-6">
                 <div class="bg-white rounded-lg shadow-sm p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Accounts Receivable</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Money Owed to Us</h2>
                     <div class="grid grid-cols-4 gap-4 mb-6">
                         <div>
                             <p class="text-sm font-medium text-gray-600">Current</p>
@@ -119,7 +119,7 @@
             <!-- AP Tab -->
             <div id="tabContentAP" class="hidden space-y-6">
                 <div class="bg-white rounded-lg shadow-sm p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Accounts Payable</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Bills We Owe</h2>
                     <div class="grid grid-cols-4 gap-4 mb-6">
                         <div>
                             <p class="text-sm font-medium text-gray-600">Current</p>
@@ -145,7 +145,7 @@
             <!-- Aging Analysis Tab -->
             <div id="tabContentAging" class="hidden space-y-6">
                 <div class="bg-white rounded-lg shadow-sm p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Aging Analysis</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">How Old Are These Balances?</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <h3 class="text-sm font-medium text-gray-600 mb-3">AR Aging Distribution</h3>
@@ -375,8 +375,10 @@
         }
 
         EIMEShell.mount({
-            onMounted: onMounted,
-            navAttribute: 'data-nav'
+            activeNav: 'reconciliation-continuous',
+            pageTitle: 'Reconciliation Continuous',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted: onMounted
         });
     </script>
 </body>

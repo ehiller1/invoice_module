@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Policy Management — Books</title>
+    <title>Policies — Books</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -11,24 +11,24 @@
         <div class="p-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Policy Management</h1>
-                <p class="text-gray-600">Define, version, and enforce policies that agents use to classify and route transactions. Detect and resolve coding pattern drift in real-time.</p>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Policies</h1>
+                <p class="text-gray-600">The rules the system follows when coding and routing transactions &mdash; what counts as a "small" bill, who approves what, and how to handle restricted gifts.</p>
             </div>
 
             <!-- Tabs -->
             <div class="mb-6 border-b border-gray-200">
                 <div class="flex gap-4 overflow-x-auto">
                     <button onclick="switchPolicyTab('active')" id="tabPolicyActive" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm whitespace-nowrap">
-                        Active Policies
+                        Current Rules
                     </button>
                     <button onclick="switchPolicyTab('drift')" id="tabPolicyDrift" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        Drift Alerts
+                        Things Have Changed
                     </button>
                     <button onclick="switchPolicyTab('history')" id="tabPolicyHistory" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        Version History
+                        Rule History
                     </button>
                     <button onclick="switchPolicyTab('create')" id="tabPolicyCreate" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm whitespace-nowrap hover:text-gray-900">
-                        Create Policy
+                        New Rule
                     </button>
                 </div>
             </div>
@@ -395,8 +395,10 @@
         }
 
         EIMEShell.mount({
-            onMounted: onMounted,
-            navAttribute: 'data-nav'
+            activeNav: 'policy-management',
+            pageTitle: 'Policy Management',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted: onMounted
         });
     </script>
 </body>

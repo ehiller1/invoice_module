@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Chat — EIME</title>
+  <title>Ask Books — Books</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -45,8 +45,8 @@
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
       <div>
-        <h1 class="text-lg font-semibold text-slate-800">Agent Chat</h1>
-        <p class="text-sm text-slate-500">Question any agent about invoice processing decisions, risk, fraud, or accounting rules.</p>
+        <h1 class="text-lg font-semibold text-slate-800">Ask Books</h1>
+        <p class="text-sm text-slate-500">Ask anything &mdash; about a bill, a budget line, a donor, or how the books are doing. Plain English, no jargon needed.</p>
       </div>
       <div class="flex items-center gap-3">
         <select id="job-selector" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none">
@@ -59,11 +59,11 @@
     <!-- Suggested questions -->
     <div id="suggestions" class="bg-white border-b border-slate-100 px-6 py-3 flex gap-2 flex-wrap flex-shrink-0">
       <p class="text-xs text-slate-400 self-center mr-1">Try:</p>
-      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Why was this invoice escalated to HITL?</button>
-      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What fraud signals were detected?</button>
-      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Explain the journal entry construction</button>
-      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What are the UMC apportionment accounts?</button>
-      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Why is the risk score HIGH for this line?</button>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Why does this bill need my approval?</button>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What looks unusual about this transaction?</button>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">How does this bill get recorded?</button>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What accounts apply for our diocesan apportionment?</button>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Why is this line flagged as risky?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What GL account should housing allowance use?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">How does GAAP ASC 958 affect fund accounting?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Who needs to approve this payment?</button>
@@ -91,7 +91,7 @@
       <div class="flex gap-3 max-w-4xl">
         <textarea
           id="question-input"
-          placeholder="Ask about any agent decision, risk flag, fraud signal, or accounting rule…"
+          placeholder="Ask anything — about a bill, donor, budget line, or a flagged item…"
           class="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-navy-600 outline-none resize-none leading-relaxed"
           rows="2"
           onkeydown="handleKey(event)"

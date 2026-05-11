@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restricted Funds — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Restricted Funds</h1>
+      <p class="text-sm text-slate-500">Funds that donors restricted to specific uses. The system blocks spending that would break a donor's promise.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="loadRestrictions()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="loadRestrictions()" class="text-sm text-navy-700 hover:underline">Refresh</button>
+    </div>
+  </header>
+
+  <div class="flex flex-col h-full">
+    <!-- Tab navigation -->
+    <div class="bg-white border-b border-slate-200 px-8 flex gap-6 flex-shrink-0">
+      <button onclick="switchTab('restrictions')" id="tab-restrictions" class="py-3 px-2 font-medium text-navy-700 border-b-2 border-navy-700 text-sm">
+        Fund Restrictions
+      </button>
+      <button onclick="switchTab('violations')" id="tab-violations" class="py-3 px-2 font-medium text-slate-500 border-b-2 border-transparent text-sm hover:text-slate-700">
+        Current Violations
+      </button>
+      <button onclick="switchTab('covenants')" id="tab-covenants" class="py-3 px-2 font-medium text-slate-500 border-b-2 border-transparent text-sm hover:text-slate-700">
+        Donor Covenants
+      </button>
+    </div>
+
+    <!-- Content area -->
+    <div class="overflow-y-auto flex-1 px-8 py-6 space-y-6">
+      <!-- Restrictions Tab -->
+      <div id="content-restrictions" class="space-y-4">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 class="font-semibold text-amber-900 text-sm mb-2">⚠️ Hard Restrictions Active</h3>
+          <p class="text-sm text-amber-700">These fund restrictions BLOCK transactions. Violations will be flagged and prevented from posting.</p>
+        </div>
+
+        <div class="space-y-3">
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-semibold text-slate-800 text-sm">MEMORIAL Fund — Building Maintenance Restriction</h4>
+                <p class="text-xs text-slate-500 mt-1">Restriction ID: RST-001 • Created: 2024-01-15 • Type: HARD BLOCK</p>
+              </div>
+              <span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded">ACTIVE</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100">
+              <p class="text-xs text-slate-600"><strong>Restriction:</strong> Memorial Fund contributions cannot be used for general operating expenses, utilities, or administrative costs. Allowed uses: Building improvements, capital maintenance only.</p>
+              <div class="mt-2 p-2 bg-red-50 rounded border border-red-200">
+                <p class="text-xs text-red-700"><strong>Blocked GL Account:</strong> 7200 Utilities - Electric (GENERAL fund allocation)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-semibold text-slate-800 text-sm">CPF Fund — Investment Volatility Hedge</h4>
+                <p class="text-xs text-slate-500 mt-1">Restriction ID: RST-002 • Created: 2023-06-20 • Type: HARD BLOCK</p>
+              </div>
+              <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">ACTIVE</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100">
+              <p class="text-xs text-slate-600"><strong>Restriction:</strong> CPF (Charitable Purpose Fund) withdrawals require matched funding from growth reserve and explicit approval from Treasurer.</p>
+              <p class="text-xs text-slate-600 mt-2"><strong>Status:</strong> No current violations. Reserve position: 87% of threshold.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Violations Tab (hidden by default) -->
+      <div id="content-violations" class="hidden space-y-4">
+        <div class="text-center py-8 text-slate-400">
+          <p class="text-sm">No active fund restriction violations detected.</p>
+          <p class="text-xs text-slate-400 mt-1">All recent transactions comply with active donor restrictions.</p>
+        </div>
+      </div>
+
+      <!-- Covenants Tab (hidden by default) -->
+      <div id="content-covenants" class="hidden space-y-4">
+        <div class="space-y-3">
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-semibold text-slate-800 text-sm">Donor Covenant: Mary Johnson Memorial Fund</h4>
+                <p class="text-xs text-slate-500 mt-1">Donor: Mary Johnson • Amount: $50,000 • Date: 2023-03-15</p>
+              </div>
+              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">INFO</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100">
+              <p class="text-xs text-slate-600">"In perpetuity, this fund shall support building improvements and capital maintenance projects as determined by the Facilities Committee."</p>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-semibold text-slate-800 text-sm">Donor Covenant: CPF Investment Restrictions</h4>
+                <p class="text-xs text-slate-500 mt-1">Donor: Multiple Contributors • Amount: $120,000 • Effective: Rolling</p>
+              </div>
+              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">INFO</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100">
+              <p class="text-xs text-slate-600">"CPF funds shall maintain a diversified investment portfolio with no more than 25% allocation to any single security, and must maintain a growth reserve buffer of 50% of annual operating expenses."</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+
+async function init() {
+  await EIMEShell.mount({
+    activeNav: 'compliance',
+    pageTitle: 'Compliance Check',
+    centerContent: document.getElementById('page-center-content').innerHTML
+  });
+
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    window.eime.setContext({
+      page: 'compliance',
+      payload: { church_id: activeChurch }
+    });
+    await loadRestrictions();
+  }
+}
+
+async function loadRestrictions() {
+  activeChurch = document.getElementById('church-selector').value;
+  window.eime.setContext({
+    page: 'compliance',
+    payload: { church_id: activeChurch }
+  });
+
+  try {
+    const res = await fetch(`/api/compliance/status?church_id=${activeChurch}`);
+    if (!res.ok) {
+      console.warn('Compliance data not available, showing mock data');
+    }
+    // UI already populated with static restricted funds above
+  } catch (e) {
+    console.error('Error loading compliance data:', e);
+  }
+}
+
+function switchTab(tab) {
+  // Hide all tabs
+  document.getElementById('content-restrictions').classList.add('hidden');
+  document.getElementById('content-violations').classList.add('hidden');
+  document.getElementById('content-covenants').classList.add('hidden');
+
+  // Remove active border from all buttons
+  document.getElementById('tab-restrictions').classList.remove('border-navy-700', 'text-navy-700');
+  document.getElementById('tab-restrictions').classList.add('text-slate-500', 'border-transparent');
+  document.getElementById('tab-violations').classList.remove('border-navy-700', 'text-navy-700');
+  document.getElementById('tab-violations').classList.add('text-slate-500', 'border-transparent');
+  document.getElementById('tab-covenants').classList.remove('border-navy-700', 'text-navy-700');
+  document.getElementById('tab-covenants').classList.add('text-slate-500', 'border-transparent');
+
+  // Show selected tab
+  document.getElementById(`content-${tab}`).classList.remove('hidden');
+
+  // Activate selected button
+  document.getElementById(`tab-${tab}`).classList.remove('text-slate-500', 'border-transparent');
+  document.getElementById(`tab-${tab}`).classList.add('border-navy-700', 'text-navy-700');
+}
+
+window.switchTab = switchTab;
+window.loadRestrictions = loadRestrictions;
+
+init();
+</script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Operations Council — Books</title>
+    <title>Pastor's Review — Books</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -11,31 +11,31 @@
         <div class="p-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Operations Council</h1>
-                <p class="text-gray-600">Unified judgment surface: exceptions needing judgment, policy decisions, questions being asked of the firm</p>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Pastor's Review</h1>
+                <p class="text-gray-600">Decisions that need a human eye &mdash; unusual transactions, policy calls, and questions the books can't answer on their own.</p>
             </div>
 
             <!-- KPI Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div class="bg-white rounded-lg shadow-sm p-4">
-                    <p class="text-gray-600 text-sm font-medium mb-2">Exceptions Pending</p>
+                    <p class="text-gray-600 text-sm font-medium mb-2">Items Needing You</p>
                     <p id="kpiExceptions" class="text-3xl font-bold text-gray-900">-</p>
-                    <p class="text-xs text-gray-500 mt-1">Requiring judgment</p>
+                    <p class="text-xs text-gray-500 mt-1">Decisions to make</p>
                 </div>
                 <div class="bg-white rounded-lg shadow-sm p-4">
-                    <p class="text-gray-600 text-sm font-medium mb-2">Policy Drifts</p>
+                    <p class="text-gray-600 text-sm font-medium mb-2">Coding Changes</p>
                     <p id="kpiDrifts" class="text-3xl font-bold text-gray-900">-</p>
-                    <p class="text-xs text-gray-500 mt-1">Pattern changes detected</p>
+                    <p class="text-xs text-gray-500 mt-1">How transactions are being categorized</p>
                 </div>
                 <div class="bg-white rounded-lg shadow-sm p-4">
-                    <p class="text-gray-600 text-sm font-medium mb-2">Questions Pending</p>
+                    <p class="text-gray-600 text-sm font-medium mb-2">Open Questions</p>
                     <p id="kpiQuestions" class="text-3xl font-bold text-gray-900">-</p>
-                    <p class="text-xs text-gray-500 mt-1">From stakeholders</p>
+                    <p class="text-xs text-gray-500 mt-1">From people who asked</p>
                 </div>
                 <div class="bg-white rounded-lg shadow-sm p-4">
-                    <p class="text-gray-600 text-sm font-medium mb-2">Covenant Health</p>
+                    <p class="text-gray-600 text-sm font-medium mb-2">Loan Rules</p>
                     <p id="kpiCovenant" class="text-3xl font-bold text-green-600">GREEN</p>
-                    <p class="text-xs text-gray-500 mt-1">No breach risk</p>
+                    <p class="text-xs text-gray-500 mt-1">On track</p>
                 </div>
             </div>
 
@@ -43,19 +43,19 @@
             <div class="mb-6 border-b border-gray-200">
                 <div class="flex gap-4">
                     <button onclick="switchTab('exceptions')" id="tabExceptions" class="pb-3 px-1 border-b-2 border-blue-600 text-blue-600 font-medium text-sm">
-                        Exceptions
+                        Items to Decide
                     </button>
                     <button onclick="switchTab('policies')" id="tabPolicies" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm hover:text-gray-900">
-                        Policy Decisions
+                        Rule Calls
                     </button>
                     <button onclick="switchTab('questions')" id="tabQuestions" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm hover:text-gray-900">
                         Questions
                     </button>
                     <button onclick="switchTab('accruals')" id="tabAccruals" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm hover:text-gray-900">
-                        Live Accruals
+                        Pending Estimates
                     </button>
                     <button onclick="switchTab('compliance')" id="tabCompliance" class="pb-3 px-1 border-b-2 border-transparent text-gray-600 font-medium text-sm hover:text-gray-900">
-                        Compliance
+                        Rules &amp; Limits
                     </button>
                 </div>
             </div>
@@ -405,8 +405,10 @@
         }
 
         EIMEShell.mount({
-            onMounted: onMounted,
-            navAttribute: 'data-nav'
+            activeNav: 'operations-council',
+            pageTitle: 'Operations Council',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted: onMounted
         });
     </script>
 </body>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Invoices in Review — Books</title>
+<title>Bills to Approve — Books</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -27,31 +27,31 @@
 
 <template id="page-center-content">
 <div class="max-w-7xl mx-auto p-6">
-  <h1 class="text-3xl font-bold text-slate-900 mb-2">Invoices in Review</h1>
-  <p class="text-slate-600 mb-6">Invoice coding and approval queue</p>
+  <h1 class="text-3xl font-bold text-slate-900 mb-2">Bills to Approve</h1>
+  <p class="text-slate-600 mb-6">Bills waiting on you to review and approve before they're paid.</p>
 
   <div class="grid grid-cols-4 gap-4 mb-8">
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">PENDING REVIEW</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">NEEDS CODING</p>
       <p class="text-3xl font-bold text-orange-600" id="count-pending">0</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">AWAITING APPROVAL</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">AWAITING YOUR APPROVAL</p>
       <p class="text-3xl font-bold text-blue-600" id="count-approval">0</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">READY TO POST</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">READY TO PAY</p>
       <p class="text-3xl font-bold text-green-600" id="count-ready">0</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-4">
-      <p class="text-xs text-slate-500 font-semibold uppercase">TOTAL PROCESSED</p>
+      <p class="text-xs text-slate-500 font-semibold uppercase">DONE THIS MONTH</p>
       <p class="text-3xl font-bold text-slate-700" id="count-total">0</p>
     </div>
   </div>
 
   <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-slate-900">Job Queue</h2>
+      <h2 class="text-lg font-semibold text-slate-900">Bills</h2>
       <button onclick="loadJobs()" class="px-3 py-1.5 text-sm bg-navy-900 text-white rounded hover:bg-navy-800">Refresh</button>
     </div>
     <div id="jobs-list" class="divide-y divide-slate-200"></div>
@@ -132,7 +132,7 @@ async function loadJobs() {
           </div>
           <div class="flex items-center gap-4">
             <span class="text-sm text-slate-600">$${(j.total_amount || 0).toFixed(2)}</span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium ${statusColor(j.status)}">${j.status}</span>
+            <span class="px-3 py-1 rounded-full text-xs font-medium ${statusColor(j.status)}">${statusLabel(j.status)}</span>
           </div>
         </div>
       </div>
@@ -148,8 +148,34 @@ function statusColor(status) {
     'HITL_APPROVED': 'bg-blue-100 text-blue-800',
     'READY_JE': 'bg-green-100 text-green-800',
     'COMPLETED': 'bg-slate-100 text-slate-800',
+    'PENDING_TREASURER': 'bg-blue-100 text-blue-800',
+    'POSTED': 'bg-green-100 text-green-800',
+    'REJECTED': 'bg-red-100 text-red-800',
+    'BLOCKED_FUND_RESTRICTION': 'bg-red-100 text-red-800',
+    'INSUFFICIENT_CONTEXT': 'bg-amber-100 text-amber-800',
   };
   return colors[status] || 'bg-slate-100 text-slate-600';
+}
+
+function statusLabel(status) {
+  const labels = {
+    'PENDING_HITL': 'Needs Review',
+    'HITL_APPROVED': 'Approved — Ready for Treasurer',
+    'READY_JE': 'Ready to Pay',
+    'COMPLETED': 'Done',
+    'PENDING_APPROVAL': 'Needs Approval',
+    'PENDING_TREASURER': 'Awaiting Treasurer',
+    'APPROVED': 'Approved',
+    'POSTED': 'Posted',
+    'SENT': 'Sent',
+    'REJECTED': 'Rejected',
+    'FAILED': 'Failed',
+    'BLOCKED_FUND_RESTRICTION': 'Blocked — Restricted Fund',
+    'INSUFFICIENT_CONTEXT': 'Needs Info',
+    'OPEN': 'Open',
+    'DRAFT': 'Draft',
+  };
+  return labels[status] || status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
 async function showJob(jobId) {

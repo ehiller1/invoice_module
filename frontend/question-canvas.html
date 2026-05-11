@@ -28,15 +28,15 @@
 <template id="page-center-content">
 <div class="max-w-5xl mx-auto p-6">
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-slate-900 mb-2">❓ Question Canvas</h1>
-    <p class="text-slate-600">Ask any question about your finances, projections, or operations. Our intent router classifies your question and routes it to the right analysis. (FRD §16.4, §10.1)</p>
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">❓ Ask Anything</h1>
+    <p class="text-slate-600">Type a question about your church's money &mdash; cash, giving, budget, projections, or donor restrictions. We'll figure out where to look and give you a real answer.</p>
   </div>
 
   <!-- Query Input -->
   <div class="bg-white rounded-lg border border-slate-200 p-6 mb-8">
     <label class="text-sm font-semibold text-slate-700 block mb-3">Your Question</label>
     <div class="flex gap-4">
-      <input type="text" id="query-input" placeholder="e.g., 'What is our cash position if pledges drop 20%?' or 'Which restricted funds have drifted from intent?'"
+      <input type="text" id="query-input" placeholder="e.g., 'What happens to cash if pledges drop 20%?' or 'Are any restricted funds being used outside their purpose?'"
         class="flex-1 px-4 py-3 border border-slate-300 rounded-lg text-base"
         onkeypress="if(event.key==='Enter') submitQuestion()" />
       <button onclick="submitQuestion()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium whitespace-nowrap">
@@ -145,6 +145,7 @@ let queryHistory = [];
 
 EIMEShell.mount({
   activeNav: 'question-canvas',
+  pageTitle: 'Question Canvas',
   centerContent: document.getElementById('page-center-content').innerHTML,
   onMounted() {
     window.eime.setContext({

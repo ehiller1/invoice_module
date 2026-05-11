@@ -58,8 +58,8 @@
 
   <!-- Navigation -->
   <div class="flex justify-between mt-6">
-    <button id="prev-btn" onclick="prevStep()" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50" disabled>← Back</button>
-    <button id="next-btn" onclick="nextStep()" class="px-6 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">Next →</button>
+    <button id="prev-btn" class="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50" disabled>← Back</button>
+    <button id="next-btn" class="px-6 py-2 bg-navy-900 text-white rounded-lg hover:bg-navy-800">Next →</button>
   </div>
 </div>
 </template>
@@ -95,6 +95,19 @@ EIMEShell.mount({
     renderStepCircles();
     renderCurrentStep();
     loadStatus();
+
+    // Attach event listeners after DOM is mounted
+    const nextBtn = document.getElementById('next-btn');
+    const prevBtn = document.getElementById('prev-btn');
+
+    if (nextBtn) {
+      nextBtn.removeEventListener('click', nextStep);
+      nextBtn.addEventListener('click', nextStep);
+    }
+    if (prevBtn) {
+      prevBtn.removeEventListener('click', prevStep);
+      prevBtn.addEventListener('click', prevStep);
+    }
   }
 });
 

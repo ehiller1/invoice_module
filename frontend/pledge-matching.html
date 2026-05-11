@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pledge Matching — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900: '#0f1f3d', 800: '#162952', 700: '#1e3a6e', 600: '#2d5399', 100: '#dbe7f5' },
+            gold: { 500: '#c9a227', 400: '#d4ad3a' },
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="/eime-bus.js"></script>
+  <script src="/eime-chat-rail.js"></script>
+  <script src="/eime-shell.js"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+
+<template id="page-center-content">
+  <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-800">Pledge → Gift Matching</h1>
+      <p class="text-sm text-slate-500">Match pledges to gift receipts and track fulfillment status.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <select id="church-selector" onchange="loadMatches()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="loadMatches()" class="text-sm text-navy-700 hover:underline">Refresh</button>
+    </div>
+  </header>
+
+  <div class="flex flex-col h-full">
+    <!-- Stats -->
+    <div class="px-8 py-6 border-b border-slate-200 bg-blue-50">
+      <div class="grid grid-cols-4 gap-4">
+        <div>
+          <p class="text-xs text-slate-600 font-medium">Total Pledges</p>
+          <p class="text-2xl font-bold text-navy-700">24</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-600 font-medium">Matched Gifts</p>
+          <p class="text-2xl font-bold text-green-600">18</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-600 font-medium">Pending</p>
+          <p class="text-2xl font-bold text-amber-600">4</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-600 font-medium">Unfulfilled</p>
+          <p class="text-2xl font-bold text-red-600">2</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matching Table -->
+    <div class="overflow-y-auto flex-1 px-8 py-6">
+      <div class="space-y-4">
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Donor</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Pledge Amount</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Gift Received</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                <th class="px-4 py-3 text-left text-sm font-semibold text-slate-700">Match Quality</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">John Smith</td>
+                <td class="px-4 py-3 text-sm text-slate-700">$10,000.00</td>
+                <td class="px-4 py-3 text-sm text-green-700 font-medium">$10,000.00</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Matched</span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-green-50 text-green-700 text-xs">100% match</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Mary Johnson</td>
+                <td class="px-4 py-3 text-sm text-slate-700">$5,000.00</td>
+                <td class="px-4 py-3 text-sm text-amber-700 font-medium">$3,500.00</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium">Partial</span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-amber-50 text-amber-700 text-xs">70% match</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Robert Davis</td>
+                <td class="px-4 py-3 text-sm text-slate-700">$2,500.00</td>
+                <td class="px-4 py-3 text-sm text-slate-500">Pending</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Pending</span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-slate-50 text-slate-600 text-xs">—</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-slate-700">Patricia Wilson</td>
+                <td class="px-4 py-3 text-sm text-slate-700">$7,500.00</td>
+                <td class="px-4 py-3 text-sm text-red-700 font-medium">No gift received</td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">Unfulfilled</span>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="px-2 py-1 bg-red-50 text-red-700 text-xs">0% match</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 class="font-semibold text-amber-900 text-sm mb-2">📋 Matching Rules</h3>
+          <ul class="text-sm text-amber-800 space-y-1">
+            <li>• Automatic matching: Same donor, ±5% amount variance, within 12 months</li>
+            <li>• Partial matches tracked for accountability and follow-up</li>
+            <li>• Unfulfilled pledges flagged after 18 months for stewardship outreach</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+let activeChurch = null;
+
+async function init() {
+  await EIMEShell.mount({
+    activeNav: 'giving',
+    pageTitle: 'Pledge Matching',
+    centerContent: document.getElementById('page-center-content').innerHTML
+  });
+
+  const churches = await fetch('/api/churches').then(r => r.json());
+  const sel = document.getElementById('church-selector');
+  sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
+  if (churches.length) {
+    activeChurch = churches[0].church_id;
+    sel.value = activeChurch;
+    window.eime.setContext({
+      page: 'pledge-matching',
+      payload: { church_id: activeChurch }
+    });
+    await loadMatches();
+  }
+}
+
+async function loadMatches() {
+  activeChurch = document.getElementById('church-selector').value;
+  window.eime.setContext({
+    page: 'pledge-matching',
+    payload: { church_id: activeChurch }
+  });
+  // Mock data is static in the template
+}
+
+window.loadMatches = loadMatches;
+
+init();
+</script>
+
+</body>
+</html>

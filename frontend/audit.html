@@ -80,7 +80,7 @@
 
   <!-- Adversarial Membrane Findings (Phase 6) -->
   <div class="mb-8">
-    <h2 class="text-xl font-bold text-slate-900 mb-4">🤖 Adversarial Membrane Findings</h2>
+    <h2 class="text-xl font-bold text-slate-900 mb-4">🤖 Flagged by System Review</h2>
     <div id="adversarial-findings" class="grid grid-cols-1 gap-4">
       <p class="text-slate-500 text-center py-8">Loading adversarial findings...</p>
     </div>
@@ -315,7 +315,7 @@ async function verifyChain() {
       text.textContent = `❌ Chain integrity FAILED — Tampering detected at event ${result.broken_at || 'unknown'}`;
     }
   } catch (e) {
-    alert('Error verifying chain: ' + e.message);
+    alert("Couldn't verify the audit trail: " + e.message);
   }
 }
 
