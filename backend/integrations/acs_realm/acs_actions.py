@@ -22,14 +22,12 @@ class PostResult:
 
 
 def _is_mock_mode() -> bool:
-    """Mock when env says so or when playwright not importable."""
-    if os.getenv("EIME_ACS_MOCK") == "1":
-        return True
-    try:
-        import playwright  # type: ignore # noqa: F401
-        return False
-    except ImportError:
-        return True
+    """Check if ACS is in mock mode (real mode is default).
+
+    Wave 2.13: Invert default — mock mode only when EIME_ACS_MOCK is explicitly set.
+    """
+    mock_flag = os.getenv("EIME_ACS_MOCK", "").lower()
+    return mock_flag in ("1", "true", "yes")
 
 
 def _line_field(ln: Any, *names: str, default: Any = Decimal("0")) -> Any:

@@ -2,15 +2,20 @@
 
 Back the cabinet.html UI with real cabinet activity, decision approvals,
 and status updates.
+
+Phase E (Wave 2.10):
+- church_id is supplied by the request body / query, never hardcoded.
+- Authentication is enforced via verify_bearer_token.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
-from backend.cards.store import get_card_store
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.auth import User, verify_bearer_token
 from backend.cards.ledger import get_decision_ledger
-from backend.models.schemas import User
+from backend.cards.store import get_card_store
 
 router = APIRouter(prefix="/api/cabinets", tags=["cabinets"])
 
@@ -20,7 +25,7 @@ async def get_cabinet_activity(
     principal: str,
     limit: int = 20,
     offset: int = 0,
-    current_user: User = None,
+    current_user: User = Depends(verify_bearer_token),
 ) -> Dict[str, Any]:
     """Get activity feed for a cabinet member.
 
@@ -51,7 +56,7 @@ async def get_cabinet_activity(
 @router.get("/{principal}/current-items")
 async def get_cabinet_current_items(
     principal: str,
-    current_user: User = None,
+    current_user: User = Depends(verify_bearer_token),
 ) -> Dict[str, Any]:
     """Get current escalations/items awaiting decision for cabinet member.
 
@@ -61,7 +66,6 @@ async def get_cabinet_current_items(
     card_store = get_card_store()
 
     # Query for DecisionPackets authored by this principal that are still pending
-    # (would need a "status" field in DecisionPacket to properly filter)
     cards = card_store.query_by_principal(principal)
     decision_cards = [c for c in cards if c.get("card_type") == "decision"]
 
@@ -76,17 +80,19 @@ async def get_cabinet_current_items(
 async def approve_cabinet_decision(
     principal: str,
     item_id: str,
-    signature: str = None,
-    notes: str = None,
-    current_user: User = None,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
 ) -> Dict[str, Any]:
     """Treasurer approves a cabinet decision/draft.
 
     Args:
         principal: Cabinet member ID
         item_id: Decision/escalation item ID
-        signature: Treasurer digital signature/approval
-        notes: Optional approval notes
+        body: {
+            church_id: required,
+            signature: optional,
+            notes: optional
+        }
 
     Returns:
         Updated decision with approval recorded
@@ -94,8 +100,14 @@ async def approve_cabinet_decision(
     if not current_user or current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Only treasurers can approve")
 
+    body = body or {}
+    # Phase E (Wave 2.10): church_id must come from request body, not hardcoded.
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
+
     card_store = get_card_store()
-    ledger = get_decision_ledger("default-church")  # Would get from current_user
+    ledger = get_decision_ledger(church_id)
 
     # Read the decision card
     card = card_store.read(item_id)
@@ -116,9 +128,9 @@ async def approve_cabinet_decision(
         },
         outcome=DecisionOutcome.ACCEPTED,
         metadata={
-            "signature": signature,
+            "signature": body.get("signature"),
             "approved_by": current_user.user_id,
-            "approval_notes": notes,
+            "approval_notes": body.get("notes"),
         },
     )
     ledger.append(entry)
@@ -135,15 +147,18 @@ async def approve_cabinet_decision(
 async def reject_cabinet_decision(
     principal: str,
     item_id: str,
-    reason: str,
-    current_user: User = None,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
 ) -> Dict[str, Any]:
     """Treasurer rejects a cabinet decision, sends back for revision.
 
     Args:
         principal: Cabinet member ID
         item_id: Decision/escalation item ID
-        reason: Reason for rejection
+        body: {
+            church_id: required,
+            reason: required
+        }
 
     Returns:
         Updated decision with rejection recorded
@@ -151,7 +166,14 @@ async def reject_cabinet_decision(
     if not current_user or current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
         raise HTTPException(status_code=403, detail="Only treasurers can reject")
 
-    ledger = get_decision_ledger("default-church")
+    body = body or {}
+    # Phase E (Wave 2.10): church_id must come from request body, not hardcoded.
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
+
+    reason = body.get("reason", "")
+    ledger = get_decision_ledger(church_id)
 
     # Write rejection to Decision Ledger
     from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome

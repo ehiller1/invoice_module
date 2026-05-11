@@ -1,0 +1,90 @@
+---
+session: build-budget-feature
+date: 2026-05-11
+status: partial
+outcome: PARTIAL_PLUS
+---
+
+goal: "Fix critical bugs blocking deployment: auth (verify_bearer_token), embeddings, approval validation, CORS, frontend API base, docker-compose"
+now: "Complete Wave 2 endpoint mismatches (#2.8), DB-backed COA routing (#2.9), church_id defaults (#2.10), and Wave 3 decision-ledger persistence (#3.14)"
+
+test: |
+  cd /Users/erichillerbrand/chart\ of\ accounts
+  python -m pytest backend/tests/test_phase3_recurring.py -v
+  python -c "from backend.main import app; print('✓ Server loads')"
+  grep -q "window.EIME_API" frontend/_shell.html && echo "✓ Frontend deconfig"
+  docker compose config > /dev/null && echo "✓ Docker compose valid"
+
+done_this_session:
+  - task: "Wave 1: Fix critical auth, embedding, and approval bugs"
+    files:
+      - backend/auth.py (added User model, verify_bearer_token, proxy-secret validation)
+      - backend/main.py (updated imports, CORS config, approval action allowlist)
+      - backend/tools/coa_store.py (lazy-init embeddings via _get_embed_fn())
+    commit: bdd284b
+  - task: "Wave 2.7: De-hardcode frontend API base"
+    files:
+      - frontend/_shell.html (injected window.EIME_API global)
+      - 15 frontend HTML files (replaced hardcoded http://localhost:8000 with (window.EIME_API ?? ''))
+    commit: 6e731ff
+  - task: "Wave 2.11: Complete docker-compose with app + redis services"
+    files:
+      - docker-compose.yml (added redis, app service, volumes, healthchecks)
+    commit: 6e731ff
+  - task: "Wave 3: Fix datetime deprecation and document env vars"
+    files:
+      - backend/scheduler.py (datetime.now(timezone.utc) instead of utcnow())
+      - backend/tests/test_phase3_recurring.py (same fix)
+      - .env.example (added CORS, auth, Plaid, ACS, feature flags)
+    commit: cdaca80
+
+blockers: []
+
+questions:
+  - "Should #1 (verify_bearer_token) actually implement real bearer-token validation instead of header-role extraction?"
+  - "For #9 (DB-backed COA): is there any production data in the file-backed store that needs migration to PostgreSQL?"
+  - "For #14 (hash chain): should we add prev_hash/entry_hash to LedgerEntry schema with a migration for existing entries?"
+
+decisions:
+  - "Used header-based trusted-proxy auth for verify_bearer_token rather than implementing full bearer-token JWT flow (rationale: existing codebase uses X-User-Role header; adding JWT would be scope-creep)"
+  - "Made CORS origins configurable via ALLOWED_ORIGINS env var with localhost:* default for dev safety"
+  - "Added X-Proxy-Secret validation in auth.py for optional production hardening"
+  - "Lazy-initialized embeddings in coa_store to prevent import-time SentenceTransformer failures without breaking existing behavior"
+
+findings:
+  - "Tests were failing due to missing SentenceTransformer import and undefined verify_bearer_token—both are now fixed and test collection works"
+  - "Frontend was hardcoded to localhost:8000 in 15+ files; now uses window.EIME_API global"
+  - "docker-compose.yml was incomplete (only postgres); now has full stack (postgres, redis, app)"
+  - "deprecated datetime.utcnow() will fail on Python 3.13+; replaced throughout"
+
+worked:
+  - "Lazy-init pattern for heavy imports (embeddings) prevents import-time failures"
+  - "Trusted-proxy auth model works well for internal deployments"
+  - "window.EIME_API global pattern for frontend configuration is clean and scalable"
+  - "Three focused waves of fixes align with severity/blocking order"
+
+failed:
+  - "Initial approach to sed -i in a loop with pipes caused parsing errors; switched to perl one-liner for batch replacements"
+
+next:
+  - "[OPTIONAL] Implement real bearer-token validation for Phase 12+ cabinet endpoints if JWT is required"
+  - "Complete Wave 2.8: Fix three frontend->backend endpoint mismatches (receipt-capture, recommendations-queue, scenario-forecast)"
+  - "Complete Wave 2.9: Route COA endpoints through db_coa_store (PostgreSQL) instead of file-backed store"
+  - "Complete Wave 2.10: Remove hardcoded church_id defaults in POST bodies (lines 3065, 3199, 3339, 3366, 3413, 3768 in main.py)"
+  - "Complete Wave 2.12: Wire openclaw.runtime.CabinetRuntime into startup() behind EIME_ENABLE_CABINET flag"
+  - "Complete Wave 2.13: Invert ACS mock default (real-mode unless EIME_ACS_MOCK=true)"
+  - "Complete Wave 3.14: Persist decision ledger + add hash chain for tamper evidence"
+  - "Complete Wave 3.15: Lock _acs_install_state dict writes in background worker with _acs_install_lock"
+  - "Complete Wave 3.18: Add Plaid vault key startup guard (refuse to boot if key is missing and tokens exist)"
+
+files:
+  created: []
+  modified:
+    - backend/auth.py
+    - backend/main.py
+    - backend/tools/coa_store.py
+    - backend/scheduler.py
+    - backend/tests/test_phase3_recurring.py
+    - .env.example
+    - docker-compose.yml
+    - frontend/_shell.html (+ 14 other HTML files)

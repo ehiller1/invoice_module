@@ -122,6 +122,15 @@ except Exception as _phase8_err:  # pragma: no cover - defensive
     import logging as _l
     _l.getLogger("eime.phase8").warning("Phase 8 approvals router failed to mount: %r", _phase8_err)
 
+# Phase E (Wave 2.10): Consolidated cabinet activity/approve/reject endpoints
+# (single source of truth, replaces duplicates previously inlined in main.py).
+try:
+    from .routes import cabinets as _phase_e_cabinets
+    app.include_router(_phase_e_cabinets.router)
+except Exception as _phase_e_err:  # pragma: no cover - defensive
+    import logging as _l
+    _l.getLogger("eime.phase_e").warning("Phase E cabinets router failed to mount: %r", _phase_e_err)
+
 
 @app.on_event("startup")
 async def startup() -> None:
@@ -131,6 +140,55 @@ async def startup() -> None:
         approval_scheduler.start_scheduler()
     except Exception as exc:
         print(f"[EIME] scheduler startup skipped: {exc}", flush=True)
+
+    # Wave 3.18: Verify Plaid vault key exists if tokens are encrypted
+    try:
+        from backend.db.connection import execute_query
+        # Check if any Plaid accounts with encrypted tokens exist
+        result = execute_query(
+            "SELECT COUNT(*) as cnt FROM plaid_accounts WHERE access_token_enc IS NOT NULL",
+            (),
+            fetch_one=True,
+        )
+        has_encrypted_tokens = result and result.get("cnt", 0) > 0
+
+        if has_encrypted_tokens:
+            # Tokens exist; verify key is accessible
+            vault_key_env = os.getenv("EIME_VAULT_KEY")
+            vault_key_file = Path(__file__).parent / "data" / ".vault_key"
+
+            if not vault_key_env and not vault_key_file.exists():
+                raise RuntimeError(
+                    "Plaid tokens are encrypted but vault key is missing. "
+                    "Set EIME_VAULT_KEY or restore backend/data/.vault_key before startup."
+                )
+            print("[EIME] Plaid vault key verified", flush=True)
+    except RuntimeError:
+        raise  # Re-raise vault key errors immediately
+    except Exception as exc:
+        print(f"[EIME] Plaid vault key check failed (non-critical): {exc}", flush=True)
+
+    # Wave 2.12: Start cabinet runtime if enabled
+    if os.getenv("EIME_ENABLE_CABINET", "").lower() in ("1", "true", "yes"):
+        try:
+            from openclaw.runtime import get_cabinet_runtime
+            # Register cabinet member runners
+            runtime = get_cabinet_runtime()
+            from openclaw.treasurer.queue_guardian import queue_guardian_runner
+            from openclaw.treasurer.decision_deputy import decision_deputy_runner
+            from openclaw.budget_owner.budget_steward import budget_steward_runner
+            from openclaw.finance_staff.intake_specialist import intake_specialist_runner
+
+            runtime.register_member("queue_guardian", "TREASURER_ADMIN", ["digest"], queue_guardian_runner)
+            runtime.register_member("decision_deputy", "TREASURER_ADMIN", ["escalation"], decision_deputy_runner)
+            runtime.register_member("budget_steward", "BUDGET_OWNER", ["digest"], budget_steward_runner)
+            runtime.register_member("intake_specialist", "FINANCE_STAFF", ["queue"], intake_specialist_runner)
+
+            # Launch as background task
+            asyncio.create_task(runtime.start())
+            print("[EIME] Cabinet runtime started", flush=True)
+        except Exception as exc:
+            print(f"[EIME] cabinet runtime startup skipped: {exc}", flush=True)
 
 
 @app.on_event("shutdown")
@@ -2890,10 +2948,11 @@ _acs_install_lock = threading.Lock()  # guards concurrent starts
 
 def _acs_install_append(line: str) -> None:
     # Bound the buffer so a runaway process can't OOM the server.
-    buf = _acs_install_state["log_lines"]
-    buf.append(line.rstrip())
-    if len(buf) > 2000:
-        del buf[: len(buf) - 2000]
+    with _acs_install_lock:
+        buf = _acs_install_state["log_lines"]
+        buf.append(line.rstrip())
+        if len(buf) > 2000:
+            del buf[: len(buf) - 2000]
 
 
 def _run_acs_install() -> None:
@@ -2917,18 +2976,21 @@ def _run_acs_install() -> None:
                 _acs_install_append(line)
             rc = proc.wait()
             if rc != 0:
-                _acs_install_state["status"] = "error"
-                _acs_install_state["returncode"] = rc
-                _acs_install_state["error"] = f"Command failed: {' '.join(cmd)} (exit {rc})"
-                _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+                with _acs_install_lock:
+                    _acs_install_state["status"] = "error"
+                    _acs_install_state["returncode"] = rc
+                    _acs_install_state["error"] = f"Command failed: {' '.join(cmd)} (exit {rc})"
+                    _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
                 return
-        _acs_install_state["status"] = "success"
-        _acs_install_state["returncode"] = 0
-        _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+        with _acs_install_lock:
+            _acs_install_state["status"] = "success"
+            _acs_install_state["returncode"] = 0
+            _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
     except Exception as exc:  # noqa: BLE001
-        _acs_install_state["status"] = "error"
-        _acs_install_state["error"] = str(exc)
-        _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+        with _acs_install_lock:
+            _acs_install_state["status"] = "error"
+            _acs_install_state["error"] = str(exc)
+            _acs_install_state["finished_at"] = datetime.datetime.utcnow().isoformat() + "Z"
 
 
 # ---------- Operations Council (FRD §16) ----------
@@ -3257,143 +3319,9 @@ async def answer_question(body: Dict[str, Any]) -> JSONResponse:
 
 
 # ---------- Cabinet Surface (FRD §16.5, Personal Cabinet) ----------
-
-@app.get("/api/cabinets/{principal}/activity")
-async def get_cabinet_activity(principal: str, church_id: str) -> JSONResponse:
-    """Get per-principal activity log: recent approvals, decisions, pending actions.
-
-    Returns activity feed for Personal Cabinet with:
-    - Recent decisions (cards approved, rejected, escalated)
-    - Pending approvals (decisions awaiting this principal's vote/action)
-    - Recent disavowals (overrides reversed)
-    - Voice/style config history
-    """
-    # Phase 5: Mock data ready for database integration
-    activity = [
-        {
-            "activity_id": f"act_{principal}_001",
-            "timestamp": (datetime.now() - timedelta(hours=2)).isoformat(),
-            "type": "approval",
-            "action": "approved",
-            "subject": "Fund reallocation recommendation",
-            "card_id": "rec_002",
-            "principal": principal,
-            "tier": 2,
-            "decision_summary": "Approved reallocation of Legacy Scholarship to Active Mission"
-        },
-        {
-            "activity_id": f"act_{principal}_002",
-            "timestamp": (datetime.now() - timedelta(hours=6)).isoformat(),
-            "type": "policy_vote",
-            "action": "voted_yes",
-            "subject": "Quasi-endowment draw policy amendment",
-            "card_id": "pol_001",
-            "principal": principal,
-            "tier": 2,
-            "decision_summary": "Voted YES on 4% annual draw limit"
-        },
-        {
-            "activity_id": f"act_{principal}_003",
-            "timestamp": (datetime.now() - timedelta(days=1)).isoformat(),
-            "type": "exception_adjudication",
-            "action": "routed",
-            "subject": "Ambiguous bequest language (donor: Jane Smith)",
-            "card_id": "exc_012",
-            "principal": principal,
-            "tier": 2,
-            "decision_summary": "Routed to Canon Lawyer (T3) for intent clarification"
-        }
-    ]
-
-    pending = [
-        {
-            "pending_id": f"pend_{principal}_001",
-            "created_at": (datetime.now() - timedelta(hours=4)).isoformat(),
-            "type": "policy_vote",
-            "subject": "Board approval: 2024 budget adjustment",
-            "card_id": "pol_002",
-            "deadline": (datetime.now() + timedelta(days=3)).isoformat(),
-            "options": ["Approve", "Reject", "Abstain"],
-            "privacy_class": "P2"
-        },
-        {
-            "pending_id": f"pend_{principal}_002",
-            "created_at": (datetime.now() - timedelta(hours=1)).isoformat(),
-            "type": "exception_review",
-            "subject": "Anonymous $50K gift with unclear intent",
-            "card_id": "exc_015",
-            "deadline": (datetime.now() + timedelta(days=7)).isoformat(),
-            "privacy_class": "P1"
-        }
-    ]
-
-    return _json({
-        "principal": principal,
-        "church_id": church_id,
-        "activity": activity,
-        "pending": pending,
-        "voice_config": {
-            "principal_name": f"Cabinet Member ({principal.title()})",
-            "tier": 2,
-            "voice_style": "pastoral",
-            "communication_preference": "brief",
-            "notification_frequency": "immediate"
-        }
-    })
-
-
-@app.post("/api/cabinets/{principal}/approve")
-async def cabinet_approve_decision(principal: str, body: Dict[str, Any]) -> JSONResponse:
-    """Record a decision approval/action in cabinet.
-
-    Commits a pending decision (policy vote, exception adjudication, etc.)
-    """
-    pending_id = body.get("pending_id")
-    action = body.get("action")  # "approve", "reject", "abstain", "route", etc.
-    reasoning = body.get("reasoning", "")
-    church_id = body.get("church_id")
-    if not church_id:
-        raise HTTPException(status_code=400, detail="church_id is required")
-
-    # Phase 5: Would integrate with decision ledger
-    return _json({
-        "principal": principal,
-        "church_id": church_id,
-        "pending_id": pending_id,
-        "action": action,
-        "status": "committed",
-        "timestamp": datetime.now().isoformat(),
-        "ledger_entry_id": f"led_{uuid.uuid4().hex[:12]}",
-        "message": f"Decision {action} recorded in audit ledger"
-    })
-
-
-@app.post("/api/cabinets/{principal}/disavow")
-async def cabinet_disavow_override(principal: str, body: Dict[str, Any]) -> JSONResponse:
-    """Disavow (reverse) an override decision made by this principal.
-
-    Opens a disavowal window showing:
-    - Original decision + rationale
-    - Time window for reversal (typically 24-48 hours)
-    - Ledger entry for the disavowal
-    - Impact on dependent decisions
-    """
-    override_id = body.get("override_id")
-    reason = body.get("reason", "")
-    church_id = body.get("church_id")
-    if not church_id:
-        raise HTTPException(status_code=400, detail="church_id is required")
-
-    # Phase 5: Would validate disavowal eligibility, check time window
-    return _json({
-        "principal": principal,
-        "church_id": church_id,
-        "override_id": override_id,
-        "disavowed": True,
-        "timestamp": datetime.now().isoformat(),
-        "disavowal_ledger_entry": f"dis_{uuid.uuid4().hex[:12]}",
-        "message": "Override disavowed. Original decision path restored. Dependent decisions flagged for review."
-    })
+# Phase E: Phase 5 mock activity/approve/disavow endpoints removed.
+# Activity, approve, and reject are now served by backend/routes/cabinets.py
+# (mounted earlier) and the Phase 12 endpoints below.
 
 
 @app.post("/api/cabinets/{principal}/delegations")
@@ -3874,14 +3802,17 @@ async def acs_install(background_tasks: BackgroundTasks) -> JSONResponse:
 
 @app.get("/api/integrations/acs/install/status")
 async def acs_install_status() -> JSONResponse:
-    return _json({
-        "status": _acs_install_state["status"],
-        "log_lines": list(_acs_install_state["log_lines"]),  # copy
-        "started_at": _acs_install_state["started_at"],
-        "finished_at": _acs_install_state["finished_at"],
-        "returncode": _acs_install_state["returncode"],
-        "error": _acs_install_state["error"],
-    })
+    # Wave 3.15: Make status snapshot atomic to avoid race conditions
+    with _acs_install_lock:
+        status_snapshot = {
+            "status": _acs_install_state["status"],
+            "log_lines": list(_acs_install_state["log_lines"]),  # atomic copy
+            "started_at": _acs_install_state["started_at"],
+            "finished_at": _acs_install_state["finished_at"],
+            "returncode": _acs_install_state["returncode"],
+            "error": _acs_install_state["error"],
+        }
+    return _json(status_snapshot)
 
 
 # ===== NEW: Event Registry, Operations Council, Reconciliation, Compliance APIs =====
@@ -4781,146 +4712,8 @@ async def project_scenario(church_id: str, body: Optional[Dict[str, Any]] = None
 
 
 # Phase 12: Cabinet Activity Endpoints
-@app.get("/api/cabinets/{principal}/activity")
-async def get_cabinet_activity(
-    principal: str,
-    limit: int = 20,
-    offset: int = 0,
-    current_user: User = Depends(verify_bearer_token),
-) -> Dict[str, Any]:
-    """Get activity feed for a cabinet member.
-
-    Args:
-        principal: Cabinet member ID (queue-guardian, decision-deputy, etc.)
-        limit: Number of cards to return
-        offset: Pagination offset
-
-    Returns:
-        List of Memory Cards authored by this cabinet member
-    """
-    from backend.cards.store import get_card_store
-
-    card_store = get_card_store()
-    cards = card_store.query_by_principal(principal)
-
-    # Paginate
-    total = len(cards)
-    cards = cards[offset : offset + limit]
-
-    return {
-        "principal": principal,
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "activity": cards,
-    }
-
-
-@app.get("/api/cabinets/{principal}/current-items")
-async def get_cabinet_current_items(
-    principal: str,
-    current_user: User = Depends(verify_bearer_token),
-) -> Dict[str, Any]:
-    """Get current escalations/items awaiting decision for cabinet member."""
-    from backend.cards.store import get_card_store
-
-    card_store = get_card_store()
-    cards = card_store.query_by_principal(principal)
-    decision_cards = [c for c in cards if c.get("card_type") == "decision"]
-
-    return {
-        "principal": principal,
-        "current_count": len(decision_cards),
-        "items": decision_cards[:10],
-    }
-
-
-@app.post("/api/cabinets/{principal}/items/{item_id}/approve")
-async def approve_cabinet_decision(
-    principal: str,
-    item_id: str,
-    body: Optional[Dict[str, Any]] = None,
-    current_user: User = Depends(verify_bearer_token),
-) -> Dict[str, Any]:
-    """Treasurer approves a cabinet decision/draft."""
-    if current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
-        raise HTTPException(status_code=403, detail="Only treasurers can approve")
-
-    from backend.cards.ledger import get_decision_ledger
-    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
-
-    body = body or {}
-    ledger = get_decision_ledger("holy_comforter")
-
-    # Write approval to Decision Ledger
-    entry = LedgerEntry(
-        entry_id=f"approval-{item_id}",
-        decision_id=item_id,
-        category=DecisionCategory.APPROVE,
-        timestamp=datetime.utcnow(),
-        authoring_actor={
-            "actor_id": current_user.user_id,
-            "actor_type": "TREASURER_ADMIN",
-        },
-        outcome=DecisionOutcome.ACCEPTED,
-        metadata={
-            "approved_by": current_user.user_id,
-            "approval_notes": body.get("notes", ""),
-        },
-    )
-    ledger.append(entry)
-
-    return {
-        "item_id": item_id,
-        "status": "approved",
-        "approved_at": datetime.utcnow().isoformat(),
-        "approved_by": current_user.user_id,
-    }
-
-
-@app.post("/api/cabinets/{principal}/items/{item_id}/reject")
-async def reject_cabinet_decision(
-    principal: str,
-    item_id: str,
-    body: Optional[Dict[str, Any]] = None,
-    current_user: User = Depends(verify_bearer_token),
-) -> Dict[str, Any]:
-    """Treasurer rejects a cabinet decision, sends back for revision."""
-    if current_user.role not in ["TREASURER_ADMIN", "ADMIN"]:
-        raise HTTPException(status_code=403, detail="Only treasurers can reject")
-
-    from backend.cards.ledger import get_decision_ledger
-    from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
-
-    body = body or {}
-    ledger = get_decision_ledger("holy_comforter")
-
-    # Write rejection to Decision Ledger
-    entry = LedgerEntry(
-        entry_id=f"rejection-{item_id}",
-        decision_id=item_id,
-        category=DecisionCategory.ROUTE,
-        timestamp=datetime.utcnow(),
-        authoring_actor={
-            "actor_id": current_user.user_id,
-            "actor_type": "TREASURER_ADMIN",
-        },
-        outcome=DecisionOutcome.REJECTED,
-        metadata={
-            "rejected_by": current_user.user_id,
-            "rejection_reason": body.get("reason", ""),
-            "send_back_to": principal,
-        },
-    )
-    ledger.append(entry)
-
-    return {
-        "item_id": item_id,
-        "status": "rejected",
-        "rejected_at": datetime.utcnow().isoformat(),
-        "rejected_by": current_user.user_id,
-        "reason": body.get("reason", ""),
-    }
+# Phase E (Wave 2.10): consolidated into backend/routes/cabinets.py (mounted at top of file).
+# Duplicate inline endpoints removed to avoid route conflicts.
 
 
 # ─── Phase 13: NBA (Next Best Action) Endpoints ─────────────────────────
@@ -5008,8 +4801,12 @@ async def accept_recommendation(
     from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
 
     card_store = get_card_store()
-    ledger = get_decision_ledger("holy_comforter")
     body = body or {}
+    # Phase E (Wave 2.10): church_id must come from request body, not hardcoded.
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
+    ledger = get_decision_ledger(church_id)
 
     # Get recommendation card
     rec_card = card_store.read(recommendation_id)
@@ -5063,8 +4860,12 @@ async def decline_recommendation(
     from backend.decision_ledger import LedgerEntry, DecisionCategory, DecisionOutcome
 
     card_store = get_card_store()
-    ledger = get_decision_ledger("holy_comforter")
     body = body or {}
+    # Phase E (Wave 2.10): church_id must come from request body, not hardcoded.
+    church_id = body.get("church_id")
+    if not church_id:
+        raise HTTPException(status_code=400, detail="church_id is required")
+    ledger = get_decision_ledger(church_id)
 
     # Get recommendation card
     rec_card = card_store.read(recommendation_id)
