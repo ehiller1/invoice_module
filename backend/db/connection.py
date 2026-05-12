@@ -8,10 +8,13 @@ from contextlib import contextmanager
 # Module-level connection pool
 _pool: Optional[pool.SimpleConnectionPool] = None
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://claude:claude_dev@localhost:5432/eime_accounting"
-)
+_DATABASE_URL_ENV = os.environ.get("DATABASE_URL")
+if not _DATABASE_URL_ENV:
+    if os.environ.get("EIME_ENV", "").lower() == "production":
+        raise RuntimeError("DATABASE_URL is required in production")
+    DATABASE_URL = "postgresql://claude:claude_dev@localhost:5432/eime_accounting"
+else:
+    DATABASE_URL = _DATABASE_URL_ENV
 
 
 def init_pool(minconn: int = 2, maxconn: int = 10) -> None:
