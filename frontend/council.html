@@ -21,7 +21,7 @@
 <script src="/eime-bus.js"></script>
 <script src="/eime-shell.js"></script>
 <script src="/eime-chat-rail.js"></script>
-<script src="/components/card-renderer.js"></script>
+<script src="/components/card-renderer.js?v=2"></script>
 </head>
 <body>
 
@@ -169,10 +169,10 @@ function updateDashboard() {
 function renderRecentItems() {
   // Combine all cards, sort by created_at (most recent first), take top 10
   const allItems = [
-    ...allCards.exceptions.map(c => ({ ...c, queue: 'exceptions' })),
-    ...allCards.policies.map(c => ({ ...c, queue: 'policies' })),
-    ...allCards.questions.map(c => ({ ...c, queue: 'questions' })),
-    ...allCards.recommendations.map(c => ({ ...c, queue: 'recommendations' }))
+    ...allCards.exceptions.map(c => ({ ...c, card_type: 'ExceptionCard', queue: 'exceptions' })),
+    ...allCards.policies.map(c => ({ ...c, card_type: 'PolicyCard', queue: 'policies' })),
+    ...allCards.questions.map(c => ({ ...c, card_type: 'QuestionCard', queue: 'questions' })),
+    ...allCards.recommendations.map(c => ({ ...c, card_type: 'RecommendationCard', queue: 'recommendations' }))
   ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
    .slice(0, 10);
 

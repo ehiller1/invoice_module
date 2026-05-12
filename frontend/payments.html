@@ -64,7 +64,7 @@
       });
 
       async function loadPayments() {
-        const churchId = (window.EIMEBus && EIMEBus.getChurch && EIMEBus.getChurch()) || 'default';
+        const churchId = (window.EIMESession && EIMESession.getChurch && EIMESession.getChurch()) || 'holy_comforter';
         try {
           const res = await fetch(`/api/churches/${churchId}/payments`);
           allPayments = await res.json();

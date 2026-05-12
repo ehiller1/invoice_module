@@ -166,11 +166,18 @@ class CardRenderer {
       </div>`;
     }
 
+    // Normalise field names: API returns status/title/card_id; schema uses state/summary/exception_id
+    const priority = card.priority || card.severity || 'NORMAL';
+    const state    = card.state || card.status || 'OPEN';
+    const summary  = card.summary || card.title || '';
+    const excId    = card.exception_id || card.card_id || '';
+    const body     = card.details?.reason || card.details?.description || card.description || '';
+
     const priorityColor = {
       HIGH: 'bg-red-100 border-red-300 text-red-900',
       NORMAL: 'bg-yellow-100 border-yellow-300 text-yellow-900',
       LOW: 'bg-blue-100 border-blue-300 text-blue-900'
-    }[card.priority] || 'bg-slate-100';
+    }[priority] || 'bg-slate-100';
 
     const stateColor = {
       OPEN: 'bg-red-50 text-red-700',
@@ -178,30 +185,30 @@ class CardRenderer {
       RESOLVED: 'bg-green-50 text-green-700',
       CLOSED: 'bg-slate-50 text-slate-700',
       PAUSED: 'bg-orange-50 text-orange-700'
-    }[card.state] || 'bg-slate-50';
+    }[state] || 'bg-slate-50';
 
     return `<div class="bg-white border border-slate-200 rounded-lg p-4">
       <div class="flex items-start justify-between mb-4">
         <div>
-          <p class="text-sm font-semibold text-slate-700">${card.exception_type}</p>
-          <p class="text-lg font-bold text-slate-900">${card.summary}</p>
+          <p class="text-sm font-semibold text-slate-700">${card.exception_type || ''}</p>
+          <p class="text-lg font-bold text-slate-900">${summary}</p>
         </div>
         <div class="text-right">
-          <p class="text-xs font-semibold rounded px-2 py-1 ${priorityColor}">${card.priority}</p>
-          <p class="text-xs font-semibold rounded px-2 py-1 ${stateColor} mt-2">${card.state}</p>
+          <p class="text-xs font-semibold rounded px-2 py-1 ${priorityColor}">${priority}</p>
+          <p class="text-xs font-semibold rounded px-2 py-1 ${stateColor} mt-2">${state}</p>
         </div>
       </div>
-      <p class="text-sm text-slate-700 mb-4">${card.details?.reason || card.details?.description || ''}</p>
+      <p class="text-sm text-slate-700 mb-4">${body}</p>
       ${card.assigned_to ? `
         <p class="text-xs text-slate-600 mb-4">👤 Assigned to: ${card.assigned_to}</p>
       ` : ''}
       <div class="flex gap-2">
-        ${card.state === 'OPEN' ? `
-          <button onclick="if(window.onExceptionApprove) window.onExceptionApprove('${card.exception_id}')"
+        ${state === 'OPEN' ? `
+          <button onclick="if(window.onExceptionApprove) window.onExceptionApprove('${excId}')"
             class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
-          <button onclick="if(window.onExceptionReject) window.onExceptionReject('${card.exception_id}')"
+          <button onclick="if(window.onExceptionReject) window.onExceptionReject('${excId}')"
             class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Reject</button>
-          <button onclick="if(window.onExceptionRoute) window.onExceptionRoute('${card.exception_id}')"
+          <button onclick="if(window.onExceptionRoute) window.onExceptionRoute('${excId}')"
             class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Route</button>
         ` : ''}
       </div>
@@ -219,34 +226,35 @@ class CardRenderer {
       </div>`;
     }
 
-    const impact = card.impact_projection || {};
+    const impact = card.impact_projection || card.evidence || {};
+    const recState = card.state || card.status || 'OPEN';
+    const recId = card.recommendation_id || card.card_id || '';
 
     return `<div class="bg-white border border-slate-200 rounded-lg p-4">
       <div class="flex items-start justify-between mb-4">
         <div>
           <p class="text-sm font-semibold text-slate-700">NBA Recommendation</p>
-          <p class="text-lg font-bold text-slate-900">${card.title}</p>
+          <p class="text-lg font-bold text-slate-900">${card.title || ''}</p>
         </div>
         <div class="text-right text-xs text-slate-500">
-          <p class="font-semibold rounded px-2 py-1 ${card.state === 'OPEN' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}">${card.state}</p>
+          <p class="font-semibold rounded px-2 py-1 ${recState === 'OPEN' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}">${recState}</p>
         </div>
       </div>
-      <p class="text-sm text-slate-700 mb-4">${card.description}</p>
+      <p class="text-sm text-slate-700 mb-4">${card.description || ''}</p>
       ${impact && Object.keys(impact).length > 0 ? `
         <div class="bg-blue-50 rounded p-3 mb-4">
           <p class="text-xs font-semibold text-blue-900 mb-2">Projected Impact</p>
           <div class="grid grid-cols-2 gap-2 text-xs text-blue-800">
-            ${impact.cash_impact ? `<div>💰 Cash: ${impact.cash_impact}</div>` : ''}
-            ${impact.covenant_impact ? `<div>📋 Covenant: ${impact.covenant_impact}</div>` : ''}
-            ${impact.mission_impact ? `<div>🎯 Mission: ${impact.mission_impact}</div>` : ''}
+            ${impact.cash_impact_usd ? `<div>💰 Cash: $${Number(impact.cash_impact_usd).toLocaleString()}</div>` : ''}
+            ${impact.confidence_pct ? `<div>🎯 Confidence: ${impact.confidence_pct}%</div>` : ''}
           </div>
         </div>
       ` : ''}
-      ${card.state === 'OPEN' && card.candidates && card.candidates.length > 0 ? `
+      ${recState === 'OPEN' ? `
         <div class="flex gap-2">
-          <button onclick="if(window.onRecommendationAccept) window.onRecommendationAccept('${card.recommendation_id}')"
+          <button onclick="if(window.onRecommendationAccept) window.onRecommendationAccept('${recId}')"
             class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Accept</button>
-          <button onclick="if(window.onRecommendationDecline) window.onRecommendationDecline('${card.recommendation_id}')"
+          <button onclick="if(window.onRecommendationDecline) window.onRecommendationDecline('${recId}')"
             class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Decline</button>
         </div>
       ` : ''}
@@ -264,36 +272,44 @@ class CardRenderer {
       </div>`;
     }
 
+    // Normalise: API returns status (not state); voted_by nested under evidence
+    const state      = card.state || card.status || 'OPEN';
+    const votedBy    = card.voted_by || card.evidence?.voted_by || [];
+    const proposed   = card.proposed_action || card.description || '';
+    const policyId   = card.policy_id || card.card_id || '';
+    const statusBadge = card.decision
+      ? 'bg-green-50 text-green-700'
+      : (state === 'OPEN' ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700');
+
     return `<div class="bg-white border border-slate-200 rounded-lg p-4">
       <div class="flex items-start justify-between mb-4">
         <div>
           <p class="text-sm font-semibold text-slate-700">Policy Decision</p>
-          <p class="text-lg font-bold text-slate-900">${card.title}</p>
+          <p class="text-lg font-bold text-slate-900">${card.title || ''}</p>
         </div>
         <div class="text-right text-xs text-slate-500">
-          <p class="font-semibold rounded px-2 py-1 ${card.decision ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}">${card.decision || card.state}</p>
+          <p class="font-semibold rounded px-2 py-1 ${statusBadge}">${card.decision || state}</p>
         </div>
       </div>
-      <p class="text-sm text-slate-700 mb-2"><strong>Proposed:</strong> ${card.proposed_action}</p>
-      <p class="text-sm text-slate-700 mb-4">${card.description}</p>
-      ${card.voted_by && card.voted_by.length > 0 ? `
+      ${proposed ? `<p class="text-sm text-slate-700 mb-4">${proposed}</p>` : ''}
+      ${votedBy.length > 0 ? `
         <div class="mb-4">
-          <p class="text-xs font-semibold text-slate-700 mb-2">Votes (${card.voted_by.length})</p>
+          <p class="text-xs font-semibold text-slate-700 mb-2">Votes (${votedBy.length})</p>
           <div class="space-y-1 text-xs text-slate-600">
-            ${card.voted_by.map(v => {
+            ${votedBy.map(v => {
               const voteColor = v.vote === 'yes' ? 'text-green-700' : v.vote === 'no' ? 'text-red-700' : 'text-slate-600';
-              return `<div class="${voteColor}">✓ ${v.actor_id} (${v.tier}): ${v.vote}</div>`;
+              return `<div class="${voteColor}">✓ ${v.actor_id || v.user_id || ''} (${v.tier || ''}): ${v.vote}</div>`;
             }).join('')}
           </div>
         </div>
       ` : ''}
-      ${card.state === 'OPEN' ? `
+      ${state === 'OPEN' ? `
         <div class="flex gap-2">
-          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${card.policy_id}', 'yes')"
+          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${policyId}', 'yes')"
             class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Vote Yes</button>
-          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${card.policy_id}', 'no')"
+          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${policyId}', 'no')"
             class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Vote No</button>
-          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${card.policy_id}', 'abstain')"
+          <button onclick="if(window.onPolicyVote) window.onPolicyVote('${policyId}', 'abstain')"
             class="text-xs px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700">Abstain</button>
         </div>
       ` : ''}
