@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forecast Parameters — Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full bg-slate-50 font-sans">
+<script src="/eime-bus.js"></script>
+<script src="/eime-shell.js"></script>
+<script src="/eime-chat-rail.js"></script>
+<script>
+const API = (window.EIME_API ?? '');
+const CHURCH_ID = 'holy_comforter';
+let current = null;
+let dirty = false;
+
+const CONFIDENCE_PRESETS = [
+  { z: 1.04, label: 'P70 (1.04σ)', desc: '70% coverage — tighter bands' },
+  { z: 1.28, label: 'P80 (1.28σ)', desc: '80% coverage — standard for nonprofits' },
+  { z: 1.645, label: 'P90 (1.645σ)', desc: '90% coverage — conservative' },
+  { z: 1.96, label: 'P95 (1.96σ)', desc: '95% coverage — very conservative' },
+];
+
+async function loadSettings() {
+  const res = await fetch(`${API}/api/churches/${CHURCH_ID}/forecast-settings`);
+  current = await res.json();
+  render();
+}
+
+function render() {
+  if (!current) return;
+
+  // Revenue weights
+  ['w0','w1','w2','w3'].forEach((id, i) => {
+    const el = document.getElementById(`rev-${id}`);
+    if (el) { el.value = Math.round(current.rev_weights[i] * 100); syncRevSlider(i); }
+  });
+
+  // Expense weights
+  ['w0','w1','w2','w3'].forEach((id, i) => {
+    const el = document.getElementById(`exp-${id}`);
+    if (el) { el.value = Math.round(current.exp_weights[i] * 100); syncExpSlider(i); }
+  });
+
+  // Volatility
+  document.getElementById('sigma-rev').value = Math.round(current.sigma_rev * 100);
+  document.getElementById('sigma-exp').value = Math.round(current.sigma_exp * 100);
+  syncVolatility();
+
+  // Confidence
+  document.getElementById('confidence-z').value = current.confidence_z;
+  syncConfidence();
+
+  // Reserve weeks
+  document.getElementById('reserve-weeks').value = current.reserve_weeks;
+  document.getElementById('reserve-display').textContent = current.reserve_weeks;
+
+  // Actuals overlay
+  document.getElementById('actuals-overlay').checked = current.actuals_overlay;
+
+  setDirty(false);
+}
+
+function setDirty(val) {
+  dirty = val;
+  const btn = document.getElementById('save-btn');
+  if (btn) {
+    btn.disabled = !dirty;
+    btn.className = dirty
+      ? 'px-5 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors'
+      : 'px-5 py-2 bg-gray-200 text-gray-400 rounded-lg font-medium text-sm cursor-not-allowed';
+  }
+}
+
+// ── Revenue weight sliders ─────────────────────────────────────────────────
+
+function syncRevSlider(idx) {
+  const vals = [0,1,2,3].map(i => parseInt(document.getElementById(`rev-w${i}`)?.value || 0));
+  const sum = vals.reduce((a,b) => a+b, 0);
+  const el = document.getElementById(`rev-val-w${idx}`);
+  if (el) el.textContent = `${vals[idx]}%`;
+  const sumEl = document.getElementById('rev-sum');
+  if (sumEl) {
+    sumEl.textContent = `${sum}%`;
+    sumEl.className = `text-sm font-bold ${sum === 100 ? 'text-green-700' : 'text-red-600'}`;
+  }
+  setDirty(true);
+}
+
+function syncExpSlider(idx) {
+  const vals = [0,1,2,3].map(i => parseInt(document.getElementById(`exp-w${i}`)?.value || 0));
+  const sum = vals.reduce((a,b) => a+b, 0);
+  const el = document.getElementById(`exp-val-w${idx}`);
+  if (el) el.textContent = `${vals[idx]}%`;
+  const sumEl = document.getElementById('exp-sum');
+  if (sumEl) {
+    sumEl.textContent = `${sum}%`;
+    sumEl.className = `text-sm font-bold ${sum === 100 ? 'text-green-700' : 'text-red-600'}`;
+  }
+  setDirty(true);
+}
+
+// ── Volatility ─────────────────────────────────────────────────────────────
+
+function syncVolatility() {
+  const rev = parseInt(document.getElementById('sigma-rev')?.value || 12);
+  const exp = parseInt(document.getElementById('sigma-exp')?.value || 8);
+  const revEl = document.getElementById('sigma-rev-val');
+  const expEl = document.getElementById('sigma-exp-val');
+  if (revEl) revEl.textContent = `${rev}%`;
+  if (expEl) expEl.textContent = `${exp}%`;
+  setDirty(true);
+}
+
+// ── Confidence ─────────────────────────────────────────────────────────────
+
+function syncConfidence() {
+  const z = parseFloat(document.getElementById('confidence-z')?.value || 1.28);
+  const preset = CONFIDENCE_PRESETS.find(p => Math.abs(p.z - z) < 0.01);
+  const el = document.getElementById('confidence-label');
+  if (el) el.textContent = preset ? preset.desc : `z = ${z}`;
+  setDirty(true);
+}
+
+// ── Save ───────────────────────────────────────────────────────────────────
+
+async function saveSettings() {
+  const revVals = [0,1,2,3].map(i => parseInt(document.getElementById(`rev-w${i}`)?.value || 0) / 100);
+  const expVals = [0,1,2,3].map(i => parseInt(document.getElementById(`exp-w${i}`)?.value || 0) / 100);
+  const revSum = revVals.reduce((a,b) => a+b, 0);
+  const expSum = expVals.reduce((a,b) => a+b, 0);
+
+  if (Math.abs(revSum - 1.0) > 0.01) {
+    showBanner('Revenue weights must sum to 100% (currently ' + Math.round(revSum * 100) + '%)', 'error');
+    return;
+  }
+  if (Math.abs(expSum - 1.0) > 0.01) {
+    showBanner('Expense weights must sum to 100% (currently ' + Math.round(expSum * 100) + '%)', 'error');
+    return;
+  }
+
+  const payload = {
+    rev_weights: revVals,
+    exp_weights: expVals,
+    sigma_rev: parseInt(document.getElementById('sigma-rev').value) / 100,
+    sigma_exp: parseInt(document.getElementById('sigma-exp').value) / 100,
+    confidence_z: parseFloat(document.getElementById('confidence-z').value),
+    reserve_weeks: parseInt(document.getElementById('reserve-weeks').value),
+    actuals_overlay: document.getElementById('actuals-overlay').checked,
+  };
+
+  try {
+    const res = await fetch(`${API}/api/churches/${CHURCH_ID}/forecast-settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showBanner(err.detail || `Save failed (${res.status})`, 'error');
+      return;
+    }
+    current = await res.json();
+    setDirty(false);
+    showBanner('Settings saved — the 13-week forecast will use these parameters on next refresh.', 'success');
+  } catch (e) {
+    showBanner('Network error: ' + e.message, 'error');
+  }
+}
+
+async function resetDefaults() {
+  if (!confirm('Reset all forecast parameters to factory defaults?')) return;
+  const defaults = {
+    rev_weights: [0.20, 0.20, 0.25, 0.35],
+    exp_weights: [0.30, 0.30, 0.15, 0.25],
+    sigma_rev: 0.12, sigma_exp: 0.08,
+    confidence_z: 1.28, reserve_weeks: 4, actuals_overlay: true,
+  };
+  const res = await fetch(`${API}/api/churches/${CHURCH_ID}/forecast-settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(defaults),
+  });
+  current = await res.json();
+  render();
+  showBanner('Reset to factory defaults.', 'success');
+}
+
+function showBanner(msg, type) {
+  const el = document.getElementById('status-banner');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `mb-4 p-3 rounded-lg text-sm ${type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'}`;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
+(async () => {
+  const centerContent = `
+  <div class="max-w-3xl mx-auto p-6">
+
+    <!-- Breadcrumb -->
+    <div class="mb-5 flex items-center gap-2 text-sm text-slate-500">
+      <a href="/settings.html" class="hover:text-slate-700">Settings</a>
+      <span>/</span>
+      <span class="text-slate-800 font-medium">Cash Forecast Parameters</span>
+    </div>
+
+    <div class="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Cash Forecast Parameters</h1>
+        <p class="text-sm text-slate-500 mt-1">Controls the 13-week direct-method cash forecast algorithm</p>
+      </div>
+      <div class="flex gap-2 mt-1">
+        <button onclick="resetDefaults()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium text-sm transition-colors">
+          Reset to defaults
+        </button>
+        <button id="save-btn" onclick="saveSettings()" disabled
+          class="px-5 py-2 bg-gray-200 text-gray-400 rounded-lg font-medium text-sm cursor-not-allowed">
+          Save changes
+        </button>
+      </div>
+    </div>
+
+    <div id="status-banner" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <!-- Revenue Seasonality -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+      <div class="flex items-start justify-between mb-1">
+        <div>
+          <h2 class="font-semibold text-slate-900">Revenue Seasonality Weights</h2>
+          <p class="text-xs text-slate-500 mt-0.5">How pledge income distributes across the 4 weeks of a month. Week 4 is typically highest (pledge Sunday before month-end).</p>
+        </div>
+        <span class="text-xs text-slate-400 mt-1">Must sum to <span id="rev-sum" class="text-sm font-bold text-green-700">100%</span></span>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        ${[
+          { id: 'w0', label: 'Week 1 (days 1–7)', hint: 'Early-month giving, first-Sunday collections' },
+          { id: 'w1', label: 'Week 2 (days 8–14)', hint: 'Mid-month, steady regular giving' },
+          { id: 'w2', label: 'Week 3 (days 15–21)', hint: 'Pre-month-end momentum building' },
+          { id: 'w3', label: 'Week 4 (days 22–31)', hint: 'Pledge Sunday concentration, year-end surges' },
+        ].map((w, i) => `
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <span class="text-sm font-medium text-slate-700">${w.label}</span>
+                <span class="ml-2 text-xs text-slate-400">${w.hint}</span>
+              </div>
+              <span id="rev-val-${w.id}" class="text-sm font-bold text-slate-800 w-10 text-right">—</span>
+            </div>
+            <input type="range" id="rev-${w.id}" min="5" max="60" step="1" value="25"
+              class="w-full h-2 accent-blue-600 cursor-pointer"
+              oninput="syncRevSlider(${i})">
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Expense Pattern -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+      <div class="flex items-start justify-between mb-1">
+        <div>
+          <h2 class="font-semibold text-slate-900">Expense Disbursement Pattern</h2>
+          <p class="text-xs text-slate-500 mt-0.5">When bills are typically paid within a month. Payroll cycles drive weeks 2 and 4; recurring bills fall on week 1.</p>
+        </div>
+        <span class="text-xs text-slate-400 mt-1">Must sum to <span id="exp-sum" class="text-sm font-bold text-green-700">100%</span></span>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        ${[
+          { id: 'w0', label: 'Week 1 (days 1–7)', hint: 'Recurring bills, mortgage/rent, subscriptions' },
+          { id: 'w1', label: 'Week 2 (days 8–14)', hint: 'Biweekly payroll cycle A' },
+          { id: 'w2', label: 'Week 3 (days 15–21)', hint: 'Variable invoices, discretionary spend' },
+          { id: 'w3', label: 'Week 4 (days 22–31)', hint: 'Biweekly payroll cycle B, month-end accruals' },
+        ].map((w, i) => `
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <span class="text-sm font-medium text-slate-700">${w.label}</span>
+                <span class="ml-2 text-xs text-slate-400">${w.hint}</span>
+              </div>
+              <span id="exp-val-${w.id}" class="text-sm font-bold text-slate-800 w-10 text-right">—</span>
+            </div>
+            <input type="range" id="exp-${w.id}" min="5" max="60" step="1" value="25"
+              class="w-full h-2 accent-blue-600 cursor-pointer"
+              oninput="syncExpSlider(${i})">
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Confidence Bands -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+      <h2 class="font-semibold text-slate-900 mb-1">Confidence Band Parameters</h2>
+      <p class="text-xs text-slate-500 mb-4">Controls the width of P10/P90 bands. Higher volatility (σ) and higher z-score → wider bands.</p>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium text-slate-700">Revenue Volatility (σ)</label>
+            <span id="sigma-rev-val" class="text-sm font-bold text-slate-800">12%</span>
+          </div>
+          <input type="range" id="sigma-rev" min="2" max="40" step="1" value="12"
+            class="w-full h-2 accent-blue-600 cursor-pointer"
+            oninput="syncVolatility()">
+          <div class="flex justify-between text-xs text-slate-400 mt-1"><span>2% (stable)</span><span>40% (volatile)</span></div>
+          <p class="text-xs text-slate-400 mt-1">Standard deviation of weekly revenue vs. budget. 12% is typical for established congregations.</p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium text-slate-700">Expense Volatility (σ)</label>
+            <span id="sigma-exp-val" class="text-sm font-bold text-slate-800">8%</span>
+          </div>
+          <input type="range" id="sigma-exp" min="2" max="30" step="1" value="8"
+            class="w-full h-2 accent-blue-600 cursor-pointer"
+            oninput="syncVolatility()">
+          <div class="flex justify-between text-xs text-slate-400 mt-1"><span>2% (fixed)</span><span>30% (variable)</span></div>
+          <p class="text-xs text-slate-400 mt-1">Standard deviation of weekly expenses. Lower than revenue because payroll is fixed.</p>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-sm font-medium text-slate-700">Confidence Coverage (z-score)</label>
+        </div>
+        <div class="grid grid-cols-4 gap-2 mt-2">
+          ${CONFIDENCE_PRESETS.map(p => `
+            <button onclick="document.getElementById('confidence-z').value=${p.z}; syncConfidence();"
+              id="conf-btn-${p.z.toString().replace('.','_')}"
+              class="conf-preset-btn px-2 py-2 rounded-lg border text-xs text-center transition-colors hover:border-blue-400">
+              <p class="font-semibold">${p.label}</p>
+              <p class="text-slate-400 mt-0.5 leading-tight">${p.desc.split('—')[1]?.trim() || ''}</p>
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="confidence-z" value="1.28">
+        <p id="confidence-label" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+    </div>
+
+    <!-- Reserve & Actuals -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <h2 class="font-semibold text-slate-900 mb-4">Risk & Actuals Settings</h2>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium text-slate-700">Minimum Reserve (weeks of expenses)</label>
+            <span id="reserve-display" class="text-sm font-bold text-slate-800">4</span>
+          </div>
+          <input type="range" id="reserve-weeks" min="1" max="26" step="1" value="4"
+            class="w-full h-2 accent-blue-600 cursor-pointer"
+            oninput="document.getElementById('reserve-display').textContent = this.value; setDirty(true)">
+          <div class="flex justify-between text-xs text-slate-400 mt-1"><span>1 week</span><span>26 weeks</span></div>
+          <p class="text-xs text-slate-400 mt-1">FASB ASC 958 recommends 3–6 months. This threshold triggers the risk flag on the forecast.</p>
+        </div>
+
+        <div class="flex flex-col justify-center">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="actuals-overlay"
+              class="mt-0.5 w-4 h-4 rounded accent-blue-600"
+              onchange="setDirty(true)">
+            <div>
+              <p class="text-sm font-medium text-slate-700">Actuals Overlay</p>
+              <p class="text-xs text-slate-400 mt-0.5">Replace forecast with posted JE transactions for elapsed weeks. Disable to see a pure budget-based projection.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Methodology note -->
+    <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 text-xs text-slate-500 leading-relaxed">
+      <p class="font-semibold text-slate-600 mb-1">How these parameters are used</p>
+      <p>The 13-week forecast pro-rates monthly budget figures to weekly amounts using the seasonality weights above, then applies √t diffusion to the confidence bands — meaning uncertainty grows proportionally with the square root of time. The z-score determines coverage: 1.28σ ≈ 80% of outcomes fall within the bands. Changes here take effect immediately on the next forecast refresh.</p>
+    </div>
+
+  </div>`;
+
+  await EIMEShell.mount({
+    activeNav: 'settings',
+    centerContent,
+    onMounted: async () => {
+      await loadSettings();
+      syncConfidenceButtons();
+      window.eime.setContext({ page: 'settings-forecast-params', payload: {} });
+    }
+  });
+})();
+
+function syncConfidenceButtons() {
+  const z = parseFloat(document.getElementById('confidence-z')?.value || 1.28);
+  CONFIDENCE_PRESETS.forEach(p => {
+    const btn = document.getElementById('conf-btn-' + p.z.toString().replace('.','_'));
+    if (!btn) return;
+    const active = Math.abs(p.z - z) < 0.01;
+    btn.className = `conf-preset-btn px-2 py-2 rounded-lg border text-xs text-center transition-colors hover:border-blue-400 ${active ? 'bg-blue-50 border-blue-500 text-blue-800' : 'border-slate-200 text-slate-600'}`;
+  });
+  syncConfidence();
+}
+
+// Override syncConfidence to also update button highlights
+const _origSync = syncConfidence;
+window.syncConfidence = function() {
+  _origSync();
+  syncConfidenceButtons();
+};
+</script>
+</body>
+</html>

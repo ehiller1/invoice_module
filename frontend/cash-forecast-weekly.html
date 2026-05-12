@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>13-Week Cash Forecast — Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <template id="page-center-content">
+        <div class="p-6 max-w-6xl mx-auto">
+
+            <!-- Header -->
+            <div class="mb-6 flex items-start justify-between flex-wrap gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">13-Week Cash Forecast</h1>
+                    <p class="text-sm text-gray-500 mt-1">Direct-method weekly projection with P10/P90 confidence bands</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div>
+                        <label class="text-xs text-gray-500 block mb-1">Starting balance</label>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-400 text-sm">$</span>
+                            <input id="startingBalance" type="number" step="1000" value="50000"
+                                class="w-32 px-2 py-1.5 border border-gray-300 rounded text-sm text-right"
+                                onchange="reload()">
+                        </div>
+                    </div>
+                    <button onclick="reload()"
+                        class="mt-5 px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                        Refresh
+                    </button>
+                    <a href="/settings/forecast-params.html" title="Edit forecast parameters"
+                        class="mt-5 p-1.5 border border-gray-300 rounded hover:bg-gray-100 transition-colors inline-flex items-center">
+                        <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div id="summaryCards" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"></div>
+
+            <!-- Risk banner -->
+            <div id="riskBanner" class="hidden mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800"></div>
+
+            <!-- Chart -->
+            <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-semibold text-gray-800">Weekly Cash Flow</h2>
+                    <div class="flex items-center gap-4 text-xs text-gray-500">
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-green-400"></span>Receipts</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-red-300"></span>Disbursements</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full bg-blue-600"></span>Balance</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-6 h-2 rounded" style="background:rgba(59,130,246,0.15)"></span>P10–P90</span>
+                    </div>
+                </div>
+                <div class="relative" style="height:260px">
+                    <canvas id="forecastChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Weekly table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+                <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="font-semibold text-gray-800">Week-by-Week Detail</h2>
+                    <span class="text-xs text-gray-400">A = Actuals overlay  ·  F = Forecast</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                                <th class="px-4 py-2 text-left">Week</th>
+                                <th class="px-4 py-2 text-left">Period</th>
+                                <th class="px-4 py-2 text-right">Receipts</th>
+                                <th class="px-4 py-2 text-right">Disbursements</th>
+                                <th class="px-4 py-2 text-right">Net</th>
+                                <th class="px-4 py-2 text-right">Ending Balance</th>
+                                <th class="px-4 py-2 text-right">P10 Balance</th>
+                                <th class="px-4 py-2 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="forecastTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Methodology note -->
+            <div class="bg-white rounded-xl shadow-sm p-5">
+                <h3 class="font-semibold text-gray-700 mb-2 text-sm">Forecast Methodology</h3>
+                <div class="grid sm:grid-cols-2 gap-4 text-xs text-gray-500">
+                    <div>
+                        <p class="font-medium text-gray-600 mb-1">Revenue pattern</p>
+                        <p>Monthly budget pro-rated with nonprofit seasonality weights: 20% week 1, 20% week 2, 25% week 3, 35% week 4 (pledge Sunday concentration). Actual posted JEs override forecast for elapsed weeks.</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-600 mb-1">Expense pattern</p>
+                        <p>30% week 1 (recurring bills), 30% week 2 (payroll cycle), 15% week 3, 25% week 4 (second payroll). Confidence bands use σ = 12% for revenue, σ = 8% for expenses with √t diffusion.</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-600 mb-1">Confidence bands</p>
+                        <p>P10/P90 computed at z = 1.28σ (80% coverage). Bands widen with time via square-root-of-time diffusion, consistent with treasury best practice for short-horizon cash forecasting.</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-600 mb-1">Minimum reserve threshold</p>
+                        <p>Risk flag triggers when the P10 (downside) balance falls below 4 weeks of average disbursements — the standard operating reserve for small nonprofits per FASB ASC 958.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="eime-bus.js"></script>
+    <script src="eime-shell.js"></script>
+    <script src="eime-chat-rail.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        const API = (window.EIME_API ?? '');
+        const CHURCH_ID = 'holy_comforter';
+        let chart = null;
+
+        // ── Formatting helpers ──────────────────────────────────────────────
+
+        const fmt$ = n => '$' + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+        const fmtNet = n => (n >= 0 ? '+' : '−') + fmt$(n);
+        const fmtDate = iso => {
+            const d = new Date(iso + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+
+        // ── Data loading ────────────────────────────────────────────────────
+
+        async function reload() {
+            const bal = parseFloat(document.getElementById('startingBalance').value) || 50000;
+            document.getElementById('forecastTable').innerHTML =
+                '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>';
+            document.getElementById('summaryCards').innerHTML = '';
+            try {
+                const res = await fetch(
+                    `${API}/api/churches/${CHURCH_ID}/cash-forecast/weekly?weeks=13&starting_balance=${bal}`
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderSummary(data);
+                renderRiskBanner(data);
+                renderChart(data);
+                renderTable(data);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('forecastTable').innerHTML =
+                    `<tr><td colspan="8" class="px-4 py-8 text-center text-red-500">Failed to load forecast: ${err.message}</td></tr>`;
+            }
+        }
+
+        // ── Summary cards ───────────────────────────────────────────────────
+
+        function renderSummary(data) {
+            const s = data.summary;
+            const endBal = data.ending_balance;
+            const startBal = data.starting_balance;
+            const change = endBal - startBal;
+            const changeColor = change >= 0 ? 'text-green-700' : 'text-red-600';
+            const cards = [
+                {
+                    label: 'Starting Balance',
+                    value: fmt$(startBal),
+                    sub: 'Today',
+                    color: 'border-gray-200',
+                },
+                {
+                    label: '13-Week Net',
+                    value: fmtNet(s.total_net),
+                    sub: change >= 0 ? 'Positive trajectory' : 'Negative trajectory',
+                    color: change >= 0 ? 'border-green-300' : 'border-red-300',
+                    valueClass: changeColor,
+                },
+                {
+                    label: 'Projected Balance',
+                    value: fmt$(endBal),
+                    sub: 'Week 13 P50',
+                    color: 'border-blue-200',
+                },
+                {
+                    label: 'Min Reserve Needed',
+                    value: fmt$(s.minimum_reserve),
+                    sub: '4-week expense buffer',
+                    color: s.at_risk_weeks.length > 0 ? 'border-red-400' : 'border-green-200',
+                    valueClass: s.at_risk_weeks.length > 0 ? 'text-red-700' : 'text-green-700',
+                },
+            ];
+            document.getElementById('summaryCards').innerHTML = cards.map(c => `
+                <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 ${c.color}">
+                    <p class="text-xs text-gray-500 mb-1">${c.label}</p>
+                    <p class="text-xl font-bold ${c.valueClass || 'text-gray-900'}">${c.value}</p>
+                    <p class="text-xs text-gray-400 mt-1">${c.sub}</p>
+                </div>
+            `).join('');
+        }
+
+        // ── Risk banner ─────────────────────────────────────────────────────
+
+        function renderRiskBanner(data) {
+            const banner = document.getElementById('riskBanner');
+            const riskWeeks = data.summary.at_risk_weeks;
+            if (riskWeeks.length === 0) {
+                banner.classList.add('hidden');
+                return;
+            }
+            const weekList = riskWeeks.map(n => {
+                const w = data.weeks[n - 1];
+                return w ? `Week ${n} (${fmtDate(w.week_start)})` : `Week ${n}`;
+            }).join(', ');
+            banner.classList.remove('hidden');
+            banner.innerHTML = `
+                <strong>Cash reserve risk detected</strong> in ${weekList}.
+                The downside scenario (P10) dips below the 4-week minimum reserve of ${fmt$(data.summary.minimum_reserve)}.
+                Consider accelerating receivables or deferring discretionary disbursements in those weeks.
+            `;
+        }
+
+        // ── Chart ───────────────────────────────────────────────────────────
+
+        function renderChart(data) {
+            const weeks = data.weeks;
+            const labels = weeks.map(w => `W${w.week}\n${fmtDate(w.week_start)}`);
+
+            // Balance line data
+            const balances    = weeks.map(w => w.ending_balance);
+            const balP10      = weeks.map(w => w.balance_p10);
+            const balP90      = weeks.map(w => w.balance_p90);
+            const receipts    = weeks.map(w => w.receipts);
+            const disbursements = weeks.map(w => -w.disbursements);
+
+            const canvas = document.getElementById('forecastChart');
+            canvas.width  = canvas.parentElement.clientWidth;
+            canvas.height = 260;
+
+            if (chart) { chart.destroy(); chart = null; }
+
+            chart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Receipts',
+                            data: receipts,
+                            backgroundColor: 'rgba(74,222,128,0.7)',
+                            borderRadius: 3,
+                            order: 2,
+                        },
+                        {
+                            label: 'Disbursements',
+                            data: disbursements,
+                            backgroundColor: 'rgba(248,113,113,0.65)',
+                            borderRadius: 3,
+                            order: 2,
+                        },
+                        {
+                            label: 'P90 Balance',
+                            data: balP90,
+                            type: 'line',
+                            borderColor: 'rgba(59,130,246,0)',
+                            backgroundColor: 'rgba(59,130,246,0.12)',
+                            fill: '+1',
+                            tension: 0.35,
+                            pointRadius: 0,
+                            order: 1,
+                        },
+                        {
+                            label: 'Balance (P50)',
+                            data: balances,
+                            type: 'line',
+                            borderColor: 'rgb(37,99,235)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            pointRadius: weeks.map(w => w.is_actual ? 5 : 3),
+                            pointBackgroundColor: weeks.map(w => w.is_actual ? 'rgb(16,185,129)' : 'rgb(37,99,235)'),
+                            yAxisID: 'yBalance',
+                            order: 0,
+                        },
+                        {
+                            label: 'P10 Balance',
+                            data: balP10,
+                            type: 'line',
+                            borderColor: 'rgba(59,130,246,0)',
+                            backgroundColor: 'rgba(59,130,246,0.12)',
+                            fill: false,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            yAxisID: 'yBalance',
+                            order: 1,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.raw;
+                                    if (v == null) return null;
+                                    const abs = Math.abs(v);
+                                    const sign = v < 0 ? '−' : '+';
+                                    return `${ctx.dataset.label}: ${ctx.datasetIndex <= 1 ? sign : ''}$${abs.toLocaleString('en-US', {maximumFractionDigits: 0})}`;
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { font: { size: 10 }, maxRotation: 0 },
+                            grid: { display: false },
+                        },
+                        y: {
+                            position: 'left',
+                            title: { display: true, text: 'Weekly $ Flow', font: { size: 10 } },
+                            ticks: { callback: v => '$' + (Math.abs(v) >= 1000 ? (v/1000).toFixed(0)+'k' : v), font: { size: 10 } },
+                            grid: { color: 'rgba(0,0,0,0.04)' },
+                        },
+                        yBalance: {
+                            position: 'right',
+                            title: { display: true, text: 'Running Balance', font: { size: 10 } },
+                            ticks: { callback: v => '$' + (v/1000).toFixed(0)+'k', font: { size: 10 } },
+                            grid: { display: false },
+                        },
+                    },
+                },
+            });
+        }
+
+        // ── Table ───────────────────────────────────────────────────────────
+
+        function renderTable(data) {
+            const minReserve = data.summary.minimum_reserve;
+            const rows = data.weeks.map(w => {
+                const isRisk    = w.at_risk;
+                const isActual  = w.is_actual;
+                const netColor  = w.net >= 0 ? 'text-green-700' : 'text-red-600';
+                const rowBg     = isRisk ? 'bg-red-50' : (isActual ? 'bg-emerald-50' : '');
+                const p10Color  = w.balance_p10 < minReserve ? 'text-red-600 font-medium' : 'text-gray-500';
+                const badge = isActual
+                    ? '<span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">A</span>'
+                    : '<span class="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">F</span>';
+                const riskBadge = isRisk
+                    ? '<span class="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs">Risk</span>'
+                    : '';
+                return `
+                    <tr class="border-t border-gray-50 ${rowBg} hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-2.5 text-gray-700 font-medium">${badge} W${w.week}</td>
+                        <td class="px-4 py-2.5 text-gray-500">${fmtDate(w.week_start)} – ${fmtDate(w.week_end)}</td>
+                        <td class="px-4 py-2.5 text-right text-green-700">${fmt$(w.receipts)}</td>
+                        <td class="px-4 py-2.5 text-right text-red-600">${fmt$(w.disbursements)}</td>
+                        <td class="px-4 py-2.5 text-right font-medium ${netColor}">${fmtNet(w.net)}</td>
+                        <td class="px-4 py-2.5 text-right font-semibold text-gray-900">${fmt$(w.ending_balance)}</td>
+                        <td class="px-4 py-2.5 text-right ${p10Color}">${fmt$(w.balance_p10)}</td>
+                        <td class="px-4 py-2.5 text-center">${isActual ? 'Actual' : 'Forecast'}${riskBadge}</td>
+                    </tr>`;
+            }).join('');
+            document.getElementById('forecastTable').innerHTML = rows;
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────
+
+        async function onMounted() {
+            await reload();
+            eime.setContext({ page: 'cash-forecast-weekly', payload: { churchId: CHURCH_ID } });
+        }
+
+        EIMEShell.mount({
+            activeNav: 'cash-forecast-weekly',
+            pageTitle: '13-Week Cash Forecast',
+            centerContent: document.getElementById('page-center-content').innerHTML,
+            onMounted,
+        });
+    </script>
+</body>
+</html>
