@@ -21,7 +21,7 @@
 <script src="/eime-bus.js"></script>
 <script src="/eime-shell.js"></script>
 <script src="/eime-chat-rail.js"></script>
-<script src="/components/card-renderer.js"></script>
+<script src="/components/card-renderer.js?v=2"></script>
 </head>
 <body>
 
@@ -98,6 +98,7 @@ const API = (window.EIME_API ?? '');
 const CHURCH_ID = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentUserTier = 2;
 let selectedEventId = null;
+let _currentProjection = null;
 
 EIMEShell.mount({
   activeNav: 'trace',
@@ -172,21 +173,40 @@ async function searchCell() {
     return;
   }
 
+  const traceBtn = document.querySelector('button[onclick="searchCell()"]');
+  if (traceBtn) { traceBtn.textContent = 'Loading…'; traceBtn.disabled = true; }
   try {
-    // TODO: Real endpoint GET /api/trace/{cell_id}
-    // For now, return mock data
-    const projection = generateMockProjection(cellId);
+    const church = (window.EIMESession && window.EIMESession.getChurch()) || CHURCH_ID;
+    const res = await fetch(`${API}/api/gl-trace/${encodeURIComponent(cellId)}?church_id=${encodeURIComponent(church)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const projection = await res.json();
+    _currentProjection = projection;
+    selectedEventId = null;
 
-    document.getElementById('empty-state').classList.add('hidden');
-    document.getElementById('trace-results').classList.remove('hidden');
-
-    renderLevel1(projection);
-    renderLevel2Empty();
-    renderLevel3Empty();
+    // If no events found, show a clear message rather than an empty trace
+    if (!projection.contributing_events || projection.contributing_events.length === 0) {
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('trace-results').classList.remove('hidden');
+      document.getElementById('level-1-content').innerHTML = `
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+          <strong>No journal entries found</strong> for account <code>${cellId}</code> in this church.
+          Try a different account number — e.g. <button onclick="document.getElementById('search-input').value='1010';searchCell()" class="underline">1010</button>.
+        </div>`;
+      renderLevel2Empty();
+      renderLevel3Empty();
+    } else {
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('trace-results').classList.remove('hidden');
+      renderLevel1(projection);
+      renderLevel2(projection);
+      renderLevel3Empty();
+    }
 
     window.scrollTo(0, document.getElementById('trace-results').offsetTop);
   } catch (e) {
-    alert('Error: ' + e.message);
+    alert('Error loading trace: ' + e.message);
+  } finally {
+    if (traceBtn) { traceBtn.textContent = 'Trace'; traceBtn.disabled = false; }
   }
 }
 
@@ -384,8 +404,7 @@ function renderLevel3(event) {
 }
 
 function getCurrentProjection() {
-  // Return the last loaded projection (simplified; in production, track state)
-  return null; // Will be refactored in Phase 3
+  return _currentProjection;
 }
 </script>
 
