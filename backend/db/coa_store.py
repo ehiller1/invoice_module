@@ -857,20 +857,53 @@ def ensure_seed() -> List[str]:
     )
 
     for church_id, yaml_filename in seeds:
-        if _try_resolve_church_pk(church_id) is not None:
-            continue
+        already_seeded = _try_resolve_church_pk(church_id) is not None
+        if not already_seeded:
+            try:
+                from . import seed_loader
+                ctx = seed_loader.load_seed_yaml(yaml_filename)
+                # Verify church_id matches
+                if ctx.church_id != church_id:
+                    # Update to ensure consistency
+                    ctx.church_id = church_id
+                save_accounting_context(ctx)
+                created.append(church_id)
+            except Exception:
+                # Seeding is best-effort — never block startup.
+                continue
+
+        # Domain-event seeds (not part of AccountingContext). Each helper is
+        # idempotent so re-runs only fill in what's missing.
         try:
             from . import seed_loader
-            ctx = seed_loader.load_seed_yaml(yaml_filename)
-            # Verify church_id matches
-            if ctx.church_id != church_id:
-                # Update to ensure consistency
-                ctx.church_id = church_id
-            save_accounting_context(ctx)
-            created.append(church_id)
+            # Synchronous SQL inserts — safe to run inline.
+            seed_loader.seed_fund_balances_from_yaml(church_id, yaml_filename)
+            seed_loader.seed_policies_from_yaml(church_id, yaml_filename)
+            seed_loader.seed_recommendations_from_yaml(church_id, yaml_filename)
+            seed_loader.seed_exceptions_from_yaml(church_id, yaml_filename)
         except Exception:
-            # Seeding is best-effort — never block startup.
-            continue
+            pass
+
+        # Async seeds (CardStore-backed) — dispatch correctly regardless of
+        # whether we're inside a running event loop or not.
+        try:
+            import asyncio
+            from . import seed_loader as _sl
+
+            async def _run_async_seeds(_yaml: str) -> None:
+                await _sl.seed_pledges_from_yaml(_yaml)
+                await _sl.seed_accruals_from_yaml(_yaml)
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(_run_async_seeds(yaml_filename))
+                else:
+                    loop.run_until_complete(_run_async_seeds(yaml_filename))
+            except RuntimeError:
+                asyncio.run(_run_async_seeds(yaml_filename))
+        except Exception:
+            pass
 
     return created
 

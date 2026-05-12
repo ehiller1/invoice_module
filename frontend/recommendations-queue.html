@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>EIME — Recommendations Queue</title>
+<title>Suggestions — Books</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -28,8 +28,8 @@
 <template id="page-center-content">
 <div class="max-w-6xl mx-auto p-6">
   <div class="mb-6">
-    <h1 class="text-3xl font-bold text-slate-900 mb-2">⭐ NBA Queue</h1>
-    <p class="text-slate-600">Next best action candidates — <span id="queue-count">0</span> pending decision</p>
+    <h1 class="text-3xl font-bold text-slate-900 mb-2">⭐ Suggestions</h1>
+    <p class="text-slate-600">Recommended next actions — <span id="queue-count">0</span> awaiting your decision</p>
   </div>
 
   <!-- Recommendations List -->
@@ -41,7 +41,7 @@
 
 <script>
 const API = (window.EIME_API ?? '');
-const CHURCH_ID = 'holy_comforter';
+const CHURCH_ID = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentUserTier = 2;
 let allRecommendations = [];
 
@@ -65,28 +65,50 @@ async function loadRecommendations() {
     const data = await res.json();
 
     if (data.cards && Array.isArray(data.cards) && data.cards.length > 0) {
-      // Convert DB format to frontend format
-      allRecommendations = data.cards.map((card, idx) => ({
-        recommendation_id: card.card_id,
-        state: card.status,
-        title: card.title,
-        description: card.description,
-        candidates: card.evidence?.candidates || [],
-        selected_candidate: card.evidence?.selected_candidate || null,
-        rationale: card.evidence?.rationale || '',
-        impact_projection: card.evidence?.impact_projection || {
-          cash_impact: '',
-          mission_impact: '',
-          covenant_impact: ''
-        },
-        decision_deadline: card.evidence?.decision_deadline || new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
-        decided_by: card.evidence?.decided_by || null,
-        decision: card.evidence?.decision || null,
-        privacy_class: card.evidence?.privacy_class || 'P2',
-        version: 1,
-        created_at: card.created_at,
-        updated_at: card.resolved_at || card.created_at
-      }));
+      // Convert DB format to frontend format. When the backend hasn't populated
+      // rationale / impact_projection in `evidence`, derive sensible fallbacks
+      // from the fields it does provide so the user never sees blank labels.
+      allRecommendations = data.cards.map((card, idx) => {
+        const ev = card.evidence || {};
+        // Backend enrichment provides cash_impact_usd / confidence_bucket / confidence_pct on evidence.
+        const cashUsd = ev.cash_impact_usd != null ? Number(ev.cash_impact_usd) : 0;
+        const basis   = ev.cash_impact_basis || 'estimated';
+        const bucket  = ev.confidence_bucket || 'unknown';
+        const conf    = ev.confidence_pct != null ? Number(ev.confidence_pct) : 0;
+        const fmtUsd  = (n) => n >= 1000
+          ? '$' + (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'K/yr'
+          : '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 }) + '/yr';
+        const cashLabel = cashUsd > 0
+          ? `${fmtUsd(cashUsd)} (${basis})`
+          : 'Not yet modelled';
+        const confLabel = conf > 0 ? `${bucket} (${conf.toFixed(0)}%)` : 'unknown';
+
+        const rationale = ev.rationale
+          || card.description
+          || 'No additional rationale recorded.';
+        const ip = ev.impact_projection || {};
+        return {
+          recommendation_id: card.card_id,
+          state: card.status,
+          title: card.title,
+          description: card.description,
+          candidates: ev.candidates || [],
+          selected_candidate: ev.selected_candidate || null,
+          rationale,
+          impact_projection: {
+            cash_impact:    ip.cash_impact    || cashLabel,
+            mission_impact: ip.mission_impact || (`confidence ${confLabel}`),
+            covenant_impact: ip.covenant_impact || null,
+          },
+          decision_deadline: ev.decision_deadline || new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+          decided_by: ev.decided_by || null,
+          decision: ev.decision || null,
+          privacy_class: ev.privacy_class || 'P2',
+          version: 1,
+          created_at: card.created_at,
+          updated_at: card.resolved_at || card.created_at,
+        };
+      });
     } else {
       // Fallback to mock data
       allRecommendations = [
@@ -190,6 +212,7 @@ function renderRecommendations() {
           </div>
         </div>
 
+        ${rec.candidates && rec.candidates.length > 0 ? `
         <div class="mb-4">
           <p class="text-xs font-semibold text-slate-900 mb-2">Candidates</p>
           <div class="space-y-2">
@@ -206,11 +229,13 @@ function renderRecommendations() {
             `).join('')}
           </div>
         </div>
+        ` : ''}
 
         ${rec.state === 'OPEN' ? `
           <div class="flex gap-2">
             <button onclick="acceptRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
             <button onclick="declineRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Reject</button>
+            <button onclick="deferRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700">Defer</button>
             <button onclick="modifyRecommendation('${rec.recommendation_id}')" class="text-xs px-3 py-1 bg-slate-600 text-white rounded hover:bg-slate-700">Review Details</button>
           </div>
         ` : `
@@ -251,25 +276,53 @@ async function selectCandidate(recId, candId) {
   }
 }
 
-async function acceptRecommendation(recId) {
+function _sessionHeaders() {
+  const s = window.EIMESession;
+  return s ? Object.assign({ 'Content-Type': 'application/json' }, s.authHeaders())
+           : { 'Content-Type': 'application/json' };
+}
+
+async function _decideRecommendation(recId, action, opts = {}) {
   try {
-    const res = await fetch(`${API}/api/recommendations/${recId}/accept`, { method: 'POST' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert('Recommendation accepted');
-    loadRecommendations();
+    const res = await fetch(`${API}/api/recommendations-session/${encodeURIComponent(recId)}/${action}`, {
+      method: 'POST',
+      headers: _sessionHeaders(),
+      body: JSON.stringify(opts || {}),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `HTTP ${res.status}`);
+    }
+    const result = await res.json();
+    return { ok: true, result };
   } catch (e) {
-    alert('Error: ' + e.message);
+    return { ok: false, error: e.message };
   }
 }
 
+async function acceptRecommendation(recId) {
+  const r = await _decideRecommendation(recId, 'accept');
+  alert(r.ok ? 'Suggestion accepted.' : 'Error: ' + r.error);
+  if (r.ok) loadRecommendations();
+}
+
 async function declineRecommendation(recId) {
-  try {
-    const res = await fetch(`${API}/api/recommendations/${recId}/decline`, { method: 'POST' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    alert('Recommendation declined');
+  const reason = prompt('Why are you declining this? (optional)') || '';
+  const r = await _decideRecommendation(recId, 'decline', { reason });
+  alert(r.ok ? 'Suggestion declined.' : 'Error: ' + r.error);
+  if (r.ok) loadRecommendations();
+}
+
+async function deferRecommendation(recId) {
+  const days = parseInt(prompt('Defer for how many days?', '30'), 10);
+  if (!days || days < 1) return;
+  const r = await _decideRecommendation(recId, 'defer', { defer_days: days });
+  if (r.ok) {
+    const until = new Date(r.result.defer_until).toLocaleDateString();
+    alert(`Suggestion deferred until ${until}.`);
     loadRecommendations();
-  } catch (e) {
-    alert('Error: ' + e.message);
+  } else {
+    alert('Error: ' + r.error);
   }
 }
 

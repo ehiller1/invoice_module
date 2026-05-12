@@ -324,3 +324,151 @@ accounts:
 apportionment_accounts:
   - account_number: "8400"
     pct_of_revenue: "12.5"
+
+# Seed pledges — give Flow 9 (Pledge → Cash Fulfillment) something to show
+# on first run. Mix of purposes (annual fund, capital campaign, restricted)
+# so the page exercises every cell of the matching matrix.
+pledges:
+  - pledge_id: pld-2026-annual-001
+    donor_name: Eleanor Whitfield
+    amount: "12000"
+    purpose: Annual Fund 2026
+    pledge_date: "2026-01-15"
+    expected_receipt_date: "2026-12-15"
+
+  - pledge_id: pld-2026-annual-002
+    donor_name: James & Margaret Cole
+    amount: "5400"
+    purpose: Annual Fund 2026
+    pledge_date: "2026-01-22"
+    expected_receipt_date: "2026-12-15"
+
+  - pledge_id: pld-2026-annual-003
+    donor_name: Robert Hawthorne
+    amount: "2400"
+    purpose: Annual Fund 2026
+    pledge_date: "2026-02-04"
+    expected_receipt_date: "2026-12-15"
+
+  - pledge_id: pld-2026-capital-001
+    donor_name: Anne Marbury
+    amount: "25000"
+    purpose: Capital Campaign — Roof Restoration
+    pledge_date: "2026-03-01"
+    expected_receipt_date: "2026-09-30"
+    restrictions:
+      fund: BLDG
+      restriction_class: WITH_RESTRICTION_PURPOSE
+
+  - pledge_id: pld-2026-capital-002
+    donor_name: Thomas Cranmer Estate
+    amount: "50000"
+    purpose: Capital Campaign — Organ Refurbishment
+    pledge_date: "2026-02-18"
+    expected_receipt_date: "2026-11-30"
+    restrictions:
+      fund: BLDG
+      restriction_class: WITH_RESTRICTION_PURPOSE
+
+  - pledge_id: pld-2026-outreach-001
+    donor_name: Hooker Family Trust
+    amount: "7500"
+    purpose: Outreach — Local Food Pantry
+    pledge_date: "2026-04-10"
+    expected_receipt_date: "2026-06-30"
+    restrictions:
+      fund: GEN
+      restriction_class: WITH_RESTRICTION_PURPOSE
+
+# Seed policies — give Flow 8 (Policy Creation, Vote, Activation) real
+# proposals to vote on instead of an empty queue. Each row becomes a row
+# in the SQL policy_cards table with status=OPEN and requires_vote=true.
+policies:
+  - policy_id: pol-capex-threshold
+    title: Approval threshold for capital purchases
+    description: Purchases over $15,000 require treasurer sign-off in addition to budget owner approval.
+    proposed_by: budget-owner
+    requires_vote: true
+
+  - policy_id: pol-discretionary-fund
+    title: Rector's discretionary fund size
+    description: Limit the rector's discretionary fund to 2% of operating revenue, capped at $25K annually.
+    proposed_by: finance-chair
+    requires_vote: true
+
+  - policy_id: pol-restricted-fund-policy
+    title: Restricted fund draw policy
+    description: No draws from a restricted fund without documented donor intent and finance-committee review.
+    proposed_by: treasurer
+    requires_vote: true
+
+# Seed suggestions / NBA recommendations — Flow 15. Each becomes a row in
+# the SQL recommendation_cards table. The /recommendations endpoint will
+# enrich with cash_impact_usd and confidence_bucket automatically.
+recommendations:
+  - recommendation_type: vendor_reclassification
+    title: Reclassify vendor Diocese Office Supply to office_expense
+    description: 14 transactions over the past 12 months consistently coded to facilities should be office_expense.
+    impact_score: 3.2
+    confidence_pct: 91
+
+  - recommendation_type: vendor_classification
+    title: Move vendor Episcopal Music Press to program_resources
+    description: Vendor is currently miscoded under capital_equipment. 6 historical transactions match program_resources pattern.
+    impact_score: 1.8
+    confidence_pct: 84
+
+  - recommendation_type: fund_reallocation
+    title: Reallocate Memorial Cash surplus to Outreach
+    description: Memorial Cash carries a $12K unused balance with no qualifying memorials in 18 months; reallocate $8K to the Local Food Pantry restricted line.
+    impact_score: 4.5
+    confidence_pct: 76
+
+  - recommendation_type: policy_change
+    title: Tighten discretionary spend approvals
+    description: Approve increasing the second-signature threshold on discretionary spend from $1,000 to $2,500 based on 9 months of transaction patterns.
+    impact_score: 2.6
+    confidence_pct: 68
+
+# Seed accruals — Flow 12. Pre-populate the schedule so the Treasurer
+# can preview months ahead instead of staring at an empty page.
+accruals:
+  - description: Prepaid insurance — annual policy, recognized monthly
+    total_amount: "12000"
+    period_count: 12
+    period_type: monthly
+    start_date: "2026-01-01"
+    expense_account: "5510"
+
+  - description: Diocesan assessment — quarterly accrual
+    total_amount: "28000"
+    period_count: 4
+    period_type: quarterly
+    start_date: "2026-01-01"
+    expense_account: "8400"
+
+  - description: Organ tuning contract — semi-annual
+    total_amount: "3600"
+    period_count: 2
+    period_type: semiannual
+    start_date: "2026-03-01"
+    expense_account: "5260"
+
+# Seed exceptions — Flow 2. A small mix of severities so the Exceptions
+# tab has something to triage. Synthetic test items are deliberately
+# avoided here; titles read like real bookkeeper questions.
+exceptions:
+  - exception_type: amount_anomaly
+    title: $50K anonymous gift with unclear intent
+    description: Donor sent a wire labelled "for the church" with no purpose specified. Treat as unrestricted? Or hold pending follow-up?
+    severity: NORMAL
+
+  - exception_type: capitalisation_threshold
+    title: Capitalization threshold variance on $2,510 HVAC repair
+    description: Invoice is $10 over the $2,500 capitalisation threshold. Capitalize or expense?
+    severity: NORMAL
+
+  - exception_type: donor_intent
+    title: Donor letter references both endowment and operations
+    description: Estate gift letter says "for the work of the church and its endowment". Need clarification on the split before posting.
+    severity: HIGH

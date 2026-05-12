@@ -136,7 +136,7 @@ EIMEShell.mount({
   onMounted() {
     window.eime.setContext({
       page: 'audit',
-      payload: { church_id: 'holy_comforter' }
+      payload: { church_id: ((window.EIMESession && EIMESession.getChurch()) || 'holy_comforter') }
     });
     setDefaultDates();
     loadAuditTrail();
@@ -334,7 +334,7 @@ async function exportPDF() {
 
 async function loadAdversarialFindings() {
   try {
-    const res = await fetch(`${API}/api/audit/adversarial-findings?church_id=holy_comforter`);
+    const res = await fetch(`${API}/api/audit/adversarial-findings?church_id=${(window.EIMESession && EIMESession.getChurch()) || "holy_comforter"}`);
     const data = await res.json();
     renderAdversarialFindings(data);
   } catch (e) {

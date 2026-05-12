@@ -57,6 +57,52 @@
       </a>
     </div>
 
+    <!-- Financial position card (Flow 16, surfaced inline) -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5 mb-6">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="text-xs text-slate-500 font-semibold uppercase">Where the Books Stand</p>
+          <p id="fp-asof" class="text-xs text-slate-400 mt-0.5">Loading ledger snapshot…</p>
+        </div>
+        <a href="/chat.html?q=What%27s%20our%20financial%20position%20right%20now%3F" class="text-xs text-navy-700 hover:underline">Ask in chat →</a>
+      </div>
+      <p id="fp-total" class="text-3xl font-bold text-slate-900 tabular-nums">—</p>
+      <p id="fp-total-label" class="text-xs text-slate-500 mt-0.5">Total fund balance</p>
+
+      <!-- Restricted/unrestricted bar -->
+      <div class="mt-4">
+        <div class="flex h-2 rounded-full overflow-hidden bg-slate-100">
+          <div id="fp-bar-unrestricted" class="bg-emerald-500 h-2" style="width: 0%"></div>
+          <div id="fp-bar-temp"         class="bg-amber-500   h-2" style="width: 0%"></div>
+          <div id="fp-bar-perm"         class="bg-slate-500   h-2" style="width: 0%"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-3 text-xs">
+          <div>
+            <p class="text-slate-500">Unrestricted</p>
+            <p id="fp-unrestricted" class="font-semibold text-emerald-700 tabular-nums">—</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Temporarily restricted</p>
+            <p id="fp-temp" class="font-semibold text-amber-700 tabular-nums">—</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Permanently restricted</p>
+            <p id="fp-perm" class="font-semibold text-slate-700 tabular-nums">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top funds -->
+      <details class="mt-4 group">
+        <summary class="cursor-pointer text-xs text-slate-500 hover:text-slate-700 select-none">Fund detail (largest first)</summary>
+        <ul id="fp-funds" class="mt-2 space-y-1 text-sm"></ul>
+      </details>
+
+      <p id="fp-confidence" class="text-xs text-slate-400 mt-3">
+        Confidence loading…
+      </p>
+    </div>
+
     <!-- Reconciliation card -->
     <div class="bg-white border border-slate-200 rounded-lg p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
@@ -98,11 +144,13 @@
         payload: { church_id: CHURCH_ID }
       });
 
-      // Greeting
+      // Greeting — prefer the active user's name; fall back to the church name.
       const hour = new Date().getHours();
       const partOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-      const churchName = (window.EIMEBus && EIMEBus.getChurchName && EIMEBus.getChurchName()) || 'Friend';
-      document.getElementById('greeting').textContent = `Good ${partOfDay}, ${churchName}`;
+      const user      = window.EIMESession && window.EIMESession.getUser();
+      const churchNm  = (window.EIMEBus && EIMEBus.getChurchName && EIMEBus.getChurchName()) || '';
+      const greeted   = (user && user.id !== 'guest' && user.name) ? user.name : (churchNm || 'Friend');
+      document.getElementById('greeting').textContent = `Good ${partOfDay}, ${greeted}`;
       document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
@@ -173,6 +221,80 @@
         setTile('questions', qCount);
       }
 
+      function _fmtUsd(n) {
+        const abs = Math.abs(n || 0);
+        if (abs >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+        if (abs >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+        if (abs >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+        return '$' + (n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+      }
+
+      async function loadFinancialPosition() {
+        const data = await safeFetch(`${API}/api/churches/${CHURCH_ID}/financial-position`);
+        const asof = document.getElementById('fp-asof');
+        const totalEl = document.getElementById('fp-total');
+        if (!data || data.ok === false) {
+          if (asof)    asof.textContent = 'No data available.';
+          if (totalEl) totalEl.textContent = '—';
+          return;
+        }
+        const t = data.totals || {};
+        if (totalEl) {
+          totalEl.textContent = _fmtUsd(t.total_fund_balance || 0);
+          totalEl.setAttribute('title', '$' + (t.total_fund_balance || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
+        }
+        const asofDate = data.as_of ? new Date(data.as_of).toLocaleString() : '—';
+        if (asof) asof.textContent = `As of ${asofDate} · ledger balance basis`;
+        document.getElementById('fp-unrestricted').textContent = _fmtUsd(t.unrestricted || 0);
+        document.getElementById('fp-temp').textContent         = _fmtUsd(t.temporarily_restricted || 0);
+        document.getElementById('fp-perm').textContent         = _fmtUsd(t.permanently_restricted || 0);
+        const tot = (t.total_fund_balance || 0) || 1;
+        document.getElementById('fp-bar-unrestricted').style.width = ((t.unrestricted || 0) / tot * 100) + '%';
+        document.getElementById('fp-bar-temp').style.width         = ((t.temporarily_restricted || 0) / tot * 100) + '%';
+        document.getElementById('fp-bar-perm').style.width         = ((t.permanently_restricted || 0) / tot * 100) + '%';
+
+        // Confidence footer reflects the API's verdict and the JE count.
+        const conf = data.confidence || {};
+        const jeN  = (data.totals && data.totals.posted_je_count) || 0;
+        const _badge = (lvl) => {
+          const c = (lvl || '').toUpperCase();
+          const cls = c === 'HIGH' ? 'text-emerald-700' : c === 'MEDIUM' ? 'text-amber-700' : 'text-slate-500';
+          return `<span class="${cls} font-medium">${c || '—'}</span>`;
+        };
+        const confEl = document.getElementById('fp-confidence');
+        if (confEl) {
+          const basis = conf.as_of_basis || 'ledger snapshot, not a closed-period statement';
+          const jeNote = jeN > 0 ? ` · ${jeN} posted JE${jeN === 1 ? '' : 's'} rolled in` : '';
+          confEl.innerHTML = `Confidence: fund-level ${_badge(conf.fund_level || 'HIGH')} · GL roll-up ${_badge(conf.gl_rollup || 'MEDIUM')} · ${basis}${jeNote}.`;
+        }
+
+        // Fund detail (largest first, top 8).
+        const funds = Array.isArray(data.funds) ? data.funds.slice(0, 8) : [];
+        const ul = document.getElementById('fp-funds');
+        const _rcLabel = (rc) => {
+          const k = String(rc || '').toUpperCase();
+          if (k === 'WITHOUT_RESTRICTION')       return { text: 'unrestricted',          cls: 'text-emerald-700 bg-emerald-50' };
+          if (k === 'WITH_RESTRICTION_PURPOSE')  return { text: 'temporarily restricted', cls: 'text-amber-700 bg-amber-50' };
+          if (k === 'WITH_RESTRICTION_PERMANENT') return { text: 'permanently restricted', cls: 'text-slate-700 bg-slate-100' };
+          return { text: '—', cls: 'text-slate-500 bg-slate-50' };
+        };
+        if (ul) {
+          ul.innerHTML = funds.map(f => {
+            const rc = _rcLabel(f.restriction_class);
+            const je = Number(f.je_net || 0);
+            const jeBadge = Math.abs(je) >= 0.01
+              ? `<span class="text-[10px] tabular-nums ${je > 0 ? 'text-emerald-700' : 'text-rose-700'}">${je > 0 ? '+' : '−'}${_fmtUsd(Math.abs(je))}</span>`
+              : '';
+            return `<li class="flex items-center justify-between gap-3 py-0.5">
+              <span class="text-slate-700 truncate flex-1">${f.fund_name || f.fund_id}</span>
+              ${jeBadge}
+              <span class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded ${rc.cls}">${rc.text}</span>
+              <span class="font-semibold text-slate-900 tabular-nums w-20 text-right">${_fmtUsd(f.current_balance || 0)}</span>
+            </li>`;
+          }).join('') || '<li class="text-xs text-slate-400">No funds configured.</li>';
+        }
+      }
+
       async function loadReconciliation() {
         const data = await safeFetch(`${API}/api/churches/${CHURCH_ID}/reconciliations/latest`);
         const el = document.getElementById('recon-status');
@@ -238,6 +360,7 @@
       }
 
       loadTiles();
+      loadFinancialPosition();
       loadReconciliation();
       loadMonthClose();
       loadRecentActivity();

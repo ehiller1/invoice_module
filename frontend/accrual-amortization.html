@@ -32,6 +32,7 @@
     </div>
     <div class="flex items-center gap-3">
       <select id="church-selector" onchange="loadAccruals()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="createAccrual()" class="text-sm px-3 py-2 bg-navy-700 text-white rounded-lg hover:bg-navy-600">+ Set Up Accrual</button>
       <button onclick="loadAccruals()" class="text-sm text-navy-700 hover:underline">Refresh</button>
     </div>
   </header>
@@ -190,18 +191,39 @@ async function init() {
   const sel = document.getElementById('church-selector');
   sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
   if (churches.length) {
-    activeChurch = churches[0].church_id;
+    // Prefer the user's session church if it's in the list; else first.
+    const _ses = (window.EIMESession && EIMESession.getChurch()) || null;
+    const _match = _ses ? churches.find(c => c.church_id === _ses) : null;
+    activeChurch = (_match && _match.church_id) || churches[0].church_id;
     sel.value = activeChurch;
     window.eime.setContext({
       page: 'accrual-amortization',
       payload: { church_id: activeChurch }
     });
     await loadAccruals();
+    // Keep the dropdown in sync if the user changes church via the sidebar chip.
+    if (window.EIMESession && typeof EIMESession.onChange === 'function') {
+      EIMESession.onChange(() => {
+        const c = EIMESession.getChurch();
+        if (c && c !== activeChurch) {
+          const sel = document.getElementById('church-selector');
+          if (sel && Array.from(sel.options).some(o => o.value === c)) {
+            sel.value = c;
+          }
+          activeChurch = c;
+          // Refresh the current view without re-entering the church-set loop.
+          const refresh = window.loadMatches || window.loadJobs || window.loadAccruals || window.loadCompliance || window.loadKb;
+          if (refresh) refresh();
+        }
+      });
+    }
   }
 }
 
 async function loadAccruals() {
   activeChurch = document.getElementById('church-selector').value;
+
+  if (window.EIMESession && activeChurch) EIMESession.setChurch(activeChurch);
   window.eime.setContext({
     page: 'accrual-amortization',
     payload: { church_id: activeChurch }
@@ -210,7 +232,10 @@ async function loadAccruals() {
     const res = await fetch(`/api/accruals?church_id=${activeChurch}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    renderAccruals(data.schedules || []);
+    // Backend payload key has historically varied between `schedules` and
+    // `accruals` — accept either so a future rename doesn't blank the page.
+    const rows = data.schedules || data.accruals || data.cards || [];
+    renderAccruals(rows);
   } catch (e) {
     console.error('Error loading accruals:', e);
     document.getElementById('accruals-tbody').innerHTML =
@@ -267,6 +292,38 @@ function switchTab(tab) {
 }
 
 window.switchTab = switchTab;
+async function createAccrual() {
+  const description = prompt('Description (e.g., "Prepaid insurance — Q1 2026"):');
+  if (!description) return;
+  const totalRaw = prompt('Total amount (USD):');
+  const total_amount = parseFloat(totalRaw);
+  if (!total_amount || total_amount <= 0) { alert('Amount must be positive.'); return; }
+  const periodsRaw = prompt('Number of periods (e.g., 12 for one year monthly):', '12');
+  const period_count = parseInt(periodsRaw, 10);
+  if (!period_count || period_count < 1) { alert('Period count must be a positive integer.'); return; }
+  const period_type = (prompt('Period type (monthly / quarterly / annual):', 'monthly') || 'monthly').toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+  const start_date = prompt('Start date (YYYY-MM-DD):', today) || today;
+  const expense_account = prompt('Expense GL account (e.g., 5200):');
+  if (!expense_account) return;
+  try {
+    const res = await fetch('/api/accruals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description, total_amount, period_count, period_type, start_date, expense_account }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `HTTP ${res.status}`);
+    }
+    const per = (total_amount / period_count).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    alert(`Accrual scheduled. ${per} will post each ${period_type} starting ${start_date}.`);
+    loadAccruals();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+window.createAccrual = createAccrual;
 window.loadAccruals = loadAccruals;
 
 init();

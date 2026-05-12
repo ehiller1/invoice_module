@@ -25,27 +25,27 @@
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                 <div id="cardCash" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Bank Balance</p>
-                    <p class="text-2xl font-bold text-gray-900">$<span id="cashAmount">-</span></p>
+                    <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="cashAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="cashStatus" class="font-medium">-</span></p>
                 </div>
                 <div id="cardAR" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Money Owed to Us</p>
-                    <p class="text-2xl font-bold text-gray-900">$<span id="arAmount">-</span></p>
+                    <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="arAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2"><span id="arExceptions" class="font-medium">0</span> issues</p>
                 </div>
                 <div id="cardAP" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Bills We Owe</p>
-                    <p class="text-2xl font-bold text-gray-900">$<span id="apAmount">-</span></p>
+                    <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="apAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2"><span id="apExceptions" class="font-medium">0</span> issues</p>
                 </div>
                 <div id="cardPayroll" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Payroll</p>
-                    <p class="text-2xl font-bold text-gray-900">$<span id="payrollAmount">-</span></p>
+                    <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="payrollAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="payrollStatus" class="font-medium">-</span></p>
                 </div>
                 <div id="cardInterco" class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-gray-500">
                     <p class="text-sm font-medium text-gray-600 mb-2">Between Funds</p>
-                    <p class="text-2xl font-bold text-gray-900">$<span id="intercoAmount">-</span></p>
+                    <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="intercoAmount">-</span></p>
                     <p class="text-xs text-gray-500 mt-2">Status: <span id="intercoStatus" class="font-medium">-</span></p>
                 </div>
             </div>
@@ -75,15 +75,15 @@
                     <div class="grid grid-cols-3 gap-4 mb-6">
                         <div>
                             <p class="text-sm font-medium text-gray-600">What Books Say</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="cashExpected">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="cashExpected">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">What Bank Says</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="cashActual">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="cashActual">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">Difference</p>
-                            <p id="cashDiff" class="text-2xl font-bold text-green-600">$-</p>
+                            <p id="cashDiff" class="text-2xl font-bold tabular-nums whitespace-nowrap">$-</p>
                         </div>
                     </div>
                     <div id="cashExceptions" class="space-y-2"></div>
@@ -97,15 +97,15 @@
                     <div class="grid grid-cols-4 gap-4 mb-6">
                         <div>
                             <p class="text-sm font-medium text-gray-600">Current</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="arCurrent">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="arCurrent">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">30 Days</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="ar30">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="ar30">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">60 Days</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="ar60">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="ar60">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">90+ Days</p>
@@ -123,15 +123,15 @@
                     <div class="grid grid-cols-4 gap-4 mb-6">
                         <div>
                             <p class="text-sm font-medium text-gray-600">Current</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="apCurrent">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="apCurrent">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">30 Days</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="ap30">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="ap30">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">60 Days</p>
-                            <p class="text-2xl font-bold text-gray-900">$<span id="ap60">-</span></p>
+                            <p class="text-xl font-bold text-gray-900 whitespace-nowrap tabular-nums">$<span id="ap60">-</span></p>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-600">90+ Days</p>
@@ -193,20 +193,45 @@
             }
         }
 
+        // Compactify currency for narrow cards. Exact value sits in the title
+        // attribute so users hovering still see the precise amount.
+        function _fmtMoney(n) {
+            const abs = Math.abs(n || 0);
+            if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+            if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (abs >= 1e4) return (n / 1e3).toFixed(1) + 'K';
+            return (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+        }
+        function _setAmount(el, n) {
+            if (!el) return;
+            el.textContent = _fmtMoney(n);
+            el.parentElement && el.parentElement.setAttribute('title',
+                (n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+            );
+        }
+
         function updateCashCard() {
             const cash = reconcData.cash || {};
-            document.getElementById('cashAmount').textContent = (cash.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-            document.getElementById('cashStatus').textContent = cash.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+            _setAmount(document.getElementById('cashAmount'), cash.expected || 0);
+            const diff = (cash.actual || 0) - (cash.expected || 0);
+            const statusEl = document.getElementById('cashStatus');
             const cardCash = document.getElementById('cardCash');
-            if (cash.status === 'reconciled') {
+            if (Math.abs(diff) < 0.01 && cash.status === 'reconciled') {
+                statusEl.textContent = '✓ Reconciled';
                 cardCash.classList.remove('border-orange-500', 'border-red-500');
                 cardCash.classList.add('border-green-500');
+            } else if (Math.abs(diff) >= 0.01) {
+                statusEl.textContent = 'Variance $' + Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits: 2});
+                cardCash.classList.remove('border-green-500');
+                cardCash.classList.add('border-orange-500');
+            } else {
+                statusEl.textContent = 'Pending';
             }
         }
 
         function updateARCard() {
             const ar = reconcData.ar || {};
-            document.getElementById('arAmount').textContent = (ar.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            _setAmount(document.getElementById('arAmount'), ar.expected || 0);
             document.getElementById('arExceptions').textContent = (ar.exceptions || []).length;
             const cardAR = document.getElementById('cardAR');
             if ((ar.exceptions || []).length > 0) {
@@ -217,7 +242,7 @@
 
         function updateAPCard() {
             const ap = reconcData.ap || {};
-            document.getElementById('apAmount').textContent = (ap.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            _setAmount(document.getElementById('apAmount'), ap.expected || 0);
             document.getElementById('apExceptions').textContent = (ap.exceptions || []).length;
             const cardAP = document.getElementById('cardAP');
             if ((ap.exceptions || []).length > 0) {
@@ -226,27 +251,65 @@
             }
         }
 
+        function _setStatusWithVariance(card, statusEl, expected, actual, reconciledFlag, accentClass) {
+            const diff = (actual || 0) - (expected || 0);
+            if (Math.abs(diff) < 0.01 && reconciledFlag) {
+                statusEl.textContent = '✓ Reconciled';
+                card.classList.remove('border-orange-500', 'border-red-500');
+                card.classList.add(accentClass);
+            } else if (Math.abs(diff) >= 0.01) {
+                statusEl.textContent = 'Variance $' + Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits: 2});
+                card.classList.remove(accentClass, 'border-green-500');
+                card.classList.add('border-orange-500');
+            } else {
+                statusEl.textContent = 'Pending';
+            }
+        }
+
         function updatePayrollCard() {
             const payroll = reconcData.payroll || {};
-            document.getElementById('payrollAmount').textContent = (payroll.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-            document.getElementById('payrollStatus').textContent = payroll.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+            _setAmount(document.getElementById('payrollAmount'), payroll.expected || 0);
+            _setStatusWithVariance(
+                document.getElementById('cardPayroll'),
+                document.getElementById('payrollStatus'),
+                payroll.expected, payroll.actual,
+                payroll.status === 'reconciled',
+                'border-purple-500'
+            );
         }
 
         function updateIntercoCard() {
             const interco = reconcData.intercompany || {};
-            document.getElementById('intercoAmount').textContent = (interco.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-            document.getElementById('intercoStatus').textContent = interco.status === 'reconciled' ? '✓ Reconciled' : 'Pending';
+            _setAmount(document.getElementById('intercoAmount'), interco.expected || 0);
+            _setStatusWithVariance(
+                document.getElementById('cardInterco'),
+                document.getElementById('intercoStatus'),
+                interco.expected, interco.actual,
+                interco.status === 'reconciled',
+                'border-gray-500'
+            );
         }
 
         function renderCashTab() {
             const cash = reconcData.cash || {};
             document.getElementById('cashExpected').textContent = (cash.expected || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
             document.getElementById('cashActual').textContent = (cash.actual || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-            document.getElementById('cashDiff').textContent = '$' + ((cash.actual || 0) - (cash.expected || 0)).toLocaleString('en-US', {minimumFractionDigits: 2});
+            (() => {
+                const diff = (cash.actual || 0) - (cash.expected || 0);
+                const el = document.getElementById('cashDiff');
+                el.textContent = (diff < 0 ? '-$' : '$') + Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits: 2});
+                el.classList.remove('text-green-600', 'text-red-600', 'text-slate-700');
+                if (Math.abs(diff) < 0.01)      el.classList.add('text-green-600');
+                else if (diff < 0)              el.classList.add('text-red-600');
+                else                            el.classList.add('text-orange-600');
+            })();
 
             const exceptions = cash.exceptions || [];
-            if (exceptions.length === 0) {
+            const diff = (cash.actual || 0) - (cash.expected || 0);
+            if (exceptions.length === 0 && Math.abs(diff) < 0.01) {
                 document.getElementById('cashExceptions').innerHTML = '<div class="text-sm text-green-600 font-medium">✓ No exceptions</div>';
+            } else if (exceptions.length === 0) {
+                document.getElementById('cashExceptions').innerHTML = '<div class="text-sm text-orange-600 font-medium">Variance present but no itemised exceptions — investigate the difference above.</div>';
             } else {
                 document.getElementById('cashExceptions').innerHTML = exceptions.map(exc => `
                     <div class="border border-orange-200 bg-orange-50 rounded p-3">

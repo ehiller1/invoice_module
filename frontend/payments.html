@@ -60,7 +60,7 @@
 
       window.eime.setContext({
         page: 'payments',
-        payload: { church_id: 'holy_comforter' }
+        payload: { church_id: ((window.EIMESession && EIMESession.getChurch()) || 'holy_comforter') }
       });
 
       async function loadPayments() {

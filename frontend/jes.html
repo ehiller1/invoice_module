@@ -107,7 +107,7 @@
 </template>
 
 <script>
-let currentChurch = 'holy_comforter';
+let currentChurch = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentRole = 'TREASURER_ADMIN';  // TODO: read from /api/me
 
 EIMEShell.mount({

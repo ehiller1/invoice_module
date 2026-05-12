@@ -41,16 +41,16 @@
   <div class="border-b border-slate-200 mb-6">
     <div class="flex gap-0">
       <button data-tab="exceptions" onclick="switchTab('exceptions')" class="inbox-tab active-tab px-5 py-3 text-sm font-medium border-b-2 border-navy-600 text-navy-700 whitespace-nowrap">
-        Exceptions <span id="badge-exceptions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full">0</span>
+        Exceptions <span id="badge-exceptions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full"><span class="inline-block w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span></span>
       </button>
       <button data-tab="questions" onclick="switchTab('questions')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
-        Questions <span id="badge-questions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+        Questions <span id="badge-questions" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full"><span class="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span></span>
       </button>
       <button data-tab="recommendations" onclick="switchTab('recommendations')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
-        Suggestions <span id="badge-recommendations" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+        Suggestions <span id="badge-recommendations" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full"><span class="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span></span>
       </button>
       <button data-tab="policies" onclick="switchTab('policies')" class="inbox-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
-        Policies <span id="badge-policies" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">0</span>
+        Policies <span id="badge-policies" class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full"><span class="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span></span>
       </button>
     </div>
   </div>
@@ -84,7 +84,7 @@
 
 <script>
 const API = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
-const CHURCH = 'holy_comforter';
+const CHURCH = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let activeTab = 'exceptions';
 
 EIMEShell.mount({

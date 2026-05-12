@@ -46,7 +46,19 @@
         </button>
       </div>
     </div>
+
+    <!-- Quick-pick accounts (pulled from real chart of accounts) -->
+    <div class="mt-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Quick-pick balance-sheet line</p>
+      <div id="quick-picks" class="flex flex-wrap gap-2 text-xs">
+        <span class="text-slate-400">Loading chart of accounts…</span>
+      </div>
+    </div>
   </div>
+
+  <!-- Loader and deep-link handler are defined outside the template (templates don't run scripts). -->
+  <!-- See <script> block at the bottom of this file. -->
+
 
   <!-- Trace Results (three-level hierarchy) -->
   <div id="trace-results" class="hidden space-y-6">
@@ -83,7 +95,7 @@
 
 <script>
 const API = (window.EIME_API ?? '');
-const CHURCH_ID = 'holy_comforter';
+const CHURCH_ID = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentUserTier = 2;
 let selectedEventId = null;
 
@@ -95,14 +107,60 @@ EIMEShell.mount({
       page: 'trace-viewer',
       payload: { church_id: CHURCH_ID }
     });
-    // Check for ?cell= or ?event= query params
+    // Check for ?cell= / ?event= / ?gl= query params and auto-trace.
     const params = new URLSearchParams(window.location.search);
-    if (params.has('cell') || params.has('event')) {
-      document.getElementById('search-input').value = params.get('cell') || params.get('event');
-      searchCell();
+    const seed = params.get('cell') || params.get('event') || params.get('gl') || params.get('account');
+    if (seed) {
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.value = seed;
+        searchCell();
+      }
     }
+    // Populate quick-pick chips from the real chart of accounts.
+    loadTracePresets();
   }
 });
+
+async function loadTracePresets() {
+  const wrap = document.getElementById('quick-picks');
+  if (!wrap) return setTimeout(loadTracePresets, 100);
+  try {
+    const church = (window.EIMESession && window.EIMESession.getChurch()) || CHURCH_ID;
+    const r = await fetch(`${API}/api/coa?church_id=${encodeURIComponent(church)}`);
+    const data = await r.json();
+    const accounts = (data && data.accounts) || [];
+    const byType = { Asset: [], Liability: [], Equity: [], Revenue: [], Expense: [], Other: [] };
+    accounts.forEach(a => {
+      const t = a.account_type || 'Other';
+      (byType[t] || byType.Other).push(a);
+    });
+    const ORDER = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
+    const picks = [];
+    // One per type first, then fill up to 8 from any remaining.
+    ORDER.forEach(t => { if (byType[t][0]) picks.push(byType[t][0]); });
+    for (let i = 1; picks.length < 8 && i < 50; i++) {
+      for (const t of ORDER) {
+        if (byType[t][i] && picks.length < 8) picks.push(byType[t][i]);
+      }
+    }
+    if (picks.length === 0) {
+      wrap.innerHTML = '<span class="text-slate-400">No accounts in chart of accounts.</span>';
+      return;
+    }
+    wrap.innerHTML = picks.map(a => {
+      const code  = a.gl_code  || a.account_number || '';
+      const label = a.gl_name  || a.account_name   || '';
+      return `<button onclick="document.getElementById('search-input').value='${code}'; searchCell();"
+                      class="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200">
+                ${code} · ${label}
+              </button>`;
+    }).join('');
+  } catch (e) {
+    console.error('CoA load failed:', e);
+    wrap.innerHTML = '<span class="text-red-500">Could not load chart of accounts.</span>';
+  }
+}
 
 /**
  * Click 1: Search for a GL cell and show its projection.

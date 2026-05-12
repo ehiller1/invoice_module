@@ -32,6 +32,7 @@
     </div>
     <div class="flex items-center gap-3">
       <select id="church-selector" onchange="loadMatches()" class="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-navy-600 outline-none"></select>
+      <button onclick="createPledge()" class="text-sm px-3 py-2 bg-navy-700 text-white rounded-lg hover:bg-navy-600">+ New Pledge</button>
       <button onclick="loadMatches()" class="text-sm text-navy-700 hover:underline">Refresh</button>
     </div>
   </header>
@@ -106,18 +107,39 @@ async function init() {
   const sel = document.getElementById('church-selector');
   sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
   if (churches.length) {
-    activeChurch = churches[0].church_id;
+    // Prefer the user's session church if it's in the list; else first.
+    const _ses = (window.EIMESession && EIMESession.getChurch()) || null;
+    const _match = _ses ? churches.find(c => c.church_id === _ses) : null;
+    activeChurch = (_match && _match.church_id) || churches[0].church_id;
     sel.value = activeChurch;
     window.eime.setContext({
       page: 'pledge-matching',
       payload: { church_id: activeChurch }
     });
     await loadMatches();
+    // Keep the dropdown in sync if the user changes church via the sidebar chip.
+    if (window.EIMESession && typeof EIMESession.onChange === 'function') {
+      EIMESession.onChange(() => {
+        const c = EIMESession.getChurch();
+        if (c && c !== activeChurch) {
+          const sel = document.getElementById('church-selector');
+          if (sel && Array.from(sel.options).some(o => o.value === c)) {
+            sel.value = c;
+          }
+          activeChurch = c;
+          // Refresh the current view without re-entering the church-set loop.
+          const refresh = window.loadMatches || window.loadJobs || window.loadAccruals || window.loadCompliance || window.loadKb;
+          if (refresh) refresh();
+        }
+      });
+    }
   }
 }
 
 async function loadMatches() {
   activeChurch = document.getElementById('church-selector').value;
+
+  if (window.EIMESession && activeChurch) EIMESession.setChurch(activeChurch);
   window.eime.setContext({
     page: 'pledge-matching',
     payload: { church_id: activeChurch }
@@ -165,6 +187,34 @@ function renderMatches(matches, summary) {
   }).join('');
 }
 
+async function createPledge() {
+  const donor_name = prompt('Donor name:');
+  if (!donor_name) return;
+  const amountRaw = prompt(`Pledge amount (USD):`);
+  const amount = parseFloat(amountRaw);
+  if (!amount || amount <= 0) { alert('Amount must be a positive number.'); return; }
+  const purpose = prompt('Purpose (e.g., "Annual fund 2026", "Capital campaign"):', 'Annual fund');
+  if (!purpose) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const pledge_date = prompt('Pledge date (YYYY-MM-DD):', today) || today;
+  const pledge_id = 'pld-' + Math.random().toString(36).slice(2, 10);
+  try {
+    const res = await fetch('/api/pledges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pledge_id, donor_name, amount, purpose, pledge_date }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `HTTP ${res.status}`);
+    }
+    alert(`Pledge from ${donor_name} for $${amount.toLocaleString()} recorded.`);
+    loadMatches();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+window.createPledge = createPledge;
 window.loadMatches = loadMatches;
 
 init();

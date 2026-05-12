@@ -122,7 +122,10 @@ async function bootstrap() {
   ).join('');
 
   if (churches.length) {
-    activeChurch = churches[0].church_id;
+    // Prefer the user's session church if it's in the list; else first.
+    const _ses = (window.EIMESession && EIMESession.getChurch()) || null;
+    const _match = _ses ? churches.find(c => c.church_id === _ses) : null;
+    activeChurch = (_match && _match.church_id) || churches[0].church_id;
     sel.value = activeChurch;
     document.getElementById('kb-title').textContent =
       `Knowledge Base — ${churches[0].church_name || activeChurch}`;
@@ -136,6 +139,22 @@ async function bootstrap() {
       window.eime.setActiveChurch(activeChurch);
     }
     await loadFileList();
+    // Keep the dropdown in sync if the user changes church via the sidebar chip.
+    if (window.EIMESession && typeof EIMESession.onChange === 'function') {
+      EIMESession.onChange(() => {
+        const c = EIMESession.getChurch();
+        if (c && c !== activeChurch) {
+          const sel = document.getElementById('church-selector');
+          if (sel && Array.from(sel.options).some(o => o.value === c)) {
+            sel.value = c;
+          }
+          activeChurch = c;
+          // Refresh the current view without re-entering the church-set loop.
+          const refresh = window.loadMatches || window.loadJobs || window.loadAccruals || window.loadCompliance || window.loadKb;
+          if (refresh) refresh();
+        }
+      });
+    }
   }
 
   sel.addEventListener('change', async () => {

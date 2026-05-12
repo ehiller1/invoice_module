@@ -40,15 +40,33 @@ def _resolve_church(body: Optional[Dict[str, Any]], church_id: Optional[str]) ->
 
 # GET endpoint to list exceptions for a church
 @church_router.get("/{church_id}/exceptions")
-async def list_exceptions(church_id: str) -> Dict[str, Any]:
-    """List exception cards for a church."""
+async def list_exceptions(
+    church_id: str,
+    include_resolved: bool = Query(default=False),
+    include_synthetic: bool = Query(default=False),
+) -> Dict[str, Any]:
+    """List exception cards for a church.
+
+    By default hides RESOLVED items and `(synthetic)` test cards (which were
+    historically generated when /resolve was called against an unknown ID).
+    """
     try:
-        cards, total = card_store.list_exception_cards(church_id, limit=100)
+        cards, total = card_store.list_exception_cards(church_id, limit=200)
+        filtered = []
+        for c in cards:
+            status = (c.get("status") or "").upper()
+            title  = c.get("title") or ""
+            if not include_resolved and status in ("RESOLVED", "CANCELLED"):
+                continue
+            if not include_synthetic and title.startswith("(synthetic)"):
+                continue
+            filtered.append(c)
         return {
             "church_id": church_id,
-            "cards": cards,
-            "total": total,
-            "count": len(cards),
+            "cards": filtered,
+            "total": len(filtered),
+            "raw_total": total,
+            "count": len(filtered),
             "ok": True,
         }
     except Exception as e:
@@ -72,12 +90,10 @@ async def resolve_exception(
     ch = _resolve_church(body, church_id)
     rec = exception_store.update_exception(ch, exception_id, status="RESOLVED")
     if rec is None:
-        # Allow resolve on unseen IDs (idempotent stub).
-        rec = exception_store.create_exception(
-            ch, title=f"(synthetic) {exception_id}",
-            description="resolved via API",
-        )
-        exception_store.update_exception(ch, rec["card_id"], status="RESOLVED")
+        # No stub creation — just report the no-op. Earlier behaviour was to
+        # synthesize a "(synthetic) {id}" exception card so the response could
+        # be 200, but that leaked test data into the user-visible queue.
+        return {"ok": True, "card_id": exception_id, "status": "RESOLVED", "no_op": True}
     return {"ok": True, "card_id": exception_id, "status": "RESOLVED"}
 
 

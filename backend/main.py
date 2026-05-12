@@ -105,7 +105,14 @@ try:
     app.include_router(_phase5_policies_routes.church_router)
     app.include_router(_phase5_policies_routes.action_router)
     app.include_router(_phase5_recommendations.router)
+    app.include_router(_phase5_recommendations.action_router)
     app.include_router(_phase5_reconciliation.router)
+    try:
+        from .routes import financial_position as _financial_position
+        app.include_router(_financial_position.router)
+    except Exception as _fp_err:
+        import logging as _l
+        _l.getLogger("eime.phase5").warning("Financial-position router failed to mount: %r", _fp_err)
 except Exception as _phase5_err:  # pragma: no cover - defensive
     import logging as _l
     _l.getLogger("eime.phase5").warning("Phase 5 routers failed to mount: %r", _phase5_err)
@@ -5369,9 +5376,13 @@ async def check_compliance_endpoint(req: CheckComplianceRequest) -> Dict[str, An
     return result
 
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_index() -> HTMLResponse:
-    return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
+@app.get("/")
+async def serve_root():
+    # Root used to serve index.html (the Enter-a-Bill upload form). That
+    # contradicted the sidebar "Today" entry which goes to /dashboard.html.
+    # Redirect to dashboard so / and Today are consistent.
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard.html", status_code=302)
 
 
 # ── Pledge matches aggregation ──────────────────────────────────────────────
@@ -5603,10 +5614,34 @@ _STATIC_MEDIA_TYPES = {
 
 @app.get("/{path:path}", response_class=HTMLResponse)
 async def serve_page(path: str):
+    # Redirect "/frontend/..." paths to "/..." — the /frontend prefix used to
+    # silently fall back to the upload form because the file didn't exist
+    # under FRONTEND_DIR/frontend/. Redirect explicitly instead.
+    if path.startswith("frontend/"):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/" + path[len("frontend/"):], status_code=307)
+
+    # Bare "/" → /dashboard.html (the real Today view). The original "/" used
+    # to serve index.html (Enter a Bill), making the sidebar "Today" entry
+    # behave inconsistently with the root URL.
+    if path == "":
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/dashboard.html", status_code=302)
+
     p = FRONTEND_DIR / path
     if p.exists() and p.is_file():
         if p.suffix == ".html":
             return HTMLResponse(p.read_text())
         media_type = _STATIC_MEDIA_TYPES.get(p.suffix.lower(), "application/octet-stream")
         return FileResponse(str(p), media_type=media_type)
-    return HTMLResponse((FRONTEND_DIR / "index.html").read_text())
+    # Unknown HTML route — return a real 404 page rather than masquerading as
+    # the upload form. Keeps URL behaviour predictable.
+    return HTMLResponse(
+        "<!doctype html><meta charset=utf-8>"
+        "<title>Not found — Books</title>"
+        "<body style='font-family:sans-serif;padding:40px;max-width:600px;margin:auto'>"
+        "<h1>Page not found</h1>"
+        "<p>The URL <code>/" + path + "</code> doesn't match any page in Books.</p>"
+        "<p><a href='/'>Go to Today</a></p></body>",
+        status_code=404,
+    )

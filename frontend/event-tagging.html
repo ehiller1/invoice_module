@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <link rel="stylesheet" href="/responsive.css">
 </head>
-<body class="bg-slate-950 text-slate-100">
+<body class="bg-slate-50 text-slate-900">
   <div id="eime-root"></div>
 
   <script src="/eime-bus.js"></script>
@@ -163,25 +163,25 @@
     function renderEvents() {
       const container = document.getElementById('events-container');
       container.innerHTML = filteredEvents.map(evt => `
-        <div class="bg-navy-800 rounded-lg p-4 border border-navy-700 hover:border-navy-600 transition-colors cursor-pointer"
+        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
              onclick="showEventDetail('${evt.id}')">
           <div class="flex items-start justify-between mb-2">
             <div>
-              <p class="text-sm font-semibold text-slate-100">${evt.id}</p>
-              <p class="text-xs text-slate-400">${new Date(evt.timestamp).toLocaleDateString()} • ${evt.event_type}</p>
+              <p class="text-sm font-semibold text-slate-900">${evt.id}</p>
+              <p class="text-xs text-slate-600">${new Date(evt.timestamp).toLocaleDateString()} • ${evt.event_type}</p>
             </div>
-            <span class="text-xs font-medium text-gold-400">$${evt.amount.toLocaleString()}</span>
+            <span class="text-xs font-medium text-amber-700">$${evt.amount.toLocaleString()}</span>
           </div>
-          <p class="text-sm text-slate-300 mb-3">${evt.description}</p>
+          <p class="text-sm text-slate-700 mb-3">${evt.description}</p>
           <div class="flex flex-wrap gap-1">
             ${Object.entries(evt.applied_tags).map(([dim, val]) => `
-              <span class="inline-flex items-center gap-1 px-2 py-1 bg-navy-700 rounded text-xs text-slate-200">
-                ${dim}:<span class="text-gold-400 font-medium">${val}</span>
+              <span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-200 rounded text-xs text-slate-700">
+                ${dim}:<span class="text-amber-700 font-medium">${val}</span>
               </span>
             `).join('')}
           </div>
           ${evt.overrides.length > 0 ? `
-            <div class="mt-2 pt-2 border-t border-navy-700 text-xs text-amber-400">
+            <div class="mt-2 pt-2 border-t border-slate-200 text-xs text-amber-700">
               ${evt.overrides.length} tag override${evt.overrides.length !== 1 ? 's' : ''}
             </div>
           ` : ''}
@@ -202,13 +202,13 @@
       const dimensions = [...new Set(Object.keys(suggested))];
 
       modal.innerHTML = `
-        <div class="bg-navy-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-navy-700">
-          <div class="sticky top-0 bg-navy-900 border-b border-navy-700 px-6 py-4 flex items-center justify-between">
+        <div class="bg-slate-50 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-slate-200">
+          <div class="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-slate-100">${evt.id}</h2>
-              <p class="text-xs text-slate-400">${new Date(evt.timestamp).toLocaleString()}</p>
+              <h2 class="text-lg font-semibold text-slate-900">${evt.id}</h2>
+              <p class="text-xs text-slate-600">${new Date(evt.timestamp).toLocaleString()}</p>
             </div>
-            <button onclick="this.closest('div').parentElement.remove()" class="text-slate-400 hover:text-white">
+            <button onclick="this.closest('div').parentElement.remove()" class="text-slate-600 hover:text-white">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -218,43 +218,43 @@
           <div class="p-6 space-y-6">
             <!-- Event Details -->
             <div>
-              <h3 class="text-sm font-semibold text-slate-300 mb-2">Event</h3>
-              <div class="bg-navy-700/50 rounded p-3 text-sm text-slate-300">
-                <p><span class="text-slate-400">Type:</span> ${evt.event_type}</p>
-                <p><span class="text-slate-400">Source:</span> ${evt.source}</p>
-                <p><span class="text-slate-400">Amount:</span> $${evt.amount.toLocaleString()}</p>
-                <p class="mt-2"><span class="text-slate-400">Description:</span> ${evt.description}</p>
-                <p><span class="text-slate-400">Economic Substance:</span> ${evt.economic_substance}</p>
+              <h3 class="text-sm font-semibold text-slate-700 mb-2">Event</h3>
+              <div class="bg-slate-200/50 rounded p-3 text-sm text-slate-700">
+                <p><span class="text-slate-600">Type:</span> ${evt.event_type}</p>
+                <p><span class="text-slate-600">Source:</span> ${evt.source}</p>
+                <p><span class="text-slate-600">Amount:</span> $${evt.amount.toLocaleString()}</p>
+                <p class="mt-2"><span class="text-slate-600">Description:</span> ${evt.description}</p>
+                <p><span class="text-slate-600">Economic Substance:</span> ${evt.economic_substance}</p>
               </div>
             </div>
 
             <!-- Tagging Section -->
             <div>
-              <h3 class="text-sm font-semibold text-slate-300 mb-3">Semantic Tags</h3>
+              <h3 class="text-sm font-semibold text-slate-700 mb-3">Semantic Tags</h3>
               <div class="space-y-3">
                 ${dimensions.map(dim => {
                   const sugg = suggested[dim];
                   const appl = applied[dim] || '(none)';
                   const isOverridden = applied[dim] && applied[dim] !== sugg.value;
                   return `
-                    <div class="bg-navy-700/50 rounded p-3">
+                    <div class="bg-slate-200/50 rounded p-3">
                       <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">${dim}</span>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">${dim}</span>
                         ${isOverridden ? `<span class="text-xs font-medium px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded">Overridden</span>` : ''}
                       </div>
                       <div class="space-y-2">
                         <div>
-                          <p class="text-xs text-slate-400 mb-1">Agent suggestion (${sugg.confidence}% confidence)</p>
+                          <p class="text-xs text-slate-600 mb-1">Agent suggestion (${sugg.confidence}% confidence)</p>
                           <div class="flex items-center gap-2">
-                            <span class="px-2 py-1 bg-gold-500/20 text-gold-400 text-xs rounded font-medium">${sugg.value}</span>
+                            <span class="px-2 py-1 bg-amber-600/20 text-amber-700 text-xs rounded font-medium">${sugg.value}</span>
                             <div class="flex-1 bg-navy-600 rounded-full h-1.5 overflow-hidden">
-                              <div class="bg-gold-500 h-full" style="width: ${sugg.confidence}%"></div>
+                              <div class="bg-amber-600 h-full" style="width: ${sugg.confidence}%"></div>
                             </div>
                           </div>
                         </div>
                         <div>
-                          <p class="text-xs text-slate-400 mb-1">Applied tag</p>
-                          <span class="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded font-medium">${appl}</span>
+                          <p class="text-xs text-slate-600 mb-1">Applied tag</p>
+                          <span class="px-2 py-1 bg-slate-700 text-slate-700 text-xs rounded font-medium">${appl}</span>
                         </div>
                       </div>
                     </div>
@@ -266,14 +266,14 @@
             <!-- Overrides History -->
             ${evt.overrides.length > 0 ? `
               <div>
-                <h3 class="text-sm font-semibold text-slate-300 mb-2">Tag Overrides</h3>
+                <h3 class="text-sm font-semibold text-slate-700 mb-2">Tag Overrides</h3>
                 <div class="space-y-2">
                   ${evt.overrides.map(ov => `
                     <div class="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-sm">
                       <p class="text-amber-400 font-medium mb-1">${ov.dimension}</p>
-                      <p class="text-slate-300"><span class="text-slate-400">Changed from:</span> ${ov.previous}</p>
-                      <p class="text-slate-300"><span class="text-slate-400">Changed to:</span> ${ov.current}</p>
-                      <p class="text-slate-400 text-xs mt-1">Reason: ${ov.reason}</p>
+                      <p class="text-slate-700"><span class="text-slate-600">Changed from:</span> ${ov.previous}</p>
+                      <p class="text-slate-700"><span class="text-slate-600">Changed to:</span> ${ov.current}</p>
+                      <p class="text-slate-600 text-xs mt-1">Reason: ${ov.reason}</p>
                     </div>
                   `).join('')}
                 </div>
@@ -282,10 +282,10 @@
 
             <!-- Actions -->
             <div class="flex gap-2 pt-2">
-              <button onclick="editEventTags('${evt.id}')" class="flex-1 px-3 py-2 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium text-sm transition-colors">
+              <button onclick="editEventTags('${evt.id}')" class="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium text-sm transition-colors">
                 Edit Tags
               </button>
-              <button onclick="this.closest('div').parentElement.remove()" class="px-3 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+              <button onclick="this.closest('div').parentElement.remove()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium text-sm transition-colors">
                 Close
               </button>
             </div>
@@ -311,23 +311,23 @@
       const dimensions = [...new Set(Object.keys(suggested))];
 
       editModal.innerHTML = `
-        <div class="bg-navy-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-navy-700">
-          <div class="sticky top-0 bg-navy-900 border-b border-navy-700 px-6 py-4">
-            <h2 class="text-lg font-semibold text-slate-100">Edit Tags — ${evt.id}</h2>
+        <div class="bg-slate-50 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-slate-200">
+          <div class="sticky top-0 bg-white border-b border-slate-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-slate-900">Edit Tags — ${evt.id}</h2>
           </div>
 
           <div class="p-6 space-y-4">
             ${dimensions.map(dim => `
-              <div class="bg-navy-700/50 rounded p-4">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">${dim}</label>
+              <div class="bg-slate-200/50 rounded p-4">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">${dim}</label>
                 <div class="flex gap-2 items-start">
                   <div class="flex-1">
                     <input type="text" value="${applied[dim] || ''}"
-                      class="w-full px-3 py-2 bg-navy-600 border border-navy-500 rounded text-sm text-slate-100 placeholder-slate-500"
+                      class="w-full px-3 py-2 bg-navy-600 border border-navy-500 rounded text-sm text-slate-900 placeholder-slate-500"
                       placeholder="Enter or select tag value">
                   </div>
-                  <div class="text-xs text-slate-400 whitespace-nowrap pt-2">
-                    Agent: <span class="text-gold-400 font-medium">${suggested[dim].value}</span>
+                  <div class="text-xs text-slate-600 whitespace-nowrap pt-2">
+                    Agent: <span class="text-amber-700 font-medium">${suggested[dim].value}</span>
                     <span class="text-slate-500">(${suggested[dim].confidence}%)</span>
                   </div>
                 </div>
@@ -335,11 +335,11 @@
             `).join('')}
           </div>
 
-          <div class="bg-navy-900 border-t border-navy-700 px-6 py-4 flex gap-2 justify-end">
-            <button onclick="this.closest('div').parentElement.remove()" class="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+          <div class="bg-white border-t border-slate-200 px-6 py-4 flex gap-2 justify-end">
+            <button onclick="this.closest('div').parentElement.remove()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium text-sm transition-colors">
               Cancel
             </button>
-            <button onclick="this.closest('div').parentElement.remove(); showEventDetail('${evt.id}')" class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium text-sm transition-colors">
+            <button onclick="this.closest('div').parentElement.remove(); showEventDetail('${evt.id}')" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium text-sm transition-colors">
               Save Changes
             </button>
           </div>
@@ -362,52 +362,48 @@
     }
 
     function initPage() {
-      const root = document.getElementById('eime-root');
-      root.innerHTML = `
-        <div class="flex h-full w-full">
-          ${EIME_SHELL_HTML}
-          <main class="flex-1 overflow-auto bg-slate-950">
+      const centerContent = `
             <div class="max-w-7xl mx-auto p-6">
               <!-- Header -->
               <div class="mb-6">
-                <h1 class="text-3xl font-bold text-slate-100 mb-2">Event Tagging</h1>
-                <p class="text-slate-400">Add semantic dimensions to economic events. Agent confidence shown for each suggestion.</p>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">Event Tagging</h1>
+                <p class="text-slate-600">Add semantic dimensions to economic events. Agent confidence shown for each suggestion.</p>
               </div>
 
               <!-- KPI Cards -->
               <div class="grid grid-cols-4 gap-4 mb-6">
-                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
-                  <p class="text-xs text-slate-400 mb-1">Total Events</p>
-                  <p class="text-2xl font-bold text-slate-100">${MOCK_EVENTS.length}</p>
+                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p class="text-xs text-slate-600 mb-1">Total Events</p>
+                  <p class="text-2xl font-bold text-slate-900">${MOCK_EVENTS.length}</p>
                 </div>
-                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
-                  <p class="text-xs text-slate-400 mb-1">Fully Tagged</p>
-                  <p class="text-2xl font-bold text-gold-400">${MOCK_EVENTS.filter(e => Object.keys(e.applied_tags).length >= 5).length}</p>
+                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p class="text-xs text-slate-600 mb-1">Fully Tagged</p>
+                  <p class="text-2xl font-bold text-amber-700">${MOCK_EVENTS.filter(e => Object.keys(e.applied_tags).length >= 5).length}</p>
                 </div>
-                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
-                  <p class="text-xs text-slate-400 mb-1">Overridden</p>
+                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p class="text-xs text-slate-600 mb-1">Overridden</p>
                   <p class="text-2xl font-bold text-amber-400">${MOCK_EVENTS.filter(e => e.overrides.length > 0).length}</p>
                 </div>
-                <div class="bg-navy-800 rounded-lg p-4 border border-navy-700">
-                  <p class="text-xs text-slate-400 mb-1">Avg Agent Confidence</p>
+                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <p class="text-xs text-slate-600 mb-1">Avg Agent Confidence</p>
                   <p class="text-2xl font-bold text-sky-400">92%</p>
                 </div>
               </div>
 
               <!-- Filter -->
-              <div class="bg-navy-800 rounded-lg p-4 border border-navy-700 mb-6">
+              <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6">
                 <div class="flex gap-3">
                   <div class="flex-1">
-                    <label class="text-xs font-semibold text-slate-400 mb-2 block">Filter by Dimension</label>
+                    <label class="text-xs font-semibold text-slate-600 mb-2 block">Filter by Dimension</label>
                     <select id="dimension-filter" onchange="filterByDimension()"
-                      class="w-full px-3 py-2 bg-navy-700 border border-navy-600 rounded text-slate-100 text-sm">
+                      class="w-full px-3 py-2 bg-slate-200 border border-slate-300 rounded text-slate-900 text-sm">
                       <option value="">All Dimensions</option>
                       ${DIMENSIONS.map(d => `<option value="${d}">${d}</option>`).join('')}
                     </select>
                   </div>
                   <div class="flex items-end">
                     <button onclick="document.getElementById('dimension-filter').value = ''; filterByDimension()"
-                      class="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+                      class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium text-sm transition-colors">
                       Clear
                     </button>
                   </div>
@@ -419,14 +415,15 @@
                 <!-- Events will render here -->
               </div>
             </div>
-          </main>
-          ${EIME_CHAT_RAIL_HTML}
-        </div>
       `;
 
-      EIMEShell.init(PAGE_ID);
-      EIMEChatRail.init(PAGE_ID);
-      loadEvents();
+      EIMEShell.mount({
+        activeNav: 'event-tagging',
+        centerContent,
+        onMounted: () => {
+          loadEvents();
+        }
+      });
     }
 
     document.addEventListener('DOMContentLoaded', initPage);

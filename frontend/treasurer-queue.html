@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Treasurer Approvals — Books</title>
+  <title>Approvals — Books</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -28,7 +28,7 @@
 <template id="page-center-content">
   <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
     <div>
-      <h1 class="text-lg font-semibold text-slate-800">Treasurer Approvals</h1>
+      <h1 class="text-lg font-semibold text-slate-800">Approvals</h1>
       <p class="text-sm text-slate-500">Final sign-off on bills before payment goes out. These have already been reviewed by the budget owner.</p>
     </div>
     <div class="flex items-center gap-3">
@@ -99,18 +99,39 @@ async function init() {
   const sel = document.getElementById('church-selector');
   sel.innerHTML = churches.map(c => `<option value="${c.church_id}">${c.church_name||c.church_id}</option>`).join('');
   if (churches.length) {
-    activeChurch = churches[0].church_id;
+    // Prefer the user's session church if it's in the list; else first.
+    const _ses = (window.EIMESession && EIMESession.getChurch()) || null;
+    const _match = _ses ? churches.find(c => c.church_id === _ses) : null;
+    activeChurch = (_match && _match.church_id) || churches[0].church_id;
     sel.value = activeChurch;
     window.eime.setContext({
       page: 'treasurer',
       payload: { church_id: activeChurch }
     });
     await loadJobs();
+    // Keep the dropdown in sync if the user changes church via the sidebar chip.
+    if (window.EIMESession && typeof EIMESession.onChange === 'function') {
+      EIMESession.onChange(() => {
+        const c = EIMESession.getChurch();
+        if (c && c !== activeChurch) {
+          const sel = document.getElementById('church-selector');
+          if (sel && Array.from(sel.options).some(o => o.value === c)) {
+            sel.value = c;
+          }
+          activeChurch = c;
+          // Refresh the current view without re-entering the church-set loop.
+          const refresh = window.loadMatches || window.loadJobs || window.loadAccruals || window.loadCompliance || window.loadKb;
+          if (refresh) refresh();
+        }
+      });
+    }
   }
 }
 
 async function loadJobs() {
   activeChurch = document.getElementById('church-selector').value;
+
+  if (window.EIMESession && activeChurch) EIMESession.setChurch(activeChurch);
   window.eime.setContext({
     page: 'treasurer',
     payload: { church_id: activeChurch }

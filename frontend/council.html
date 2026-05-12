@@ -73,7 +73,7 @@
     <!-- Recommendations Queue -->
     <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-4 border border-emerald-200">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-lg font-bold text-emerald-900">⭐ NBA</h2>
+        <h2 class="text-lg font-bold text-emerald-900">⭐ Suggestions</h2>
         <span id="recommendation-count" class="inline-block bg-emerald-600 text-white text-xs font-bold rounded-full w-8 h-8 flex items-center justify-center">0</span>
       </div>
       <p class="text-sm text-emerald-800 mb-4">Next best action candidates</p>
@@ -95,7 +95,7 @@
 
 <script>
 const API = (window.EIME_API ?? '');
-const CHURCH_ID = 'holy_comforter';
+const CHURCH_ID = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentUserTier = 2; // T2 by default; from context in production
 let allCards = {
   exceptions: [],
@@ -126,31 +126,28 @@ EIMEShell.mount({
 async function loadQueues() {
   try {
     // Fetch each queue from its real endpoint in parallel
-    const [exRes, polRes, qRes] = await Promise.all([
+    const [exRes, polRes, qRes, recRes] = await Promise.all([
       fetch(`${API}/api/churches/${CHURCH_ID}/exceptions`).catch(() => null),
       fetch(`${API}/api/churches/${CHURCH_ID}/policies`).catch(() => null),
       fetch(`${API}/api/churches/${CHURCH_ID}/questions`).catch(() => null),
+      fetch(`${API}/api/churches/${CHURCH_ID}/recommendations`).catch(() => null),
     ]);
 
-    if (exRes?.ok) {
-      const d = await exRes.json();
-      allCards.exceptions = Array.isArray(d) ? d : (d?.exceptions || []);
-    } else {
-      allCards.exceptions = [];
-    }
-    if (polRes?.ok) {
-      const d = await polRes.json();
-      allCards.policies = Array.isArray(d) ? d : (d?.policies || []);
-    } else {
-      allCards.policies = [];
-    }
-    if (qRes?.ok) {
-      const d = await qRes.json();
-      allCards.questions = Array.isArray(d) ? d : (d?.questions || []);
-    } else {
-      allCards.questions = [];
-    }
-    allCards.recommendations = [];
+    // Accept any of: array, {cards:[]}, {exceptions:[]}, {policies:[]}, etc.
+    const _list = (d, key) => Array.isArray(d) ? d : (d?.cards || d?.[key] || []);
+    const _openOnly = (arr) => arr.filter(c => {
+      const s = (c?.status || '').toUpperCase();
+      return !s || s === 'OPEN' || s === 'PENDING' || s === 'PENDING_HITL';
+    });
+
+    if (exRes?.ok)  allCards.exceptions     = _openOnly(_list(await exRes.json(),  'exceptions'));
+    else            allCards.exceptions     = [];
+    if (polRes?.ok) allCards.policies       = _openOnly(_list(await polRes.json(), 'policies'));
+    else            allCards.policies       = [];
+    if (qRes?.ok)   allCards.questions      = _openOnly(_list(await qRes.json(),   'questions'));
+    else            allCards.questions      = [];
+    if (recRes?.ok) allCards.recommendations = _openOnly(_list(await recRes.json(), 'recommendations'));
+    else            allCards.recommendations = [];
 
     updateDashboard();
     renderRecentItems();
@@ -191,7 +188,7 @@ function renderRecentItems() {
       exceptions: '⚠️ Exception',
       policies: '📋 Policy',
       questions: '❓ Question',
-      recommendations: '⭐ NBA'
+      recommendations: '⭐ Suggestions'
     }[card.queue];
 
     return `

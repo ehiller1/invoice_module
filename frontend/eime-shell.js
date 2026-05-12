@@ -48,6 +48,26 @@
       document.head.appendChild(link);
     }
 
+    // Ensure eime-session.js + eime-toast.js are loaded (any page using the shell gets both).
+    if (!window.EIMESession) {
+      await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = '/eime-session.js';
+        s.onload = resolve;
+        s.onerror = resolve; // continue even if it fails
+        document.head.appendChild(s);
+      });
+    }
+    if (!window.EIMEToast) {
+      await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = '/eime-toast.js';
+        s.onload = resolve;
+        s.onerror = resolve;
+        document.head.appendChild(s);
+      });
+    }
+
     // Inject center content
     const centerEl = document.getElementById('eime-center');
     if (centerEl) centerEl.innerHTML = centerContent;
@@ -85,8 +105,12 @@
       });
     }
 
-    // Load church name badge
+    // Load church name badge + user chip
     loadChurchBadge();
+    renderUserChip();
+    if (window.EIMESession && typeof window.EIMESession.onChange === 'function') {
+      window.EIMESession.onChange(renderUserChip);
+    }
 
     // Poll HITL count — updates all [data-badge="hitl"] elements
     refreshHitlBadge();
@@ -95,6 +119,10 @@
     // Poll inbox count — updates all [data-badge="inbox"] elements
     refreshInboxBadge();
     setInterval(refreshInboxBadge, 15000);
+
+    // Poll flagged/pastor counts — updates [data-badge="flagged"|"pastor"]
+    refreshAttentionBadges();
+    setInterval(refreshAttentionBadges, 15000);
 
     // Restore admin nav collapsed state from localStorage
     try {
@@ -253,5 +281,75 @@
     } catch(e) { /* offline */ }
   }
 
-  window.EIMEShell = { mount, toggleNav, toggleChat, toggleAdminNav };
+  function renderUserChip() {
+    if (!window.EIMESession) return;
+    const u = window.EIMESession.getUser();
+    const nameEl     = document.getElementById('eime-user-name');
+    const roleEl     = document.getElementById('eime-user-role');
+    const initialsEl = document.getElementById('eime-user-initials');
+    if (nameEl)     nameEl.textContent = u.name || u.id;
+    if (roleEl)     roleEl.textContent = (u.role || 'STAFF').toLowerCase() + ' · click to switch';
+    if (initialsEl) initialsEl.textContent = (u.name || u.id || '?').slice(0, 1).toUpperCase();
+  }
+
+  function promptUser() {
+    if (!window.EIMESession) return;
+    const ROLES = [
+      { id: 'bookkeeper-1',     name: 'Jane Bookkeeper',    role: 'BOOKKEEPER' },
+      { id: 'treasurer-1',      name: 'Tom Treasurer',      role: 'TREASURER' },
+      { id: 'finance-chair-1',  name: 'Frank Finance Chair', role: 'FINANCE_CHAIR' },
+      { id: 'vestry-senior-1',  name: 'Vera Vestry Senior',  role: 'VESTRY_SENIOR' },
+      { id: 'guest',            name: 'Guest',               role: 'GUEST' },
+    ];
+    const current = window.EIMESession.getUser();
+    const lines = ROLES.map((r, i) => `${i + 1}. ${r.name} — ${r.role.toLowerCase()}`).join('\n');
+    const choice = prompt(
+      `Switch active user (currently: ${current.name} · ${current.role})\n\n${lines}\n\nEnter 1-${ROLES.length}:`,
+      ''
+    );
+    if (!choice) return;
+    const idx = parseInt(choice, 10) - 1;
+    if (idx < 0 || idx >= ROLES.length) return;
+    window.EIMESession.setUser(ROLES[idx]);
+  }
+
+  async function refreshAttentionBadges() {
+    try {
+      const API_BASE = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
+      const church = 'holy_comforter';
+
+      const [exRes, jobRes] = await Promise.all([
+        fetch(`${API_BASE}/api/churches/${church}/exceptions`).catch(() => null),
+        fetch(`${API_BASE}/api/jobs`).catch(() => null),
+      ]);
+
+      // Flagged Items: open exceptions
+      let flagged = 0;
+      if (exRes && exRes.ok) {
+        const d = await exRes.json();
+        const arr = Array.isArray(d) ? d : (d?.cards || d?.exceptions || []);
+        flagged = arr.filter(e => {
+          const s = (e?.status || '').toUpperCase();
+          return !s || s === 'OPEN';
+        }).length;
+      }
+      document.querySelectorAll('[data-badge="flagged"]').forEach((el) => {
+        if (flagged > 0) { el.textContent = flagged; el.classList.remove('hidden'); }
+        else el.classList.add('hidden');
+      });
+
+      // Pastor's Review: pending-HITL jobs needing pastor/treasurer review
+      let pastor = 0;
+      if (jobRes && jobRes.ok) {
+        const jobs = await jobRes.json();
+        pastor = (Array.isArray(jobs) ? jobs : []).filter(j => (j.status || '').toUpperCase() === 'PENDING_HITL').length;
+      }
+      document.querySelectorAll('[data-badge="pastor"]').forEach((el) => {
+        if (pastor > 0) { el.textContent = pastor; el.classList.remove('hidden'); }
+        else el.classList.add('hidden');
+      });
+    } catch (e) { /* offline */ }
+  }
+
+  window.EIMEShell = { mount, toggleNav, toggleChat, toggleAdminNav, promptUser };
 })();

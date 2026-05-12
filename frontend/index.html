@@ -128,7 +128,7 @@
 
 <script>
 const API = (window.EIME_API ?? '');
-let currentChurch = 'holy_comforter';
+let currentChurch = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let currentJobId = null;
 
 EIMEShell.mount({

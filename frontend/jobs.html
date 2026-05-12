@@ -83,7 +83,7 @@ EIMEShell.mount({
   onMounted() {
     window.eime.setContext({
       page: 'jobs',
-      payload: { church_id: 'holy_comforter', job_id: null }
+      payload: { church_id: ((window.EIMESession && EIMESession.getChurch()) || 'holy_comforter'), job_id: null }
     });
     loadJobs();              // initial full load
     setInterval(pollJobs, 2000);  // efficient delta polling every 2s
@@ -185,7 +185,7 @@ async function showJob(jobId) {
 
     window.eime.setContext({
       page: 'jobs',
-      payload: { church_id: 'holy_comforter', job_id: jobId }
+      payload: { church_id: ((window.EIMESession && EIMESession.getChurch()) || 'holy_comforter'), job_id: jobId }
     });
 
     // Render the InvoiceReviewCard with callbacks for Approve, Reject, Override

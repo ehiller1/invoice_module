@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <link rel="stylesheet" href="/responsive.css">
 </head>
-<body class="bg-slate-950 text-slate-100">
+<body class="bg-slate-50 text-slate-900">
   <div id="eime-root"></div>
 
   <script src="/eime-bus.js"></script>
@@ -134,12 +134,21 @@
 
     function loadScenarios() {
       return fetch('/api/scenarios/list')
-        .then(r => r.json())
-        .catch(() => ({ scenarios: MOCK_SCENARIOS }))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .catch(() => ({ scenarios: [] }))
         .then(data => {
-          scenarios = data.scenarios || MOCK_SCENARIOS;
+          const raw = Array.isArray(data?.scenarios) ? data.scenarios : [];
+          // Normalize backend rows ({scenario_id, scenario_name, ...}) and merge with MOCK presets.
+          const fromApi = raw.map(s => ({
+            id: s.id || s.scenario_id || s.card_id,
+            name: s.name || s.scenario_name || 'Untitled scenario',
+            description: s.description || s.scenario_type || '',
+            parameters: s.parameters || s.assumptions || {},
+            results: s.results || null,
+          })).filter(s => s.id);
+          scenarios = fromApi.length > 0 ? [...MOCK_SCENARIOS, ...fromApi] : MOCK_SCENARIOS;
           renderScenarioList();
-          selectScenario(scenarios[0].id);
+          if (scenarios[0]) selectScenario(scenarios[0].id);
         });
     }
 
@@ -149,11 +158,11 @@
         <button onclick="selectScenario('${s.id}')"
           class="scenario-btn w-full text-left p-4 rounded-lg border transition-all ${
             selectedScenario?.id === s.id
-              ? 'bg-gold-500/20 border-gold-500 text-slate-100'
-              : 'bg-navy-800 border-navy-700 text-slate-300 hover:border-navy-600'
+              ? 'bg-amber-600/20 border-amber-600 text-slate-900'
+              : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
           }">
           <p class="font-semibold text-sm mb-1">${s.name}</p>
-          <p class="text-xs text-slate-400">${s.description}</p>
+          <p class="text-xs text-slate-600">${s.description}</p>
         </button>
       `).join('');
     }
@@ -206,13 +215,13 @@
         }[riskLevel];
 
         return `
-          <div class="bg-navy-700/50 rounded p-3 flex items-center justify-between">
+          <div class="bg-slate-200/50 rounded p-3 flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-slate-200">${c.covenant}</p>
               <div class="flex gap-4 mt-1">
-                <span class="text-xs text-slate-400">Current: <span class="text-slate-100 font-semibold">${c.current}</span></span>
-                <span class="text-xs text-slate-400">Projected: <span class="text-slate-100 font-semibold">${c.projected}</span></span>
-                <span class="text-xs text-slate-400">Threshold: <span class="text-slate-100 font-semibold">${c.threshold}</span></span>
+                <span class="text-xs text-slate-600">Current: <span class="text-slate-900 font-semibold">${c.current}</span></span>
+                <span class="text-xs text-slate-600">Projected: <span class="text-slate-900 font-semibold">${c.projected}</span></span>
+                <span class="text-xs text-slate-600">Threshold: <span class="text-slate-900 font-semibold">${c.threshold}</span></span>
               </div>
             </div>
             <div class="text-right">
@@ -227,16 +236,16 @@
       // Margin Impact
       const marginHtml = results.margin_impact.map(m => {
         const isNegative = m.direction === 'negative';
-        const color = m.direction === 'stable' ? 'text-slate-300' : isNegative ? 'text-red-400' : 'text-green-400';
+        const color = m.direction === 'stable' ? 'text-slate-700' : isNegative ? 'text-red-400' : 'text-green-400';
         const icon = m.direction === 'stable' ? '→' : isNegative ? '↓' : '↑';
 
         return `
-          <div class="bg-navy-700/50 rounded p-3">
+          <div class="bg-slate-200/50 rounded p-3">
             <p class="text-sm font-medium text-slate-200 mb-2">${m.metric}</p>
             <div class="flex items-center justify-between">
               <div class="flex gap-4">
-                <span class="text-xs text-slate-400">Current: <span class="text-slate-100 font-semibold">${m.current}%</span></span>
-                <span class="text-xs text-slate-400">Projected: <span class="text-slate-100 font-semibold">${m.projected}%</span></span>
+                <span class="text-xs text-slate-600">Current: <span class="text-slate-900 font-semibold">${m.current}%</span></span>
+                <span class="text-xs text-slate-600">Projected: <span class="text-slate-900 font-semibold">${m.projected}%</span></span>
               </div>
               <span class="text-sm font-semibold ${color}">${icon} ${Math.abs(m.projected - m.current)}%</span>
             </div>
@@ -301,10 +310,10 @@
             <p class="font-medium text-sm text-sky-400">${l.lever}</p>
             <span class="text-xs px-2 py-0.5 bg-sky-500/20 text-sky-300 rounded">${l.difficulty}</span>
           </div>
-          <p class="text-xs text-slate-400 mb-2">Impact: <span class="text-slate-200 font-semibold">${l.impact}</span></p>
-          <p class="text-xs text-slate-400">Timing: ${l.timing}</p>
+          <p class="text-xs text-slate-600 mb-2">Impact: <span class="text-slate-200 font-semibold">${l.impact}</span></p>
+          <p class="text-xs text-slate-600">Timing: ${l.timing}</p>
         </div>
-      `).join('') : '<p class="text-sm text-slate-400">No mitigation levers for this scenario</p>';
+      `).join('') : '<p class="text-sm text-slate-600">No mitigation levers for this scenario</p>';
       document.getElementById('levers').innerHTML = leversHtml;
     }
 
@@ -314,46 +323,46 @@
       modal.onclick = e => e.target === modal && modal.remove();
 
       modal.innerHTML = `
-        <div class="bg-navy-800 rounded-lg max-w-md w-full border border-navy-700">
-          <div class="bg-navy-900 border-b border-navy-700 px-6 py-4">
-            <h2 class="text-lg font-semibold text-slate-100">Create Scenario</h2>
+        <div class="bg-slate-50 rounded-lg max-w-md w-full border border-slate-200">
+          <div class="bg-white border-b border-slate-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-slate-900">Create Scenario</h2>
           </div>
 
           <div class="p-6 space-y-4">
             <div>
-              <label class="text-xs font-semibold text-slate-400 mb-2 block">Scenario Name</label>
+              <label class="text-xs font-semibold text-slate-600 mb-2 block">Scenario Name</label>
               <input type="text" placeholder="e.g., Optimistic Case"
-                class="w-full px-3 py-2 bg-navy-700 border border-navy-600 rounded text-slate-100 text-sm">
+                class="w-full px-3 py-2 bg-slate-200 border border-slate-300 rounded text-slate-900 text-sm">
             </div>
             <div>
-              <label class="text-xs font-semibold text-slate-400 mb-2 block">Description</label>
+              <label class="text-xs font-semibold text-slate-600 mb-2 block">Description</label>
               <textarea placeholder="What assumptions drive this scenario?"
-                class="w-full px-3 py-2 bg-navy-700 border border-navy-600 rounded text-slate-100 text-sm h-20"></textarea>
+                class="w-full px-3 py-2 bg-slate-200 border border-slate-300 rounded text-slate-900 text-sm h-20"></textarea>
             </div>
             <div>
-              <label class="text-xs font-semibold text-slate-400 mb-2 block">Parameters</label>
+              <label class="text-xs font-semibold text-slate-600 mb-2 block">Parameters</label>
               <div class="space-y-2">
                 <label class="flex items-center gap-2">
                   <input type="checkbox" class="w-4 h-4 rounded">
-                  <span class="text-sm text-slate-300">Revenue change (%)</span>
+                  <span class="text-sm text-slate-700">Revenue change (%)</span>
                 </label>
                 <label class="flex items-center gap-2">
                   <input type="checkbox" class="w-4 h-4 rounded">
-                  <span class="text-sm text-slate-300">OPEX change (%)</span>
+                  <span class="text-sm text-slate-700">OPEX change (%)</span>
                 </label>
                 <label class="flex items-center gap-2">
                   <input type="checkbox" class="w-4 h-4 rounded">
-                  <span class="text-sm text-slate-300">Interest rate change (bps)</span>
+                  <span class="text-sm text-slate-700">Interest rate change (bps)</span>
                 </label>
               </div>
             </div>
           </div>
 
-          <div class="bg-navy-900 border-t border-navy-700 px-6 py-4 flex gap-2 justify-end">
-            <button onclick="this.closest('div').parentElement.remove()" class="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 rounded font-medium text-sm transition-colors">
+          <div class="bg-white border-t border-slate-200 px-6 py-4 flex gap-2 justify-end">
+            <button onclick="this.closest('div').parentElement.remove()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium text-sm transition-colors">
               Cancel
             </button>
-            <button onclick="this.closest('div').parentElement.remove(); alert('Scenario created'); location.reload()" class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium text-sm transition-colors">
+            <button onclick="this.closest('div').parentElement.remove(); alert('Scenario created'); location.reload()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium text-sm transition-colors">
               Create
             </button>
           </div>
@@ -363,24 +372,20 @@
     }
 
     function initPage() {
-      const root = document.getElementById('eime-root');
-      root.innerHTML = `
-        <div class="flex h-full w-full">
-          ${EIME_SHELL_HTML}
-          <main class="flex-1 overflow-auto bg-slate-950">
+      const centerContent = `
             <div class="max-w-7xl mx-auto p-6">
               <!-- Header -->
               <div class="mb-6">
-                <h1 class="text-3xl font-bold text-slate-100 mb-2">What-If Planning</h1>
-                <p class="text-slate-400">Try out scenarios &mdash; "what happens if pledges drop 20%?" &mdash; and see the effect on your cash, budget, and obligations.</p>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">What-If Planning</h1>
+                <p class="text-slate-600">Try out scenarios &mdash; "what happens if pledges drop 20%?" &mdash; and see the effect on your cash, budget, and obligations.</p>
               </div>
 
               <div class="grid grid-cols-3 gap-6">
                 <!-- Left: Scenario List -->
                 <div>
                   <div class="mb-3 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-slate-300">Scenarios</h2>
-                    <button onclick="createCustomScenario()" class="text-xs px-2 py-1 bg-gold-500 hover:bg-gold-600 text-white rounded font-medium transition-colors">
+                    <h2 class="text-sm font-semibold text-slate-700">Scenarios</h2>
+                    <button onclick="createCustomScenario()" class="text-xs px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium transition-colors">
                       + New
                     </button>
                   </div>
@@ -391,22 +396,22 @@
 
                 <!-- Right: Results -->
                 <div class="col-span-2">
-                  <div class="bg-navy-800 rounded-lg p-6 border border-navy-700">
-                    <h2 id="scenario-title" class="text-2xl font-bold text-slate-100 mb-1"></h2>
-                    <p id="scenario-desc" class="text-sm text-slate-400 mb-6"></p>
+                  <div class="bg-slate-50 rounded-lg p-6 border border-slate-200">
+                    <h2 id="scenario-title" class="text-2xl font-bold text-slate-900 mb-1"></h2>
+                    <p id="scenario-desc" class="text-sm text-slate-600 mb-6"></p>
 
                     <!-- Tabs -->
-                    <div class="flex gap-2 mb-6 border-b border-navy-700">
-                      <button class="tab-btn active px-3 py-2 text-sm font-medium text-slate-300 hover:text-white border-b-2 border-transparent hover:border-navy-600" onclick="switchTab(event, 'covenants')">
+                    <div class="flex gap-2 mb-6 border-b border-slate-200">
+                      <button class="tab-btn active px-3 py-2 text-sm font-medium text-slate-700 hover:text-white border-b-2 border-transparent hover:border-slate-300" onclick="switchTab(event, 'covenants')">
                         Covenants
                       </button>
-                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-300 hover:text-white border-b-2 border-transparent hover:border-navy-600" onclick="switchTab(event, 'margins')">
+                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-700 hover:text-white border-b-2 border-transparent hover:border-slate-300" onclick="switchTab(event, 'margins')">
                         Margins
                       </button>
-                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-300 hover:text-white border-b-2 border-transparent hover:border-navy-600" onclick="switchTab(event, 'cash')">
+                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-700 hover:text-white border-b-2 border-transparent hover:border-slate-300" onclick="switchTab(event, 'cash')">
                         Cash
                       </button>
-                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-300 hover:text-white border-b-2 border-transparent hover:border-navy-600" onclick="switchTab(event, 'levers')">
+                      <button class="tab-btn px-3 py-2 text-sm font-medium text-slate-700 hover:text-white border-b-2 border-transparent hover:border-slate-300" onclick="switchTab(event, 'levers')">
                         Levers
                       </button>
                     </div>
@@ -436,13 +441,15 @@
                 </div>
               </div>
             </div>
-          </main>
-          ${EIME_CHAT_RAIL_HTML}
-        </div>
       `;
 
-      EIMEShell.init(PAGE_ID);
-      EIMEChatRail.init(PAGE_ID);
+      EIMEShell.mount({
+        activeNav: 'scenario-forecast',
+        centerContent,
+        onMounted: () => {
+          loadScenarios();
+        }
+      });
 
       window.switchTab = function(e, tab) {
         // Update buttons
@@ -452,7 +459,7 @@
         });
         e.target.classList.add('active');
         e.target.classList.remove('border-transparent');
-        e.target.classList.add('border-gold-500');
+        e.target.classList.add('border-amber-600');
 
         // Update content
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));

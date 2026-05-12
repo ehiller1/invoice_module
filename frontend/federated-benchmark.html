@@ -210,7 +210,7 @@
 
 <script>
 const API = (window.EIME_API ?? '');
-const CHURCH_ID = 'holy_comforter';
+const CHURCH_ID = (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
 let benchmarkData = null;
 
 EIMEShell.mount({

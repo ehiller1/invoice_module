@@ -142,7 +142,7 @@ EIMEShell.mount({
   onMounted() {
     window.eime.setContext({
       page: 'settings-coa',
-      payload: { church_id: 'holy_comforter' }
+      payload: { church_id: ((window.EIMESession && EIMESession.getChurch()) || 'holy_comforter') }
     });
     loadCOA();
   }
@@ -263,7 +263,7 @@ function closeEditModal() {
 
 async function loadCOA() {
   try {
-    const res = await fetch(`${API}/api/coa?church_id=holy_comforter`);
+    const res = await fetch(`${API}/api/coa?church_id=${(window.EIMESession && EIMESession.getChurch()) || "holy_comforter"}`);
     const data = await res.json();
     allAccounts = data.accounts || [];
     allFunds = data.funds || [];
@@ -288,7 +288,7 @@ async function searchCOA() {
   }
 
   try {
-    const res = await fetch(`${API}/api/coa/search?q=${encodeURIComponent(query)}&church_id=holy_comforter`);
+    const res = await fetch(`${API}/api/coa/search?q=${encodeURIComponent(query)}&church_id=${(window.EIMESession && EIMESession.getChurch()) || "holy_comforter"}`);
     const results = await res.json();
     renderAccounts(results.matches || []);
   } catch (e) {
@@ -316,9 +316,9 @@ function renderAccounts(accounts) {
 function renderFlatAccounts(accounts) {
   const list = document.getElementById('coa-list');
   list.innerHTML = (accounts || []).map(acc => `
-    <div class="px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="showAccount('${acc.gl_code}')">
+    <div class="px-6 py-4 hover:bg-slate-50 transition-colors">
       <div class="flex items-center justify-between gap-4">
-        <div class="flex-1">
+        <div class="flex-1 cursor-pointer" onclick="showAccount('${acc.gl_code}')">
           <div class="flex items-center gap-2 mb-1">
             <p class="font-medium text-slate-900">${acc.gl_code}</p>
             ${getAccountTypePill(acc.account_type)}
@@ -326,7 +326,11 @@ function renderFlatAccounts(accounts) {
           <p class="text-sm text-slate-600">${acc.gl_name || 'Unknown'}</p>
           ${acc.fund_restriction ? `<p class="text-xs text-orange-600 mt-1">🔒 ${acc.fund_restriction}</p>` : ''}
         </div>
-        <div class="text-right flex-shrink-0">
+        <div class="text-right flex-shrink-0 flex items-center gap-2">
+          <a href="/trace.html?gl=${encodeURIComponent(acc.gl_code)}"
+             title="Trace this account to its source events"
+             onclick="event.stopPropagation()"
+             class="px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200">🔍 Trace</a>
           <span class="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800">${acc.fund || 'General'}</span>
         </div>
       </div>
@@ -375,16 +379,21 @@ function renderGroupedAccounts(accounts) {
         </div>
         <div class="fund-accounts-${fundId} hidden bg-slate-50">
           ${fundAccounts.map(acc => `
-            <div class="px-6 py-3 border-t border-slate-200 hover:bg-slate-100 cursor-pointer transition-colors" onclick="showAccount('${acc.gl_code}')">
+            <div class="px-6 py-3 border-t border-slate-200 hover:bg-slate-100 transition-colors">
               <div class="flex items-center justify-between gap-4">
-                <div class="flex-1">
+                <div class="flex-1 cursor-pointer" onclick="showAccount('${acc.gl_code}')">
                   <div class="flex items-center gap-2 mb-1">
                     <p class="font-medium text-slate-800 text-sm">${acc.gl_code}</p>
                     ${getAccountTypePill(acc.account_type)}
                   </div>
                   <p class="text-xs text-slate-600">${acc.gl_name || 'Unknown'}</p>
                 </div>
-                ${acc.fund_restriction ? `<span class="text-xs text-orange-600 flex-shrink-0">🔒</span>` : ''}
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <a href="/trace.html?gl=${encodeURIComponent(acc.gl_code)}"
+                     onclick="event.stopPropagation()"
+                     class="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200">🔍</a>
+                  ${acc.fund_restriction ? `<span class="text-xs text-orange-600">🔒</span>` : ''}
+                </div>
               </div>
             </div>
           `).join('')}
