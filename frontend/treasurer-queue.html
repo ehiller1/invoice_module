@@ -226,7 +226,6 @@ async function submitTreasurerDecision(action) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Role': 'TREASURER_ADMIN',
       },
       body: JSON.stringify({
         action,

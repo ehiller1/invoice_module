@@ -20,7 +20,6 @@ if _env_file.exists():
         if val:  # Always set if value is non-empty, even if already in environ
             os.environ[key] = val
     print(f"[EIME] Loaded {len(_env_vars)} env vars from {_env_file}", flush=True)
-    print(f"[EIME] ANTHROPIC_API_KEY = {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:20]}...", flush=True)
 
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -80,11 +79,57 @@ app = FastAPI(
     description="Church invoice multi-agent COA mapping system (FRS-EMBARK-ACCT-001)",
     version="1.1.0",
 )
+
+import logging as _logging
+logger = _logging.getLogger("eime.main")
+
+
+# ===== Global auth middleware =====
+# Validates X-User-Role on protected routes when EIME_ENV=production.
+# Also validates X-Proxy-Secret if TRUSTED_PROXY_SECRET is configured.
+_AUTH_EXEMPT_PATHS = {"/health", "/", "/api/churches"}
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    method = request.method
+
+    # Exempt public/static paths
+    is_exempt = (
+        (method == "GET" and path in _AUTH_EXEMPT_PATHS)
+        or path.startswith("/static")
+    )
+
+    if not is_exempt:
+        role = request.headers.get("X-User-Role", "").strip()
+        if not role and os.environ.get("EIME_ENV", "").lower() == "production":
+            return JSONResponse(
+                {"detail": "Authentication required"}, status_code=401
+            )
+
+        trusted_proxy_secret = os.environ.get("TRUSTED_PROXY_SECRET")
+        if trusted_proxy_secret:
+            provided_secret = request.headers.get("X-Proxy-Secret", "")
+            if provided_secret != trusted_proxy_secret:
+                return JSONResponse(
+                    {"detail": "Invalid proxy secret"}, status_code=403
+                )
+
+    return await call_next(request)
+
+
 # CORS: restrict to known origins in production
-allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:*").split(",")
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:*")
+_origins_list = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+if "*" in _origins_list:
+    allowed_origins = ["*"]
+else:
+    allowed_origins = _origins_list
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-User-Role", "X-User-Email", "X-Proxy-Secret"],
 )
@@ -93,58 +138,43 @@ app.add_middleware(
 app.include_router(_setup_wizard.router)
 
 # Phase 5: Queue action endpoints + reconciliation latest
-try:
-    from .routes import exceptions as _phase5_exceptions
-    from .routes import questions as _phase5_questions
-    from .routes import policies as _phase5_policies_routes
-    from .routes import reconciliation as _phase5_reconciliation
-    from .routes import recommendations as _phase5_recommendations
-    app.include_router(_phase5_exceptions.router)
-    app.include_router(_phase5_exceptions.church_router)
-    app.include_router(_phase5_questions.router)
-    app.include_router(_phase5_policies_routes.church_router)
-    app.include_router(_phase5_policies_routes.action_router)
-    app.include_router(_phase5_recommendations.router)
-    app.include_router(_phase5_recommendations.action_router)
-    app.include_router(_phase5_reconciliation.router)
-    try:
-        from .routes import financial_position as _financial_position
-        app.include_router(_financial_position.router)
-    except Exception as _fp_err:
-        import logging as _l
-        _l.getLogger("eime.phase5").warning("Financial-position router failed to mount: %r", _fp_err)
-except Exception as _phase5_err:  # pragma: no cover - defensive
-    import logging as _l
-    _l.getLogger("eime.phase5").warning("Phase 5 routers failed to mount: %r", _phase5_err)
+from .routes import exceptions as _phase5_exceptions
+from .routes import questions as _phase5_questions
+from .routes import policies as _phase5_policies_routes
+from .routes import reconciliation as _phase5_reconciliation
+from .routes import recommendations as _phase5_recommendations
+app.include_router(_phase5_exceptions.router)
+app.include_router(_phase5_exceptions.church_router)
+app.include_router(_phase5_questions.router)
+app.include_router(_phase5_policies_routes.church_router)
+app.include_router(_phase5_policies_routes.action_router)
+app.include_router(_phase5_recommendations.router)
+app.include_router(_phase5_recommendations.action_router)
+app.include_router(_phase5_reconciliation.router)
+from .routes import financial_position as _financial_position
+app.include_router(_financial_position.router)
 
 # Phase 6: HITL decision endpoint (/v2/hitl/{id}/decision)
-try:
-    from .routes import hitl as _phase6_hitl
-    app.include_router(_phase6_hitl.router)
-except Exception as _phase6_err:  # pragma: no cover - defensive
-    import logging as _l
-    _l.getLogger("eime.phase6").warning("Phase 6 HITL router failed to mount: %r", _phase6_err)
+from .routes import hitl as _phase6_hitl
+app.include_router(_phase6_hitl.router)
 
 # Phase 8: Approval + ACS posting with guider verdicts
-try:
-    from .routes import approvals as _phase8_approvals
-    app.include_router(_phase8_approvals.router)
-except Exception as _phase8_err:  # pragma: no cover - defensive
-    import logging as _l
-    _l.getLogger("eime.phase8").warning("Phase 8 approvals router failed to mount: %r", _phase8_err)
+from .routes import approvals as _phase8_approvals
+app.include_router(_phase8_approvals.router)
 
 # Phase E (Wave 2.10): Consolidated cabinet activity/approve/reject endpoints
-# (single source of truth, replaces duplicates previously inlined in main.py).
-try:
-    from .routes import cabinets as _phase_e_cabinets
-    app.include_router(_phase_e_cabinets.router)
-except Exception as _phase_e_err:  # pragma: no cover - defensive
-    import logging as _l
-    _l.getLogger("eime.phase_e").warning("Phase E cabinets router failed to mount: %r", _phase_e_err)
+from .routes import cabinets as _phase_e_cabinets
+app.include_router(_phase_e_cabinets.router)
 
 
 @app.on_event("startup")
 async def startup() -> None:
+    # B6: Ensure schema exists before seeding
+    try:
+        from .db.migrations import init_schema
+        init_schema()
+    except Exception as exc:
+        raise RuntimeError(f"Schema initialization failed — cannot start: {exc}") from exc
     db.coa_store.ensure_seed()
     # FR-05.5: launch reminder/escalation scheduler.
     try:
@@ -3040,6 +3070,37 @@ async def list_plaid_transactions(
 @app.post("/api/churches/{church_id}/plaid/webhook")
 async def plaid_webhook(church_id: str, request: Request) -> JSONResponse:
     """Receive Plaid webhook events. On TRANSACTIONS events, sync accounts and emit BankItemObserved."""
+    # --- Signature verification ---
+    plaid_webhook_secret = os.environ.get("PLAID_WEBHOOK_SECRET")
+    if plaid_webhook_secret:
+        verification_header = request.headers.get("Plaid-Verification")
+        if not verification_header:
+            return JSONResponse(
+                {"detail": "Missing Plaid-Verification header"}, status_code=401
+            )
+        try:
+            import jwt as _pyjwt  # PyJWT
+        except Exception:
+            logger.error("PyJWT not installed; cannot verify Plaid webhook")
+            return JSONResponse(
+                {"detail": "Webhook verification unavailable"}, status_code=503
+            )
+        try:
+            _pyjwt.decode(
+                verification_header,
+                plaid_webhook_secret,
+                algorithms=["HS256", "ES256"],
+            )
+        except Exception as _jwt_err:
+            logger.warning("Plaid webhook JWT verification failed: %r", _jwt_err)
+            return JSONResponse(
+                {"detail": "Invalid Plaid signature"}, status_code=403
+            )
+    else:
+        logger.warning(
+            "PLAID_WEBHOOK_SECRET not configured; accepting webhook without verification (dev mode)"
+        )
+
     try:
         body = await request.json()
     except Exception:

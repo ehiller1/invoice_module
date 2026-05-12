@@ -5,8 +5,8 @@ services:
     image: postgres:15-alpine
     container_name: eime-postgres
     environment:
-      POSTGRES_USER: claude
-      POSTGRES_PASSWORD: claude_dev
+      POSTGRES_USER: ${POSTGRES_USER:-claude}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-claude_dev}
       POSTGRES_DB: eime_accounting
     ports:
       - "5432:5432"
@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
     container_name: eime-app
     environment:
-      DATABASE_URL: postgresql://claude:claude_dev@postgres:5432/eime_accounting
+      DATABASE_URL: postgresql://${POSTGRES_USER:-claude}:${POSTGRES_PASSWORD:-claude_dev}@postgres:5432/eime_accounting
       REDIS_URL: redis://redis:6379
       PYTHONUNBUFFERED: "1"
     ports:
@@ -49,7 +49,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2
 
 volumes:
   postgres_data:
