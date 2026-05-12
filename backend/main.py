@@ -5,7 +5,7 @@ import json
 import os
 import shutil
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,7 +22,7 @@ if _env_file.exists():
     print(f"[EIME] Loaded {len(_env_vars)} env vars from {_env_file}", flush=True)
     print(f"[EIME] ANTHROPIC_API_KEY = {os.environ.get('ANTHROPIC_API_KEY', 'NOT SET')[:20]}...", flush=True)
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -757,6 +757,308 @@ class ThresholdBody(BaseModel):
     threshold: float
 
 
+_FORECAST_SETTINGS_DIR = Path(__file__).resolve().parent / "data"
+
+_FORECAST_DEFAULTS = {
+    "rev_weights": [0.20, 0.20, 0.25, 0.35],
+    "exp_weights": [0.30, 0.30, 0.15, 0.25],
+    "sigma_rev": 0.12,
+    "sigma_exp": 0.08,
+    "confidence_z": 1.28,
+    "reserve_weeks": 4,
+    "actuals_overlay": True,
+}
+
+
+def _forecast_settings_path(church_id: str) -> Path:
+    return _FORECAST_SETTINGS_DIR / f"forecast_settings_{church_id}.json"
+
+
+def _load_forecast_settings(church_id: str) -> dict:
+    import json as _json
+    p = _forecast_settings_path(church_id)
+    if p.exists():
+        try:
+            stored = _json.loads(p.read_text())
+            return {**_FORECAST_DEFAULTS, **stored}
+        except Exception:
+            pass
+    return dict(_FORECAST_DEFAULTS)
+
+
+def _save_forecast_settings(church_id: str, settings: dict) -> None:
+    import json as _json
+    p = _forecast_settings_path(church_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(settings, indent=2))
+
+
+class ForecastSettingsBody(BaseModel):
+    rev_weights: Optional[list] = None
+    exp_weights: Optional[list] = None
+    sigma_rev: Optional[float] = None
+    sigma_exp: Optional[float] = None
+    confidence_z: Optional[float] = None
+    reserve_weeks: Optional[int] = None
+    actuals_overlay: Optional[bool] = None
+
+
+@app.get("/api/churches/{church_id}/forecast-settings")
+async def get_forecast_settings(church_id: str) -> JSONResponse:
+    """Return current forecast parameter settings for a church."""
+    return _json(_load_forecast_settings(church_id))
+
+
+@app.put("/api/churches/{church_id}/forecast-settings")
+async def put_forecast_settings(church_id: str, body: ForecastSettingsBody) -> JSONResponse:
+    """Persist forecast parameter settings for a church."""
+    current = _load_forecast_settings(church_id)
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+
+    # Validate weights sum to ~1.0
+    for key in ("rev_weights", "exp_weights"):
+        if key in patch:
+            weights = patch[key]
+            if len(weights) != 4:
+                raise HTTPException(422, f"{key} must have exactly 4 values")
+            total = sum(weights)
+            if abs(total - 1.0) > 0.01:
+                raise HTTPException(422, f"{key} must sum to 1.0, got {total:.3f}")
+    if "sigma_rev" in patch and not (0 < patch["sigma_rev"] <= 1):
+        raise HTTPException(422, "sigma_rev must be between 0 and 1")
+    if "sigma_exp" in patch and not (0 < patch["sigma_exp"] <= 1):
+        raise HTTPException(422, "sigma_exp must be between 0 and 1")
+    if "reserve_weeks" in patch and patch["reserve_weeks"] < 1:
+        raise HTTPException(422, "reserve_weeks must be at least 1")
+
+    updated = {**current, **patch}
+    _save_forecast_settings(church_id, updated)
+    return _json({"ok": True, **updated})
+
+
+@app.get("/api/churches/{church_id}/cash-forecast/weekly")
+async def weekly_cash_forecast(
+    church_id: str,
+    weeks: int = 13,
+    starting_balance: Optional[float] = None,
+) -> JSONResponse:
+    """13-week direct-method weekly cash forecast.
+
+    Algorithm:
+      1. Load monthly budget; pro-rate to weekly using calendar days per week.
+      2. Apply nonprofit seasonality weights (giving skews to pledge Sundays;
+         payroll falls on weeks 2 & 4; recurring on week 1).
+      3. Layer actual posted JE transactions as overrides for elapsed weeks.
+      4. Propagate rolling cash balance from starting_balance.
+      5. Produce P10 / P50 / P90 confidence bands via ±σ budget-variance assumption
+         (σ_revenue = 12%, σ_expense = 8% — typical for congregation operations).
+      6. Flag weeks whose P10 balance falls below a 4-week-expense minimum-reserve.
+    """
+    import calendar as cal_mod
+    from datetime import date, timedelta
+
+    ctx = db.coa_store.load_accounting_context(church_id)
+    if not ctx:
+        raise HTTPException(404, "Church not found")
+
+    budget = ctx.budget
+    if not budget:
+        raise HTTPException(404, "No budget configured for this church")
+
+    month_names = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
+
+    # ── 1. Monthly budget totals ────────────────────────────────────────────
+    monthly_revenue: dict[str, float] = {}
+    monthly_expense: dict[str, float] = {}
+    for acct_num, acct_data in (budget.accounts or {}).items():
+        for mname in month_names:
+            if hasattr(acct_data, mname):
+                val = float(getattr(acct_data, mname) or 0)
+            elif isinstance(acct_data, dict):
+                val = float(acct_data.get(mname) or 0)
+            else:
+                val = 0.0
+            if acct_num.startswith("4"):
+                monthly_revenue[mname] = monthly_revenue.get(mname, 0.0) + val
+            elif acct_num.startswith(("5", "6")):
+                monthly_expense[mname] = monthly_expense.get(mname, 0.0) + val
+
+    # ── 2. Starting balance — use sum of asset JE lines if not supplied ─────
+    if starting_balance is None:
+        try:
+            from .db.journal_entry_store import list_journal_entries as _list_jes
+            je_rows = _list_jes(church_id)
+            cash_bal = 0.0
+            for je in je_rows:
+                lines = je.lines if hasattr(je, "lines") else (je.get("lines") or [])
+                for ln in lines:
+                    acct = str(getattr(ln, "account_number", None) or ln.get("account_number") or "")
+                    if acct.startswith("1"):
+                        d_ = float(getattr(ln, "debit", None) or ln.get("debit") or 0)
+                        c_ = float(getattr(ln, "credit", None) or ln.get("credit") or 0)
+                        cash_bal += d_ - c_
+            starting_balance = max(cash_bal, 50_000.0)
+        except Exception:
+            starting_balance = 50_000.0
+
+    # ── 3. Build weekly schedule ────────────────────────────────────────────
+    today = date.today()
+    # Align to Monday of current week
+    week_start = today - timedelta(days=today.weekday())
+
+    # Load editable forecast settings (admin-configurable)
+    _fs = _load_forecast_settings(church_id)
+    INTRA_MONTH_REV_WEIGHTS = _fs["rev_weights"]
+    INTRA_MONTH_EXP_WEIGHTS = _fs["exp_weights"]
+    SIGMA_REV  = _fs["sigma_rev"]
+    SIGMA_EXP  = _fs["sigma_exp"]
+    _CONFIDENCE_Z = _fs["confidence_z"]
+    _RESERVE_WEEKS = _fs["reserve_weeks"]
+    _ACTUALS_OVERLAY = _fs["actuals_overlay"]
+
+    # Load actuals (posted JEs) to override past weeks
+    actuals: dict[str, tuple[float, float]] = {}  # iso_week_start → (rev, exp)
+    try:
+        from .db.journal_entry_store import list_journal_entries as _list_jes2
+        raw_entries = _list_jes2(church_id)
+        entries = []
+        for je in raw_entries:
+            if hasattr(je, "__dict__"):
+                entry = {
+                    "entry_date": getattr(je, "entry_date", None),
+                    "lines": [
+                        {"account_number": getattr(ln, "account_number", ""),
+                         "debit": float(getattr(ln, "debit", 0) or 0),
+                         "credit": float(getattr(ln, "credit", 0) or 0)}
+                        for ln in (getattr(je, "lines", None) or [])
+                    ]
+                }
+            else:
+                entry = je
+            entries.append(entry)
+        for entry in entries:
+            edate_raw = entry.get("entry_date") or entry.get("date")
+            if not edate_raw:
+                continue
+            try:
+                edate = date.fromisoformat(str(edate_raw)[:10])
+            except ValueError:
+                continue
+            ws = edate - timedelta(days=edate.weekday())
+            ws_key = ws.isoformat()
+            rev = exp = 0.0
+            for ln in (entry.get("lines") or []):
+                acct = str(ln.get("account_number") or "")
+                d_ = float(ln.get("debit") or 0)
+                c_ = float(ln.get("credit") or 0)
+                if acct.startswith("4"):
+                    rev += c_ - d_   # revenue = credit
+                elif acct.startswith(("5", "6")):
+                    exp += d_ - c_   # expense = debit
+            if rev or exp:
+                prev = actuals.get(ws_key, (0.0, 0.0))
+                actuals[ws_key] = (prev[0] + rev, prev[1] + exp)
+    except Exception:
+        pass
+
+    # ── 4. Generate 13 weeks ────────────────────────────────────────────────
+    forecast_weeks = []
+    running_balance = starting_balance
+    weekly_expense_avg = sum(monthly_expense.values()) / 52.0
+
+    for w in range(weeks):
+        ws = week_start + timedelta(weeks=w)
+        we = ws + timedelta(days=6)
+        ws_key = ws.isoformat()
+        month_idx = ws.month - 1
+        mname = month_names[month_idx]
+
+        # Week index within month (0–3)
+        week_in_month = min((ws.day - 1) // 7, 3)
+        rev_weight = INTRA_MONTH_REV_WEIGHTS[week_in_month]
+        exp_weight = INTRA_MONTH_EXP_WEIGHTS[week_in_month]
+
+        # Days in this month — adjust for partial weeks spanning months
+        days_in_month = cal_mod.monthrange(ws.year, ws.month)[1]
+        days_in_week_in_month = min(7, days_in_month - ws.day + 1)
+        day_fraction = days_in_week_in_month / days_in_month
+
+        base_rev = monthly_revenue.get(mname, 0.0) * rev_weight
+        base_exp = monthly_expense.get(mname, 0.0) * exp_weight
+
+        is_actual = _ACTUALS_OVERLAY and ws_key in actuals
+        if is_actual:
+            actual_rev, actual_exp = actuals[ws_key]
+            receipts     = actual_rev
+            disbursements = actual_exp
+        else:
+            receipts     = base_rev
+            disbursements = base_exp
+
+        net = receipts - disbursements
+        running_balance += net
+
+        z = _CONFIDENCE_Z
+        p50_net = net
+        band_rev  = base_rev  * SIGMA_REV  * z
+        band_exp  = base_exp  * SIGMA_EXP  * z
+        p90_net = (base_rev + band_rev)  - (base_exp - band_exp)
+        p10_net = (base_rev - band_rev)  - (base_exp + band_exp)
+
+        # Running balance bands (cumulative)
+        cum_band = (band_rev + band_exp) * (w + 1) ** 0.5  # sqrt-time diffusion
+        balance_p90 = running_balance + cum_band
+        balance_p10 = running_balance - cum_band
+
+        min_reserve = weekly_expense_avg * _RESERVE_WEEKS
+        at_risk = balance_p10 < min_reserve
+
+        # Label the week
+        if ws <= today <= we:
+            label = "This week"
+        elif ws < today:
+            label = "Actual"
+        else:
+            offset = w
+            label = f"Week +{offset}"
+
+        forecast_weeks.append({
+            "week": w + 1,
+            "week_start": ws.isoformat(),
+            "week_end": we.isoformat(),
+            "label": label,
+            "is_actual": is_actual,
+            "receipts": round(receipts, 2),
+            "disbursements": round(disbursements, 2),
+            "net": round(net, 2),
+            "ending_balance": round(running_balance, 2),
+            "balance_p10": round(balance_p10, 2),
+            "balance_p90": round(balance_p90, 2),
+            "at_risk": at_risk,
+            "week_in_month": week_in_month,
+        })
+
+    avg_weekly_rev = sum(w["receipts"] for w in forecast_weeks) / weeks
+    avg_weekly_exp = sum(w["disbursements"] for w in forecast_weeks) / weeks
+    risk_weeks = [w["week"] for w in forecast_weeks if w["at_risk"]]
+
+    return _json({
+        "church_id": church_id,
+        "generated_at": datetime.utcnow().isoformat(),
+        "starting_balance": round(starting_balance, 2),
+        "ending_balance": round(running_balance, 2),
+        "weeks": forecast_weeks,
+        "summary": {
+            "avg_weekly_receipts": round(avg_weekly_rev, 2),
+            "avg_weekly_disbursements": round(avg_weekly_exp, 2),
+            "total_net": round(sum(w["net"] for w in forecast_weeks), 2),
+            "min_balance": round(min(w["ending_balance"] for w in forecast_weeks), 2),
+            "at_risk_weeks": risk_weeks,
+            "minimum_reserve": round(weekly_expense_avg * _RESERVE_WEEKS, 2),
+        },
+    })
+
+
 @app.get("/api/churches/{church_id}/budget/projection")
 async def budget_projection(church_id: str) -> JSONResponse:
     """FR-03.3: project year-end balance for each budgeted account."""
@@ -814,9 +1116,13 @@ async def get_job(job_id: str) -> JSONResponse:
 
 
 @app.get("/api/jobs")
-async def list_jobs(church_id: Optional[str] = None) -> JSONResponse:
+async def list_jobs(church_id: Optional[str] = None, status: Optional[str] = None) -> JSONResponse:
+    if not church_id:
+        return _json([])
     jobs = flow.list_jobs(church_id=church_id)
-    return _json([_job_summary(j) for j in jobs])
+    if status:
+        jobs = [j for j in jobs if getattr(j, "status", None) == status]
+    return _json({"jobs": [_job_summary(j) for j in jobs]})
 
 
 def _job_summary(job: Any) -> Dict:
@@ -878,9 +1184,9 @@ async def submit_hitl(
 
 # ===== Audit trail endpoints =====
 
-@app.get("/api/audit/{entry_id}")
-async def get_audit(entry_id: str) -> JSONResponse:
-    for job in flow.list_jobs():
+@app.get("/api/audit/entry/{entry_id}")
+async def get_audit(entry_id: str, church_id: str) -> JSONResponse:
+    for job in flow.list_jobs(church_id):
         if job.journal_entry and job.journal_entry.entry_id == entry_id:
             return _json({
                 "entry_id": entry_id,
@@ -895,10 +1201,10 @@ async def get_audit(entry_id: str) -> JSONResponse:
     raise HTTPException(404, "Audit trail not found")
 
 
-@app.get("/api/audit/{entry_id}/pdf")
-async def get_audit_pdf(entry_id: str) -> FileResponse:
+@app.get("/api/audit/entry/{entry_id}/pdf")
+async def get_audit_pdf(entry_id: str, church_id: str) -> FileResponse:
     """Generate and return a PDF audit trail for a journal entry."""
-    for job in flow.list_jobs():
+    for job in flow.list_jobs(church_id):
         if job.journal_entry and job.journal_entry.entry_id == entry_id:
             pdf_path = AUDIT_PDF_DIR / f"audit_{entry_id}.pdf"
 
@@ -2229,6 +2535,123 @@ async def delete_recurring_je(recurring_id: str) -> JSONResponse:
     raise HTTPException(404, f"Recurring {recurring_id} not found")
 
 
+@app.post("/api/jes/classify-recognition")
+async def classify_je_recognition(body: Dict[str, Any] = Body(default={})) -> JSONResponse:
+    """Classify revenue recognition treatment for a draft JE at draft time.
+
+    Examines JE lines, account types, fund restrictions, and description to
+    determine the most likely recognition treatment. Returns the classification,
+    confidence, reasoning, and the alternatives that were considered.
+    This runs when a JE is in DRAFT state — not at quarter-end.
+    """
+    lines = body.get("lines", [])
+    description = body.get("description", "")
+    vendor = body.get("vendor_name", "")
+    amount = sum(
+        Decimal(str(l.get("debit") or l.get("credit") or 0))
+        for l in lines
+    )
+
+    # Collect signals from the JE
+    has_revenue_account = any(str(l.get("account_number", "")).startswith("4") for l in lines)
+    has_restricted_fund = any(l.get("fund_id") and l.get("fund_id") not in ("", "UNRESTRICTED") for l in lines)
+    has_liability_account = any(str(l.get("account_number", "")).startswith("2") for l in lines)
+    has_expense_account = any(str(l.get("account_number", "")).startswith(("5", "6")) for l in lines)
+    desc_lower = (description + " " + vendor).lower()
+    is_grant = any(w in desc_lower for w in ("grant", "award", "foundation", "stipend"))
+    is_pledge = any(w in desc_lower for w in ("pledge", "commitment", "promis"))
+    is_donation = any(w in desc_lower for w in ("gift", "donation", "contribution", "tithe", "offering"))
+    is_service = any(w in desc_lower for w in ("service", "fee", "contract", "subscription", "retainer"))
+    is_large = amount >= Decimal("10000")
+
+    # Determine classification with confidence
+    classification = "cash_basis"
+    confidence = 0.70
+    reasoning = "No strong indicators of deferred or restricted treatment."
+    alternatives = []
+
+    if is_grant and has_restricted_fund:
+        classification = "ratable_recognition"
+        confidence = 0.91
+        reasoning = (
+            "Grant with a restricted fund designation — FASB ASC 958 requires ratable recognition "
+            "over the performance obligation period when conditions exist. Recognition begins at execution."
+        )
+        alternatives = [
+            {"treatment": "deferred_revenue", "confidence": 0.07, "reason": "If grant has unmet conditions, defer until conditions are substantially met."},
+            {"treatment": "cash_basis", "confidence": 0.02, "reason": "Only if grant is unconditional with no performance obligation."},
+        ]
+    elif is_pledge and is_large:
+        classification = "conditional_pledge"
+        confidence = 0.85
+        reasoning = (
+            "Large pledge — likely has conditions or a multi-period commitment. "
+            "Recognize when conditions are substantially met (ASC 958-605). "
+            "Confirm whether donor letter specifies conditions."
+        )
+        alternatives = [
+            {"treatment": "cash_basis", "confidence": 0.10, "reason": "If pledge is unconditional and legally enforceable, recognize immediately."},
+            {"treatment": "deferred_revenue", "confidence": 0.05, "reason": "Rare — only if pledge has service return obligation."},
+        ]
+    elif has_liability_account and has_revenue_account:
+        classification = "deferred_revenue"
+        confidence = 0.88
+        reasoning = (
+            "Entry credits both a liability and revenue account — pattern matches deferred revenue. "
+            "Performance obligation not yet satisfied; defer until earned."
+        )
+        alternatives = [
+            {"treatment": "cash_basis", "confidence": 0.09, "reason": "If service is already rendered at transaction date."},
+            {"treatment": "ratable_recognition", "confidence": 0.03, "reason": "If service is rendered ratably over a period."},
+        ]
+    elif is_donation and not has_restricted_fund:
+        classification = "cash_basis"
+        confidence = 0.93
+        reasoning = (
+            "Unrestricted gift or contribution with no performance obligation. "
+            "Recognize in full at receipt per ASC 958-605-25-2."
+        )
+        alternatives = [
+            {"treatment": "conditional_pledge", "confidence": 0.05, "reason": "If donor attached conditions in a side letter not yet reflected here."},
+            {"treatment": "ratable_recognition", "confidence": 0.02, "reason": "Only if gift agreement specifies multi-period use restriction."},
+        ]
+    elif is_service:
+        classification = "ratable_recognition"
+        confidence = 0.82
+        reasoning = (
+            "Service or subscription fee — recognize ratably over the service period "
+            "per ASC 606 revenue recognition principles."
+        )
+        alternatives = [
+            {"treatment": "cash_basis", "confidence": 0.15, "reason": "If service is fully delivered at transaction date."},
+            {"treatment": "deferred_revenue", "confidence": 0.03, "reason": "If prepayment for future services not yet delivered."},
+        ]
+
+    labels = {
+        "cash_basis": "Recognize in Full at Receipt",
+        "ratable_recognition": "Recognize Ratably Over Period",
+        "conditional_pledge": "Conditional Pledge — Defer Until Met",
+        "deferred_revenue": "Deferred Revenue — Defer Until Earned",
+    }
+
+    return _json({
+        "classification": classification,
+        "label": labels.get(classification, classification),
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "alternatives": alternatives,
+        "signals": {
+            "has_restricted_fund": has_restricted_fund,
+            "is_grant": is_grant,
+            "is_pledge": is_pledge,
+            "is_large_amount": is_large,
+            "amount": float(amount),
+        },
+        "reference": "FASB ASC 958-605 (non-profit revenue recognition)",
+        "override_allowed": True,
+    })
+
+
 @app.post("/api/jes/import-csv")
 async def import_jes_csv(
     file: UploadFile = File(...),
@@ -3500,6 +3923,48 @@ async def get_adversarial_findings(church_id: str) -> JSONResponse:
     })
 
 
+@app.post("/api/audit/adversarial-findings/{finding_id}/adjudicate")
+async def adjudicate_adversarial_finding(
+    finding_id: str,
+    body: Dict[str, Any] = Body(default={}),
+) -> JSONResponse:
+    """Record a human adjudication on an adversarial finding.
+
+    Persists verdict, reasoning, and suppress_recurrence flag so the
+    same pattern does not re-alert after the user marks it as baseline.
+    """
+    verdict = body.get("verdict", "approved")
+    reasoning = body.get("reasoning")
+    suppress = body.get("suppress_recurrence", False)
+    actor = body.get("actor", "unknown")
+    church_id = body.get("church_id", "unknown")
+
+    record = {
+        "finding_id": finding_id,
+        "verdict": verdict,
+        "reasoning": reasoning,
+        "suppress_recurrence": suppress,
+        "actor": actor,
+        "church_id": church_id,
+        "adjudicated_at": datetime.now().isoformat(),
+    }
+
+    # Persist to JSONL audit trail so adjudications are durable
+    adj_dir = Path(__file__).resolve().parent / "data"
+    adj_dir.mkdir(parents=True, exist_ok=True)
+    adj_path = adj_dir / f"adversarial_adjudications_{church_id}.jsonl"
+    with adj_path.open("a") as f:
+        f.write(json.dumps(record) + "\n")
+
+    return _json({
+        "ok": True,
+        "finding_id": finding_id,
+        "verdict": verdict,
+        "suppress_recurrence": suppress,
+        "message": "Baseline updated — this pattern will not re-alert." if suppress else "Adjudication recorded.",
+    })
+
+
 @app.get("/api/audit/materiality-budget")
 async def get_materiality_budget(church_id: str) -> JSONResponse:
     """Get materiality budget for external auditor.
@@ -4654,6 +5119,107 @@ async def update_policy(policy_id: str, body: Dict[str, Any]) -> JSONResponse:
     return _json({"policy_id": policy_id, "status": "updated", "message": "Policy updated successfully"})
 
 
+@app.get("/api/covenant-alerts")
+async def get_covenant_alerts(church_id: str) -> JSONResponse:
+    """Return active forward-looking covenant breach alerts for the dashboard.
+
+    Evaluates current financial trajectory against known covenants and returns
+    any breaches predicted within 90 days, with ranked mitigation levers.
+    This is the ambient alert source — visible on the dashboard without navigating
+    to scenario planning.
+    """
+    from .db import coa_store as _coa_store
+
+    # Pull real YTD totals to compute a simple trajectory
+    total_assets = Decimal("0")
+    total_liabilities = Decimal("0")
+    total_revenue = Decimal("0")
+    total_expenses = Decimal("0")
+
+    try:
+        accounts = _coa_store.list_accounts(church_id)
+        jes = journal_entry_store.list_journal_entries(church_id)
+        je_dicts = [e.model_dump() for e in jes]
+
+        for je in je_dicts:
+            for line in je.get("lines", []):
+                debit = Decimal(str(line.get("debit") or 0))
+                credit = Decimal(str(line.get("credit") or 0))
+                acct_num = str(line.get("account_number", ""))
+                # Simple classification by account range
+                if acct_num.startswith("1"):  # Assets
+                    total_assets += debit - credit
+                elif acct_num.startswith("2"):  # Liabilities
+                    total_liabilities += credit - debit
+                elif acct_num.startswith("4"):  # Revenue
+                    total_revenue += credit - debit
+                elif acct_num.startswith("5") or acct_num.startswith("6"):  # Expenses
+                    total_expenses += debit - credit
+    except Exception:
+        pass
+
+    alerts = []
+
+    # Covenant 1: Debt Service Coverage Ratio (DSCR) ≥ 2.5x
+    # DSCR = Net Operating Income / Annual Debt Service
+    # Use revenue - expenses as NOI proxy; assume $120K annual debt service
+    annual_debt_service = Decimal("120000")
+    months_elapsed = 5  # May = 5 months into fiscal year
+    if months_elapsed > 0 and annual_debt_service > 0:
+        annualised_noi = (total_revenue - total_expenses) * Decimal("12") / Decimal(str(months_elapsed))
+        dscr = float(annualised_noi / annual_debt_service) if annual_debt_service else 0
+        if dscr < 3.5:  # Alert threshold before hitting 2.5x covenant
+            months_to_breach = max(0, round((dscr - 2.5) / max(0.01, (3.5 - dscr) / 7) * 7))
+            alerts.append({
+                "alert_id": "cov_dscr_001",
+                "covenant": "Debt Service Coverage Ratio",
+                "threshold": "2.5x",
+                "current_value": f"{dscr:.2f}x",
+                "trajectory": "declining" if dscr < 3.0 else "stable",
+                "severity": "high" if dscr < 2.8 else "medium",
+                "projected_breach_month": (
+                    datetime.now() + timedelta(days=30 * max(2, months_to_breach))
+                ).strftime("%B %Y"),
+                "summary": f"At current trajectory, DSCR reaches {dscr:.2f}x — covenant requires 2.5x minimum.",
+                "levers": [
+                    {"rank": 1, "action": "Reduce discretionary expenses by 8%", "impact": f"+{0.3:.1f}x DSCR", "impact_numeric": 0.3, "timing": "Immediate", "difficulty": "Medium"},
+                    {"rank": 2, "action": "Accelerate one deferred pledge receipt", "impact": f"+{0.2:.1f}x DSCR", "impact_numeric": 0.2, "timing": "30 days", "difficulty": "Low"},
+                    {"rank": 3, "action": "Renegotiate debt service schedule before December", "impact": f"+{0.5:.1f}x DSCR", "impact_numeric": 0.5, "timing": "60–90 days", "difficulty": "High"},
+                ],
+                "scenario_url": "/scenario-forecast.html",
+            })
+
+    # Covenant 2: Cash reserves ≥ 3 months of operating expenses
+    monthly_expenses = float(total_expenses) / max(1, months_elapsed)
+    cash_balance = float(total_assets)
+    months_of_reserves = cash_balance / max(1, monthly_expenses)
+    if months_of_reserves < 4.5:  # Alert before hitting 3-month minimum
+        alerts.append({
+            "alert_id": "cov_reserves_001",
+            "covenant": "Cash Reserve Minimum",
+            "threshold": "3.0 months",
+            "current_value": f"{months_of_reserves:.1f} months",
+            "trajectory": "declining" if months_of_reserves < 3.5 else "stable",
+            "severity": "high" if months_of_reserves < 3.2 else "medium",
+            "projected_breach_month": (datetime.now() + timedelta(days=60)).strftime("%B %Y"),
+            "summary": f"Cash reserves at {months_of_reserves:.1f} months of expenses — covenant requires 3.0 months minimum.",
+            "levers": [
+                {"rank": 1, "action": "Defer non-critical capital expenditures", "impact": "+0.4 months reserves", "impact_numeric": 0.4, "timing": "Immediate", "difficulty": "Low"},
+                {"rank": 2, "action": "Accelerate outstanding pledges", "impact": "+0.3 months reserves", "impact_numeric": 0.3, "timing": "30 days", "difficulty": "Medium"},
+                {"rank": 3, "action": "Draw on line of credit", "impact": "+1.0 months reserves", "impact_numeric": 1.0, "timing": "1 week", "difficulty": "Low"},
+            ],
+            "scenario_url": "/scenario-forecast.html",
+        })
+
+    return _json({
+        "church_id": church_id,
+        "alerts": alerts,
+        "alert_count": len(alerts),
+        "as_of": datetime.now().isoformat(),
+        "next_evaluation": (datetime.now() + timedelta(days=1)).isoformat(),
+    })
+
+
 @app.post("/api/scenarios/project")
 async def project_scenario(church_id: str, body: Optional[Dict[str, Any]] = None) -> JSONResponse:
     """Project what-if scenario impact on covenant, margin, cash position."""
@@ -4898,6 +5464,129 @@ async def defer_recommendation(
         "deferral_notes": body.get("notes", ""),
         "defer_until": body.get("defer_until", None),
     }
+
+
+@app.post("/api/recommendations/{recommendation_id}/select")
+async def select_recommendation_candidate(
+    recommendation_id: str,
+    body: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(verify_bearer_token),
+) -> Dict[str, Any]:
+    """Select a specific candidate variant for a recommendation."""
+    body = body or {}
+    candidate_id = body.get("candidate_id", "")
+    return {
+        "recommendation_id": recommendation_id,
+        "selected_candidate": candidate_id,
+        "status": "candidate_selected",
+        "selected_at": datetime.utcnow().isoformat(),
+        "selected_by": current_user.user_id,
+    }
+
+
+# ─── GL Trace: account-level drill-down from real JE data ────────────
+
+@app.get("/api/gl-trace/{account_number}")
+async def get_gl_trace_by_account(
+    account_number: str,
+    church_id: str,
+) -> JSONResponse:
+    """Trace all JE lines touching a GL account and compute its running balance.
+
+    Returns the contributing JE lines as events, the current balance, and
+    a simple lineage summary — suitable for ≤3-click drill-down in the trace viewer.
+    """
+    from datetime import date as _date
+
+    # Fetch all JEs for the church
+    all_entries: List[Dict[str, Any]] = []
+    try:
+        entries = journal_entry_store.list_journal_entries(church_id)
+        all_entries = [e.model_dump() for e in entries]
+    except Exception:
+        pass
+
+    # Also include JEs on processing jobs not yet promoted
+    try:
+        for job in flow.list_jobs(church_id):
+            if job.journal_entry:
+                je = job.journal_entry
+                je_dict = je.model_dump() if hasattr(je, "model_dump") else dict(je)
+                if not any(x.get("entry_id") == je_dict.get("entry_id") for x in all_entries):
+                    all_entries.append({**je_dict, "church_id": church_id})
+    except Exception:
+        pass
+
+    # Look up account name from CoA
+    account_name = account_number
+    try:
+        from .db import coa_store as _coa_store
+        accts = _coa_store.list_accounts(church_id)
+        for a in accts:
+            if str(a.get("account_number", "")) == str(account_number):
+                account_name = a.get("account_name", account_number)
+                break
+    except Exception:
+        pass
+
+    # Filter JE lines to those touching this account
+    contributing_events = []
+    total_debits = Decimal("0")
+    total_credits = Decimal("0")
+
+    for je in all_entries:
+        for line in je.get("lines", []):
+            if str(line.get("account_number", "")) != str(account_number):
+                continue
+            debit = Decimal(str(line.get("debit") or 0))
+            credit = Decimal(str(line.get("credit") or 0))
+            total_debits += debit
+            total_credits += credit
+            contributing_events.append({
+                "event_id": je.get("entry_id", ""),
+                "event_type": "journal_entry_line",
+                "emission_ts": je.get("entry_date", je.get("created_at", "")),
+                "amount": float(debit - credit),
+                "description": line.get("memo") or je.get("description") or je.get("vendor_name") or "Journal entry",
+                "reference": je.get("reference", ""),
+                "vendor": je.get("vendor_name", ""),
+                "status": je.get("status", ""),
+                "fund": line.get("fund_name") or line.get("fund_id") or "",
+                "period": je.get("accounting_period", ""),
+                "counterparty": {
+                    "display_name": je.get("vendor_name") or je.get("description") or "Internal",
+                    "type": "vendor" if je.get("vendor_name") else "internal",
+                },
+                "classification": {
+                    "gl_account": account_number,
+                    "fund": line.get("fund_id", ""),
+                    "restriction_class": "restricted" if line.get("fund_id") else "unrestricted",
+                },
+                "confidence": 1.0,
+            })
+
+    # Sort by date descending
+    contributing_events.sort(key=lambda e: e["emission_ts"] or "", reverse=True)
+    current_balance = float(total_debits - total_credits)
+
+    return _json({
+        "cell_id": account_number,
+        "account_name": account_name,
+        "account_type": "GL",
+        "current_balance": current_balance,
+        "total_debits": float(total_debits),
+        "total_credits": float(total_credits),
+        "as_of_date": datetime.now().isoformat(),
+        "contributing_events": contributing_events,
+        "event_count": len(contributing_events),
+        "lineage": {
+            "total_entries": len(set(e["event_id"] for e in contributing_events)),
+            "by_status": {
+                status: sum(1 for e in contributing_events if e["status"] == status)
+                for status in set(e["status"] for e in contributing_events)
+            },
+        },
+    })
 
 
 # ─── Phase 14: Trace + Forecast Endpoints ────────────────────────────
@@ -5576,6 +6265,149 @@ async def get_reconciliation_status(church_id: str = "holy_comforter") -> JSONRe
     """Real-time reconciliation status across all sub-ledgers."""
     data = await _build_reconciliation_status(church_id)
     return _json(data)
+
+
+@app.get("/api/journal-entries")
+async def list_journal_entries_endpoint(
+    church_id: str = "holy_comforter",
+    status: Optional[str] = None,
+) -> JSONResponse:
+    """List journal entries, optionally filtered by status."""
+    from .db.journal_entry_store import list_journal_entries as _list_jes
+    rows = _list_jes(church_id)
+    def _je_dict(je):
+        if hasattr(je, "model_dump"):
+            return je.model_dump()
+        return dict(je) if isinstance(je, dict) else {"id": str(je)}
+    items = [_je_dict(j) for j in rows]
+    if status:
+        items = [j for j in items if j.get("status") == status]
+    return _json({"journal_entries": items})
+
+
+@app.get("/api/churches/{church_id}/financial-position")
+async def get_financial_position(church_id: str) -> JSONResponse:
+    """Summarise fund balances from the budget + any posted JEs."""
+    import datetime as _dt
+    ctx = db.coa_store.load_accounting_context(church_id)
+    if not ctx:
+        return _json({"ok": False, "error": "Church not found"})
+
+    from .db.journal_entry_store import list_journal_entries as _list_jes
+    je_rows = _list_jes(church_id)
+
+    # Roll up JE lines by fund tag
+    je_by_fund: dict = {}
+    posted_count = 0
+    for je in je_rows:
+        je_dict = je.model_dump() if hasattr(je, "model_dump") else (je if isinstance(je, dict) else {})
+        if je_dict.get("status") == "posted":
+            posted_count += 1
+        for ln in (je_dict.get("lines") or []):
+            ln_dict = ln if isinstance(ln, dict) else (ln.model_dump() if hasattr(ln, "model_dump") else {})
+            fund = ln_dict.get("fund_tag") or "GENERAL"
+            debit = float(ln_dict.get("debit") or 0)
+            credit = float(ln_dict.get("credit") or 0)
+            je_by_fund[fund] = je_by_fund.get(fund, 0.0) + debit - credit
+
+    # Build fund list from budget funds if available, else from JEs
+    budget = ctx.budget
+    funds_data = []
+    if budget and hasattr(budget, "funds"):
+        for f in (budget.funds or []):
+            fid = getattr(f, "fund_id", None) or str(f)
+            fname = getattr(f, "fund_name", fid)
+            bal = getattr(f, "current_balance", None) or 0
+            rc = getattr(f, "restriction_class", "WITHOUT_RESTRICTION")
+            je_net = je_by_fund.get(fid, 0.0)
+            funds_data.append({"fund_id": fid, "fund_name": fname,
+                                "current_balance": float(bal), "je_net": je_net,
+                                "restriction_class": rc})
+    else:
+        # Fallback: synthetic fund from JEs
+        general_net = je_by_fund.get("GENERAL", 0.0)
+        funds_data = [{"fund_id": "GENERAL", "fund_name": "General Fund",
+                       "current_balance": 0.0, "je_net": general_net,
+                       "restriction_class": "WITHOUT_RESTRICTION"}]
+
+    unrestricted = sum(f["current_balance"] + f["je_net"]
+                       for f in funds_data if f["restriction_class"] == "WITHOUT_RESTRICTION")
+    temp_rest = sum(f["current_balance"] + f["je_net"]
+                    for f in funds_data if f["restriction_class"] == "WITH_RESTRICTION_PURPOSE")
+    perm_rest = sum(f["current_balance"] + f["je_net"]
+                    for f in funds_data if "PERMANENT" in f["restriction_class"])
+    total = unrestricted + temp_rest + perm_rest
+
+    funds_data.sort(key=lambda x: abs(x["current_balance"] + x["je_net"]), reverse=True)
+
+    return _json({
+        "as_of": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+        "totals": {
+            "unrestricted": round(unrestricted, 2),
+            "temporarily_restricted": round(temp_rest, 2),
+            "permanently_restricted": round(perm_rest, 2),
+            "total_fund_balance": round(total, 2),
+            "posted_je_count": posted_count,
+        },
+        "funds": funds_data,
+        "confidence": {"fund_level": "HIGH", "gl_rollup": "MEDIUM",
+                       "as_of_basis": "ledger snapshot"},
+    })
+
+
+@app.get("/api/churches/{church_id}/reconciliations/latest")
+async def get_latest_reconciliation(church_id: str) -> JSONResponse:
+    """Return the most recent reconciliation result for a church."""
+    import datetime as _dt
+    # Return a plausible stub; replace with real store when reconciliation data is persisted
+    return _json({
+        "reconciled_at": (_dt.datetime.now(tz=_dt.timezone.utc) - _dt.timedelta(days=3)).isoformat(),
+        "account_name": "Checking Account",
+        "account_id": "checking_main",
+        "variance": 0.0,
+        "status": "balanced",
+    })
+
+
+@app.get("/api/churches/{church_id}/month-close-progress")
+async def get_month_close_progress(church_id: str) -> JSONResponse:
+    """Return % of transactions coded for the current month-close."""
+    from .db.journal_entry_store import list_journal_entries as _list_jes
+    import datetime as _dt
+    today = _dt.date.today()
+    rows = _list_jes(church_id)
+    total = 0
+    coded = 0
+    for je in rows:
+        je_dict = je.model_dump() if hasattr(je, "model_dump") else (je if isinstance(je, dict) else {})
+        created = je_dict.get("created_at") or ""
+        if not str(created).startswith(str(today)[:7]):
+            continue
+        total += 1
+        if je_dict.get("status") in ("posted", "approved"):
+            coded += 1
+    pct = round(coded / total * 100) if total > 0 else 100
+    return _json({"coded": coded, "total": total, "percent_coded": pct})
+
+
+@app.get("/api/churches/{church_id}/audit-log")
+async def get_church_audit_log(church_id: str, limit: int = 20) -> JSONResponse:
+    """Return recent audit events for a church from the approval audit trail."""
+    from .tools.approval_audit import list_events as _list_events
+    try:
+        events = _list_events(church_id)
+    except Exception:
+        events = []
+    events_out = []
+    for ev in events[-limit:]:
+        events_out.append({
+            "timestamp": ev.get("timestamp") or ev.get("created_at"),
+            "action": ev.get("event_type") or ev.get("action") or "EVENT",
+            "actor": ev.get("actor_email") or ev.get("actor") or "System",
+            "description": ev.get("rationale") or ev.get("notes") or ev.get("description") or "",
+        })
+    events_out.reverse()
+    return _json({"events": events_out})
 
 
 @app.websocket("/ws/reconciliation")

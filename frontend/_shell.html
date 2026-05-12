@@ -4,8 +4,8 @@
   Mobile  (<1024px):  Bottom tab bar (5 items) + slide-in left nav + bottom-sheet chat
 -->
 <script>
-// Global API base — set from environment or default to empty string (relative paths through proxy)
-window.EIME_API = window.EIME_API || '';
+// Global API base — defaults to the current origin so relative API calls work on any port
+window.EIME_API = window.EIME_API || window.location.origin;
 </script>
 <div id="eime-shell-root" class="flex h-full w-full overflow-hidden">
 
@@ -136,6 +136,15 @@ window.EIME_API = window.EIME_API || '';
             d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
         </svg>
         Restricted Funds
+      </a>
+
+      <a data-nav="cash-forecast-weekly" href="/cash-forecast-weekly.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        13-Week Cash Forecast
       </a>
 
       <a data-nav="scenario-forecast" href="/scenario-forecast.html"

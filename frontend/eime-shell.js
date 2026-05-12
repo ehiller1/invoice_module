@@ -17,7 +17,9 @@
  */
 (function () {
   const SHELL_URL = '/_shell.html';
-  const API = (typeof window !== 'undefined' && window.EIME_API) || 'http://localhost:8000';
+  // Bootstrap the global API base from the current origin so all pages hit the right port
+  if (!window.EIME_API) window.EIME_API = window.location.origin;
+  const API = window.EIME_API;
 
   async function mount(opts) {
     opts = opts || {};

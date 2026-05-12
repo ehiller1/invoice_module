@@ -109,7 +109,11 @@ def check_pending_approvals() -> None:
     from .tools.approval_audit import append_event
 
     now = datetime.utcnow()
-    for job in flow.list_jobs():
+    try:
+        all_jobs = flow.list_jobs("holy_comforter")
+    except Exception:
+        return
+    for job in all_jobs:
         if job.status != ProcessingStatus.PENDING_BUDGET_OWNER:
             continue
         started = job.pending_approval_started_at or job.updated_at

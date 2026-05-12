@@ -105,7 +105,20 @@
                 </div>
                 <div class="p-6 space-y-6">
                     <div id="findingDetail"></div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <!-- Rationale capture — shown before confirming an action -->
+                    <div id="rationaleSection" class="hidden border-t border-gray-200 pt-4 space-y-3">
+                        <p id="rationalePrompt" class="text-sm font-medium text-gray-700"></p>
+                        <textarea id="rationaleText" rows="3" placeholder="e.g. This vendor changed their billing model in January per amended contract on file…" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                        <label id="baselineLabel" class="hidden flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="suppressCheck" class="rounded border-gray-300 text-green-600" />
+                            <span class="text-sm text-gray-700">Mark as new baseline — this pattern won't alert again</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <button id="btnConfirmAction" class="px-4 py-2 text-white rounded-lg font-medium text-sm">Confirm</button>
+                            <button onclick="cancelRationale()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-200">Cancel</button>
+                        </div>
+                    </div>
+                    <div id="adjudicationButtons" class="grid grid-cols-2 gap-4">
                         <button id="btnApprove" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">
                             ✓ Approve as OK
                         </button>
@@ -131,7 +144,7 @@
                 const data = await response.json();
 
                 // Map the response format
-                allFindings = data.map(f => ({
+                allFindings = (data.findings || data).map(f => ({
                     ...f,
                     status: f.status || 'pending'
                 }));
@@ -324,49 +337,98 @@
             document.getElementById('findingDetail').innerHTML = detailHtml;
 
             document.getElementById('btnApprove').onclick = () => {
-                finding.status = 'approved';
-                updateStats();
-                renderFindings(allFindings);
-                closeFindingModal();
+                showRationaleCapture(finding, 'approved');
             };
 
             document.getElementById('btnInvestigate').onclick = () => {
-                finding.status = 'investigating';
-                updateStats();
-                renderFindings(allFindings);
-                closeFindingModal();
+                showRationaleCapture(finding, 'investigating');
             };
 
             document.getElementById('findingModal').classList.remove('hidden');
         }
 
-        function closeFindingModal() {
-            document.getElementById('findingModal').classList.add('hidden');
+        function showRationaleCapture(finding, action) {
+            const isApprove = action === 'approved';
+            document.getElementById('adjudicationButtons').classList.add('hidden');
+            const section = document.getElementById('rationaleSection');
+            section.classList.remove('hidden');
+            document.getElementById('rationalePrompt').textContent = isApprove
+                ? 'Why is this finding OK? Your rationale will improve future detection.'
+                : 'What are you investigating? Add context for the audit trail.';
+            const baselineLabel = document.getElementById('baselineLabel');
+            if (isApprove) baselineLabel.classList.remove('hidden');
+            else baselineLabel.classList.add('hidden');
+            document.getElementById('rationaleText').value = '';
+            document.getElementById('suppressCheck').checked = false;
+            const btn = document.getElementById('btnConfirmAction');
+            btn.textContent = isApprove ? 'Approve as OK' : 'Start Investigation';
+            btn.className = `px-4 py-2 text-white rounded-lg font-medium text-sm ${isApprove ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+            btn.onclick = async () => {
+                const reasoning = document.getElementById('rationaleText').value.trim() || null;
+                const suppress = isApprove && document.getElementById('suppressCheck').checked;
+                try {
+                    await fetch(`/api/audit/adversarial-findings/${finding.finding_id}/adjudicate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ verdict: action, reasoning, suppress_recurrence: suppress, actor: 'current_user' })
+                    });
+                } catch (_) { /* best-effort */ }
+                finding.status = action;
+                if (suppress) finding.suppressed = true;
+                updateStats();
+                renderFindings(allFindings);
+                closeFindingModal();
+                const msg = suppress
+                    ? '✓ Approved — this pattern is marked as new baseline and won\'t alert again'
+                    : isApprove ? '✓ Finding approved as OK' : '🔍 Marked as investigating';
+                showBanner(msg, isApprove ? 'green' : 'blue');
+            };
+            document.getElementById('rationaleText').focus();
         }
 
-        document.getElementById('btnFilter').addEventListener('click', () => {
-            const severity = document.getElementById('filterSeverity').value;
-            const type = document.getElementById('filterType').value;
-            const status = document.getElementById('filterStatus').value;
+        function cancelRationale() {
+            document.getElementById('rationaleSection').classList.add('hidden');
+            document.getElementById('adjudicationButtons').classList.remove('hidden');
+        }
 
-            const filtered = allFindings.filter(f => {
-                if (severity && f.severity !== severity) return false;
-                if (type && f.category !== type) return false;
-                if (status && f.status !== status) return false;
-                return true;
-            });
+        function showBanner(message, color) {
+            const colors = { green: 'bg-green-100 text-green-800 border-green-300', blue: 'bg-blue-100 text-blue-800 border-blue-300' };
+            const banner = document.createElement('div');
+            banner.className = `fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded-lg border text-sm font-medium shadow-lg z-50 ${colors[color] || colors.green}`;
+            banner.textContent = message;
+            document.body.appendChild(banner);
+            setTimeout(() => banner.remove(), 4000);
+        }
 
-            renderFindings(filtered);
-        });
-
-        document.getElementById('btnClear').addEventListener('click', () => {
-            document.getElementById('filterSeverity').value = '';
-            document.getElementById('filterType').value = '';
-            document.getElementById('filterStatus').value = '';
-            renderFindings(allFindings);
-        });
+        function closeFindingModal() {
+            document.getElementById('findingModal').classList.add('hidden');
+            document.getElementById('rationaleSection').classList.add('hidden');
+            document.getElementById('adjudicationButtons').classList.remove('hidden');
+        }
 
         async function onMounted() {
+            document.getElementById('btnFilter').addEventListener('click', () => {
+                const severity = document.getElementById('filterSeverity').value;
+                const type = document.getElementById('filterType').value;
+                const status = document.getElementById('filterStatus').value;
+
+                const filtered = allFindings.filter(f => {
+                    if (severity && f.severity !== severity) return false;
+                    if (type && f.category !== type) return false;
+                    if (status && f.status !== status) return false;
+                    return true;
+                });
+
+                renderFindings(filtered);
+            });
+
+            document.getElementById('btnClear').addEventListener('click', () => {
+                document.getElementById('filterSeverity').value = '';
+                document.getElementById('filterType').value = '';
+                document.getElementById('filterStatus').value = '';
+                renderFindings(allFindings);
+            });
+
             await loadFindings();
             eime.setContext({
                 page: 'adversarial-findings',

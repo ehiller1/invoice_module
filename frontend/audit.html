@@ -161,8 +161,14 @@ async function loadAuditTrail() {
     });
     
     const res = await fetch(`${API}/api/churches/holy_comforter/audit/approvals?${params}`);
-    allEvents = await res.json();
-    if (!Array.isArray(allEvents)) allEvents = allEvents.events || [];
+    const raw = await res.json();
+    allEvents = (Array.isArray(raw) ? raw : raw.events || []).map(e => ({
+      ...e,
+      action: (e.action || e.event_type || 'UNKNOWN').toUpperCase(),
+      actor: e.actor || e.actor_email || 'System',
+      role: e.role || e.actor_role || 'unknown',
+      notes: e.notes || e.rationale || '',
+    }));
     
     updateStats();
     renderAuditTrail();

@@ -282,6 +282,57 @@ function lineCredit(l) {
   return parseFloat(l.credit ?? l.credit_amount ?? 0) || 0;
 }
 
+const RECOG_LABELS = {
+  cash_basis:        { label: 'Recognize at Receipt',     color: 'bg-green-100 text-green-800' },
+  deferred:          { label: 'Defer — Multi-Period',      color: 'bg-blue-100 text-blue-800'  },
+  restricted:        { label: 'Restricted — Hold',         color: 'bg-purple-100 text-purple-800' },
+  conditional_grant: { label: 'Conditional Grant',         color: 'bg-orange-100 text-orange-800' },
+  pledge:            { label: 'Pledge — Recognize Ratably', color: 'bg-yellow-100 text-yellow-800' },
+};
+
+async function classifyRevenue(jeId) {
+  const API = (window.EIME_API ?? '');
+  const badge = document.getElementById(`rev-badge-${jeId}`);
+  if (badge) badge.innerHTML = '<p class="text-xs text-gray-400 mt-1 animate-pulse">Classifying…</p>';
+
+  try {
+    // Find the JE in the currently loaded list
+    const card = document.getElementById(`je-card-${jeId}`);
+    const lines = [];
+    if (card) {
+      card.querySelectorAll('[data-account]').forEach(el => {
+        lines.push({ account_number: el.dataset.account, debit: parseFloat(el.dataset.debit || 0), credit: parseFloat(el.dataset.credit || 0) });
+      });
+    }
+    const res = await fetch(`${API}/api/jes/classify-recognition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entry_id: jeId, lines, church_id: currentChurch || 'holy_comforter' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const style = RECOG_LABELS[data.classification] || { label: data.label || data.classification, color: 'bg-gray-100 text-gray-700' };
+    const conf = data.confidence != null ? `${(data.confidence * 100).toFixed(0)}%` : '';
+    const signals = data.signals || {};
+    const signalTags = Object.entries(signals)
+      .filter(([k, v]) => v === true)
+      .map(([k]) => k.replace(/_/g, ' '))
+      .join(' · ');
+    if (badge) badge.innerHTML = `
+      <div class="mt-2 p-2 rounded border border-gray-100 bg-gray-50">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="px-2 py-0.5 rounded text-xs font-semibold ${style.color}">${style.label}</span>
+          ${conf ? `<span class="text-xs text-gray-400">${conf} confidence</span>` : ''}
+          ${signalTags ? `<span class="text-xs text-gray-400">· ${signalTags}</span>` : ''}
+        </div>
+        <p class="text-xs text-gray-500 mt-1">${data.reasoning || ''}</p>
+        <p class="text-xs text-gray-400 mt-0.5 italic">${data.reference || ''}</p>
+      </div>`;
+  } catch (err) {
+    if (badge) badge.innerHTML = `<p class="text-xs text-red-500 mt-1">Classification failed: ${err.message}</p>`;
+  }
+}
+
 function renderJeCard(je, state) {
   const lines = je.lines || [];
   const totalDebit = lines.reduce((s, l) => s + lineDebit(l), 0);
@@ -299,8 +350,17 @@ function renderJeCard(je, state) {
 
   const memoText = je.description || je.memo || 'Journal Entry';
 
+  // Show "Classify Revenue" button on DRAFT JEs that have revenue lines (4xxx accounts)
+  const hasRevLine = lines.some(l => String(l.account_number || '').startsWith('4'));
+  const revClassifyBtn = (state === 'DRAFT' && hasRevLine)
+    ? `<button onclick="classifyRevenue('${je.entry_id}')"
+         class="px-3 py-1 text-sm rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors">
+         Classify Revenue
+       </button>`
+    : '';
+
   return `
-    <div class="border rounded-lg p-4 bg-white shadow-sm">
+    <div class="border rounded-lg p-4 bg-white shadow-sm" id="je-card-${je.entry_id}">
       <div class="flex justify-between items-start">
         <div>
           <div class="text-sm text-gray-500">${je.entry_id} · ${je.entry_date || 'No date'}</div>
@@ -308,6 +368,7 @@ function renderJeCard(je, state) {
         </div>
         <div class="text-lg font-bold">$${totalDebit.toFixed(2)}</div>
       </div>
+      <div id="rev-badge-${je.entry_id}"></div>
       <div class="mt-3 text-sm">
         ${lines.slice(0, 3).map(l => {
           const dr = lineDebit(l), cr = lineCredit(l);
@@ -320,7 +381,8 @@ function renderJeCard(je, state) {
         }).join('')}
         ${lines.length > 3 ? `<div class="text-gray-400">+${lines.length - 3} more lines</div>` : ''}
       </div>
-      <div class="mt-3 flex gap-2">
+      <div class="mt-3 flex gap-2 flex-wrap">
+        ${revClassifyBtn}
         ${actions.map(a => `<button class="je-action px-3 py-1 text-sm rounded ${a.isPost ? 'bg-green-600 text-white' : a.isPayment ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}" data-je="${je.entry_id}" data-state="${a.toState}" data-ispost="${a.isPost || false}" data-ispayment="${a.isPayment || false}">${a.label}</button>`).join('')}
       </div>
     </div>
