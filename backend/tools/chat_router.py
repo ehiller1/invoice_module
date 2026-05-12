@@ -11,6 +11,7 @@ parish-specific guidance alongside denominational canon.
 """
 from __future__ import annotations
 import json
+import logging
 import os
 import re
 import uuid
@@ -19,6 +20,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
 from .skill_registry import get_registry
+
+logger = logging.getLogger(__name__)
 
 # Denomination skill map
 _DENOM_SKILL = {
@@ -396,13 +399,29 @@ def _build_system_prompt(job: Optional[Any], kb_hits: Optional[List[Any]] = None
     qa_skill = registry.load_body("agent_qa_interface") if registry.get("agent_qa_interface") else ""
 
     system = (
-        "You are the EIME Agent Q&A Interface — an expert church accountant who explains "
-        "the decisions made by the EIME invoice processing pipeline. You have deep knowledge "
-        "of nonprofit fund accounting (GAAP ASC 958), church denomination-specific accounting "
-        "rules, and the EIME pipeline architecture.\n\n"
-        "Always cite specific values from the job context when available. "
-        "When uncertainty exists, acknowledge it. "
-        "Use plain English; define accounting terms inline.\n\n"
+        "You are the Books assistant — an expert church accountant for a parish using "
+        "the Books platform. You have deep knowledge of nonprofit fund accounting "
+        "(GAAP ASC 958), church-denomination-specific accounting rules, and the Books "
+        "pipeline.\n\n"
+        "You can answer questions in three modes, and you should pick the right mode "
+        "based on the question:\n"
+        "  1. **Invoice/job triage** — when a specific job context is provided, explain "
+        "     classification rationale, GL account selection, risk scores, fraud signals, "
+        "     fund restrictions, and journal entry construction.\n"
+        "  2. **Financial position** — when the user asks about current cash, balances, "
+        "     net assets, fund position, or 'how are we doing right now', use the "
+        "     'Current financial position' snapshot in the user context. Always state "
+        "     the basis (cash vs accrual) and the as-of date. Show confidence ranges "
+        "     instead of point estimates when the underlying numbers carry uncertainty.\n"
+        "  3. **General accounting Q&A** — for everything else, answer as a church "
+        "     accountant would.\n\n"
+        "Rules:\n"
+        "- Cite specific values from the supplied context whenever possible.\n"
+        "- When uncertainty exists, acknowledge it explicitly and propose what would "
+        "  tighten the answer.\n"
+        "- Use plain English; define accounting terms inline.\n"
+        "- Do not refuse a question because it's outside the invoice pipeline. If you "
+        "  lack data, say what you'd need.\n\n"
     )
     if qa_skill:
         system += f"## Agent Q&A Interface Protocol\n{qa_skill[:1500]}\n\n"
@@ -420,12 +439,81 @@ def _build_system_prompt(job: Optional[Any], kb_hits: Optional[List[Any]] = None
     return system
 
 
-def _build_user_context(question: str, job: Optional[Any]) -> str:
-    """Build a rich context string from job state for the LLM prompt."""
+def _build_financial_position_snippet(ctx: Optional[Any]) -> str:
+    """Compose a balance-sheet-flavoured snapshot for the LLM prompt.
+
+    Delegates to backend.routes.financial_position.compute_position so the
+    chat snippet and the dashboard card show the *same* numbers. Returns
+    an empty string when no church_id is available.
+    """
+    if ctx is None:
+        return ""
+    church_id = getattr(ctx, "church_id", None)
+    if not church_id:
+        return ""
+    try:
+        from ..routes.financial_position import compute_position
+        snap = compute_position(church_id)
+    except Exception:
+        snap = None
+    if not snap:
+        return ""
+
+    totals = snap.get("totals", {}) or {}
+    funds = snap.get("funds", []) or []
+    out = ["## Current financial position (latest available snapshot)"]
+    out.append(f"- As-of: {snap.get('as_of', '?')} (basis: {snap.get('basis', 'ledger_balance')})")
+    out.append(f"- Total fund balance: ${totals.get('total_fund_balance', 0):,.0f}")
+    out.append(f"  - Unrestricted:           ${totals.get('unrestricted', 0):,.0f}")
+    out.append(f"  - Temporarily restricted: ${totals.get('temporarily_restricted', 0):,.0f}")
+    out.append(f"  - Permanently restricted: ${totals.get('permanently_restricted', 0):,.0f}")
+    if funds:
+        out.append("- Fund-level detail (largest first):")
+        for f in funds[:8]:
+            name = f.get('fund_name', '?')
+            rc = f.get('restriction_class', '?')
+            cur = f.get('current_balance', 0)
+            opening = f.get('opening_balance', cur)
+            je_net = f.get('je_net', 0.0)
+            je_n = f.get('posted_je_count', 0)
+            if je_n > 0:
+                sign = '+' if je_net >= 0 else '-'
+                je_label = f"opening ${opening:,.0f} + {je_n} posted JE {sign}${abs(je_net):,.0f}"
+                out.append(f"  - {name}: ${cur:,.0f} ({rc}) [{je_label}]")
+            else:
+                out.append(f"  - {name}: ${cur:,.0f} ({rc})")
+    conf = snap.get("confidence", {}) or {}
+    out.append(f"- Confidence: fund-level {conf.get('fund_level', 'HIGH')}, GL roll-up {conf.get('gl_rollup', 'MEDIUM')}.")
+    out.append(f"- {conf.get('as_of_basis', 'ledger snapshot, not a closed-period statement')}.")
+    return "\n".join(out)
+
+
+def _build_user_context(question: str, job: Optional[Any], ctx: Optional[Any] = None) -> str:
+    """Build a rich context string from job state for the LLM prompt.
+
+    `ctx` is the AccountingContext — passed in directly so callers without a
+    job (Flow 16 "books-as-of-now") still get a real financial-position
+    snippet appended.
+    """
     parts: List[str] = [f"## User Question\n{question}\n"]
 
     if not job:
-        parts.append("\n## Context\nNo specific job context provided. Answer based on general EIME/accounting knowledge.")
+        # No job context — but we still know the church. Include a
+        # financial-position snapshot when an AccountingContext is available
+        # so Flow 16 questions ("what's our financial position?") get a real
+        # answer instead of a "no context" stub.
+        snippet = _build_financial_position_snippet(ctx)
+        if snippet:
+            parts.append("\n" + snippet)
+            parts.append("\n## Answering guidance")
+            parts.append(
+                "If the user asks about current financial position, cash, fund balances, "
+                "net assets, or 'how are we doing right now', cite the snapshot above and "
+                "flag any number whose basis or confidence is less than HIGH. Show ranges "
+                "or confidence bands instead of point estimates when uncertainty exists."
+            )
+        else:
+            parts.append("\n## Context\nNo specific job context provided. Answer based on general EIME/accounting knowledge.")
         return "\n".join(parts)
 
     # Determine which skills to load based on question keywords
@@ -625,11 +713,18 @@ async def route_question(
         kb_hits = []
 
     if not api_key:
+        # Distinct error code so ops can grep for it; user sees a stable string.
+        logger.error(
+            "chat-assistant unavailable: ANTHROPIC_API_KEY is not set "
+            "(error_code=assistant-unavailable:no-key)"
+        )
         return {
             "answer": (
-                "The Agent Q&A interface requires an ANTHROPIC_API_KEY environment variable. "
-                "Set it and restart the server to enable conversational agent interrogation."
+                "I can't answer questions right now — the conversational assistant is offline. "
+                "Please reach out to your administrator and quote error code "
+                "`assistant-unavailable:no-key`."
             ),
+            "error_code": "assistant-unavailable:no-key",
             "intent": INTENT_QA,
             "skills_consulted": [],
             "kb_citations": [getattr(h, "citation", "") for h in kb_hits],
@@ -639,8 +734,17 @@ async def route_question(
     try:
         import anthropic
     except ImportError:
+        logger.error(
+            "chat-assistant unavailable: anthropic Python package not installed "
+            "(error_code=assistant-unavailable:no-package). Install with `uv pip install anthropic`."
+        )
         return {
-            "answer": "The anthropic package is not installed. Run: uv pip install anthropic",
+            "answer": (
+                "I can't answer questions right now — the conversational assistant is offline. "
+                "Please reach out to your administrator and quote error code "
+                "`assistant-unavailable:no-package`."
+            ),
+            "error_code": "assistant-unavailable:no-package",
             "intent": INTENT_QA,
             "skills_consulted": [],
             "model": None,
@@ -687,7 +791,7 @@ async def route_question(
             text = (getattr(h, "text", "") or "")[:400]
             system += f"- [{cite}] {text}\n"
 
-    user_context = _build_user_context(question, job)
+    user_context = _build_user_context(question, job, ctx)
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(

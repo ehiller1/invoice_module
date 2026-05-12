@@ -59,6 +59,7 @@
     <!-- Suggested questions -->
     <div id="suggestions" class="bg-white border-b border-slate-100 px-6 py-3 flex gap-2 flex-wrap flex-shrink-0">
       <p class="text-xs text-slate-400 self-center mr-1">Try:</p>
+      <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What's our financial position right now?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">Why does this bill need my approval?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">What looks unusual about this transaction?</button>
       <button onclick="sendSuggestion(this)" class="suggestion text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">How does this bill get recorded?</button>
@@ -77,10 +78,15 @@
           <svg class="w-4 h-4 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
         </div>
         <div class="flex-1">
-          <p class="text-xs font-semibold text-slate-500 mb-1">EIME Agent Q&A</p>
+          <p class="text-xs font-semibold text-slate-500 mb-1">Books Assistant</p>
           <div class="bg-white rounded-xl rounded-tl-none border border-slate-200 px-4 py-3 max-w-2xl prose text-sm text-slate-700">
-            <p>Hello! I can explain any decision made by the EIME pipeline — classification rationale, GL account selection, risk scores, fraud signals, fund restriction rules, denomination-specific accounting, and journal entry construction.</p>
-            <p class="mt-2">Select a processing job from the dropdown above to give me context about a specific invoice, or ask a general accounting question.</p>
+            <p>Hi — I'm the Books assistant. I can:</p>
+            <ul class="mt-2 space-y-1 list-disc pl-5">
+              <li>Tell you <strong>where the books stand right now</strong> — cash, fund balances, net position with confidence framing.</li>
+              <li>Explain any <strong>invoice decision</strong> — classification rationale, GL coding, risk scores, fund restrictions, JE construction.</li>
+              <li>Answer <strong>general accounting questions</strong> for a parish — GAAP ASC 958, denomination rules, journal entries.</li>
+            </ul>
+            <p class="mt-2 text-xs text-slate-500">Tip: pick a specific job from the dropdown above to ground my answer in one invoice; leave it on <em>General</em> for books-wide questions.</p>
           </div>
         </div>
       </div>
@@ -176,7 +182,7 @@ function appendMessage(role, html, meta) {
         <svg class="w-4 h-4 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
       </div>
       <div class="flex-1 max-w-3xl">
-        <p class="text-xs font-semibold text-slate-500 mb-1">EIME Agent Q&A${meta ? ` · ${meta}` : ''}</p>
+        <p class="text-xs font-semibold text-slate-500 mb-1">Books Assistant${meta ? ` · ${meta}` : ''}</p>
         <div class="bg-white rounded-xl rounded-tl-none border border-slate-200 px-4 py-3 prose text-sm text-slate-700 leading-relaxed">${html}</div>
       </div>`;
   } else {
@@ -242,10 +248,11 @@ async function sendQuestion() {
   appendThinking();
 
   try {
+    const church_id = (window.EIMESession && window.EIMESession.getChurch()) || 'holy_comforter';
     const res = await fetch(`${API}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, job_id: jobId }),
+      body: JSON.stringify({ question, job_id: jobId, church_id }),
     });
     const data = await res.json();
     removeThinking();
@@ -285,6 +292,11 @@ EIMEShell.mount({
     });
     loadJobs();
     checkApiKey();
+    const preQ = new URLSearchParams(window.location.search).get('q');
+    if (preQ) {
+      const inp = document.getElementById('question-input');
+      if (inp) inp.value = preQ;
+    }
   }
 });
 </script>
