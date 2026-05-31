@@ -24,10 +24,7 @@
           "component": "ApprovalCard",
           "props": {
             "title": "Hard block",
-            "body_template": "{block.reason}",
-            "blocking": true,
-            "overridable": false,
-            "catalog_gap_note": "needed: non-dismissible blocking modal with explain-only action (no override) for FUND_RESTRICTION_VIOLATION / PAYMENT_DEDUP_RISK",
+            "body_template": "This action is permanently blocked: {block.reason}. It cannot be overridden.",
             "actions": [ { "id": "explain", "label": "Why?", "style": "default" } ]
           }
         },
@@ -75,5 +72,14 @@
     "membrane_id": "mem.ein.parish.outer",
     "perturbation_correlation_id": "{runtime.correlation_id}"
   },
-  "rendering_hints": { "priority": "high", "dismissible": false, "persist_until": null, "theme_override": null }
+  "rendering_hints": {
+    "priority": "urgent",
+    "dismissible": false,
+    "persist_until": null,
+    "theme_override": null,
+    "catalog_gap_note": [
+      "needed: HardBlockModal — non-dismissible blocking modal with explain-only action and no override path, for FUND_RESTRICTION_VIOLATION / PAYMENT_DEDUP_RISK. Fallback: ApprovalCard with explain-only action (no approve/reject) + rendering_hints.dismissible=false.",
+      "needed: BudgetOverageBanner — inline non-blocking banner with threshold gauge for BUDGET_OVERAGE_RISK. Fallback: EvidencePack notice summary."
+    ]
+  }
 }

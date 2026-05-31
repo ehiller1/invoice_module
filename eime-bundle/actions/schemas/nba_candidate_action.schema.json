@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "eime/actions/schemas/nba_candidate_action.schema.json",
+  "title": "NBA Candidate Action",
+  "type": "object",
+  "required": ["action_type", "trigger_context_id", "fields", "reversibility", "actor_class"],
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": ["post_je_now", "route_to_approval", "defer_posting", "request_human_review",
+               "propose_reclassification", "batch_approve_high_confidence", "escalate_sla",
+               "propose_dedup_resolution", "recommend_budget_reallocation", "do_nothing"]
+    },
+    "trigger_context_id": { "type": "string" },
+    "fields": { "type": "object" },
+    "eligibility_passed": { "type": "boolean" },
+    "reversibility": { "type": "string", "enum": ["reversible", "partially_reversible", "irreversible"] },
+    "actor_class": { "type": "string", "enum": ["human_only", "agent_eligible", "either"] }
+  }
+}

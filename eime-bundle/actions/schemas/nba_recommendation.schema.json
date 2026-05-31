@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "eime/actions/schemas/nba_recommendation.schema.json",
+  "title": "NBA Recommendation (published as embark.surface.eime.recommendation.v1)",
+  "type": "object",
+  "required": ["recommendation_id", "domain", "goal_state", "chosen_action", "alternatives", "rationale", "consumer", "ledger_ref"],
+  "properties": {
+    "recommendation_id": { "type": "string" },
+    "domain": { "type": "string", "const": "nba-eime" },
+    "trigger_perturbation_id": { "type": "string" },
+    "goal_state": { "type": "string" },
+    "distance_from_goal": { "type": "string" },
+    "chosen_action": { "$ref": "nba_candidate_action.schema.json" },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action_type": { "type": "string" },
+          "score": { "type": "number" },
+          "would_have_won_if": { "type": "string" }
+        }
+      }
+    },
+    "factor_scores": {
+      "type": "object",
+      "properties": {
+        "propensity": { "type": "number" },
+        "context": { "type": "number" },
+        "value": { "type": "number" },
+        "levers": { "type": "number" }
+      }
+    },
+    "rationale": { "type": "string" },
+    "consumer": { "type": "string", "enum": ["agent", "human_card"] },
+    "escalate": { "type": "boolean" },
+    "surface_id": { "type": "string" },
+    "ucs_mode": { "type": "string", "enum": ["Analyze", "Delegate", "Automate", "Shadow"] },
+    "ledger_ref": { "type": "string" },
+    "correlation_id": { "type": "string" }
+  }
+}

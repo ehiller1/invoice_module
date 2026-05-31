@@ -1,0 +1,30 @@
+{
+  "comment": "5 edge-case signal variants for the EIME NBA crew. Each names the expected crew behavior.",
+  "fixtures": [
+    {
+      "name": "happy_path_recurring_post",
+      "expected": "Sensor passes; Arbiter picks post_je_now; consumer=human_card Delegate on treasurer_dashboard.",
+      "signal": { "type": "eime.journal_entry_ready", "data": { "je_id": "je_5001", "recurring_template_match": "tmpl_utilities_monthly", "within_amount_tolerance": true, "classification_confidence": 0.94, "no_active_hard_block": true, "consuming_actor_role": "TREASURER_ADMIN" } }
+    },
+    {
+      "name": "cooldown_suppression",
+      "expected": "Sensor suppresses — same je_id evaluated 2m ago, within 5m cooldown.",
+      "signal": { "type": "eime.journal_entry_ready", "data": { "je_id": "je_4821", "_recent_eval_seconds_ago": 120 } }
+    },
+    {
+      "name": "conflicting_projections",
+      "expected": "Arbiter must arbitrate — post_je_now saves toil but raises cash_timing_impact while route_to_approval lowers SLA risk; spread > 0.10 so no escalation.",
+      "signal": { "type": "eime.budget_overage_risk", "data": { "fund_id": "fund_facilities", "breaches_budget_threshold": true, "classification_confidence": 0.88 } }
+    },
+    {
+      "name": "irreversible_top_candidate_escalation",
+      "expected": "Top candidate is recommend_budget_reallocation (human_only, harm axis non-zero) -> escalate=true, consumer=human_card Analyze on cabinet.",
+      "signal": { "type": "eime.budget_overage_risk", "data": { "fund_id": "fund_restricted_memorial", "breaches_budget_threshold": true, "compliance_adjacent": true } }
+    },
+    {
+      "name": "insufficient_context_defer",
+      "expected": "Recommender defers — trigger lacks confidence + tolerance fields to project; emits request_human_review rather than guessing.",
+      "signal": { "type": "eime.reconciliation_exception", "data": { "exception_id": "exc_99", "match_candidates": [] } }
+    }
+  ]
+}

@@ -11,9 +11,7 @@
           "component": "ActionCard",
           "props": {
             "title_template": "Recommended: {recommendation.title}",
-            "body_template": "{recommendation.rationale}",
-            "impact_preview_template": "{recommendation.impact_preview}",
-            "catalog_gap_note": "needed: impact-preview / scenario component showing projected before/after deltas; falling through to ActionCard body for now",
+            "body_template": "{recommendation.rationale}\n\nProjected impact: {recommendation.impact_preview}",
             "actions": [
               { "id": "accept", "label": "Do it", "style": "primary" },
               { "id": "dismiss", "label": "Dismiss", "style": "default" }
@@ -52,5 +50,13 @@
     "membrane_id": "mem.ein.parish.cabinet_gate",
     "perturbation_correlation_id": "{runtime.correlation_id}"
   },
-  "rendering_hints": { "priority": "normal", "dismissible": true, "persist_until": null, "theme_override": null }
+  "rendering_hints": {
+    "priority": "normal",
+    "dismissible": true,
+    "persist_until": null,
+    "theme_override": null,
+    "catalog_gap_note": [
+      "needed: ImpactPreviewPanel — scenario/impact panel showing projected before/after deltas for a next-best-action recommendation. Fallback: projected impact folded into ActionCard body_template."
+    ]
+  }
 }

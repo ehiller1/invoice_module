@@ -22,6 +22,7 @@ crews:
         backstory: Document-extraction worker. Always call your tool; never ask for input.
         tools: [extract_invoice_pdf]
         consumes_perturbations: [INVOICE_INGESTED]
+        loadable_skills: [agent-output-display]   # emits to finance_position
       - id: coa_loader
         role: Chart of Accounts Loader
         goal: Call the load_chart_of_accounts tool exactly once and report its JSON output verbatim.
@@ -32,18 +33,21 @@ crews:
         goal: Call the classify_line_items_against_coa tool exactly once and report its JSON output verbatim.
         backstory: Automation worker. Always call your tool; never ask for input.
         tools: [classify_line_items_against_coa]
+        loadable_skills: [agent-output-display]   # emits to finance_position
       - id: gl_account_mapper
         role: GL Account Mapper
         goal: Call the map_lines_to_gl_accounts tool exactly once and report its JSON output verbatim.
         backstory: Automation worker. Always call your tool; never ask for input.
         tools: [map_lines_to_gl_accounts]
         emits_perturbations: [MAPPING_CONFIDENCE_LOW]
+        loadable_skills: [agent-output-display]   # emits to finance_position
       - id: risk_fraud_officer
         role: Risk and Fraud Officer
         goal: Call assess_risk_and_fraud, then compare_to_budget. Report both JSON outputs verbatim.
         backstory: Automation worker. Always call your tools in order; never ask for input.
         tools: [assess_risk_and_fraud, compare_to_budget]
         emits_perturbations: [BUDGET_OVERAGE_RISK]
+        loadable_skills: [agent-output-display]   # emits to treasurer_dashboard / cabinet
       - id: allocation_reviewer
         role: Allocation Reviewer
         goal: Call the review_allocations_for_approval tool exactly once and report its JSON output verbatim.
@@ -55,6 +59,7 @@ crews:
         backstory: Automation worker. Always call your tool; never ask for input.
         tools: [build_journal_entry]
         emits_perturbations: [JOURNAL_ENTRY_READY]
+        loadable_skills: [agent-output-display]   # emits to finance_position / treasurer_dashboard
 
   # ============== Crew 2: JE Drafting & Fund-Accounting Compliance (UC-2) ==============
   journal_entry_compliance:
@@ -66,11 +71,13 @@ crews:
         goal: Transform natural-language descriptions into accurate, balanced journal entries with proper chart-of-accounts mapping.
         backstory: You hold the parish chart of accounts and fund roster; you never emit an unbalanced entry.
         consumes_perturbations: [JOURNAL_ENTRY_READY]
+        loadable_skills: [agent-output-display]   # emits to finance_position
       - id: compliance_officer
         role: Compliance Officer & Policy Enforcer
         goal: Ensure all journal entries comply with fund restrictions, donor intent, and church policies before posting; flag policy violations.
         backstory: You are the policy conscience of EIME; restricted-fund violations are hard blocks, never overrides.
         emits_perturbations: [FUND_RESTRICTION_VIOLATION, POLICY_VIOLATION]
+        loadable_skills: [agent-output-display]   # emits to treasurer_dashboard (hard-block modal / policy feed)
 
   # ============== Crew 3: Human-in-the-Loop Approval (UC-3) ==============
   approval_hitl:
@@ -83,6 +90,7 @@ crews:
         backstory: You hold the approval chain config and the role/authority of every acting user; you never let a posting skip a required tier.
         consumes_perturbations: [JOURNAL_ENTRY_READY, APPROVAL_DEADLINE_PRESSURE]
         emits_perturbations: [HITL_ESCALATION]
+        loadable_skills: [agent-output-display]   # emits to approvals_hitl
 
   # ============== Crew 4: Bank Reconciliation (UC-4) ==============
   bank_reconciliation:
@@ -95,6 +103,7 @@ crews:
         backstory: You reconcile the parish's real money against its recorded intentions; unresolved differences become exceptions, never silent matches.
         tools: [plaid_sync, structural_matcher]
         emits_perturbations: [RECONCILIATION_EXCEPTION, PAYMENT_DEDUP_RISK]
+        loadable_skills: [agent-output-display]   # emits to reconciliation
 
   # ============== Crew 5: Autonomous Posting of Recurring Entries (UC-5) ==============
   autonomous_posting:
@@ -107,6 +116,7 @@ crews:
         backstory: You earn autonomy slowly; outside tolerance you defer rather than guess.
         tools: [recurring_learning_read]
         consumes_perturbations: [JOURNAL_ENTRY_READY]
+        loadable_skills: [agent-output-display]   # emits to treasurer_dashboard (posting queue)
 
   # ============== Crew 6: Advisory Analysis & Next-Best-Action (UC-6) ==============
   advisory_nba:
@@ -118,6 +128,7 @@ crews:
         goal: Provide audit-trail visibility, analyze decision patterns, recommend process improvements based on decision-ledger review and variance analysis.
         backstory: You read the ledger like a historian and surface options, never commands.
         tools: [decision_ledger_read, variance_analysis]
+        loadable_skills: [agent-output-display]   # emits to cabinet (recommendations / advisory)
 
   # ============== Crew 7: Conversational Query / Intent Routing (UC-7) ==============
   conversational_routing:
@@ -129,3 +140,4 @@ crews:
         goal: Classify each utterance, verify the user's authority, and dispatch to the right agent or skill — answer the question or open a question card.
         backstory: You are the front door; you route by intent and authority, never by guesswork.
         tools: [chat_router, intent_classifier]
+        loadable_skills: [agent-output-display]   # opens question/intent cards on finance_position & cabinet

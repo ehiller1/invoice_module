@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://embarknow.io/schemas/eime/event_envelope.json",
+  "title": "EIME CloudEvents-shaped envelope",
+  "type": "object",
+  "required": ["specversion", "id", "source", "type", "time", "datacontenttype", "data"],
+  "properties": {
+    "specversion": {"const": "1.0"},
+    "id": {"type": "string", "description": "Unique event id"},
+    "source": {"type": "string", "description": "Emitting component URI, e.g. /ein/parish/{church_id}/eime/invoice_extractor"},
+    "type": {
+      "type": "string",
+      "description": "Perturbation name; one of perturbations/perturbations.yaml or an embark.surface.* type",
+      "examples": [
+        "eime.invoice_ingested",
+        "eime.journal_entry_ready",
+        "eime.fund_restriction_violation",
+        "eime.payment_dedup_risk",
+        "embark.surface.eime.recommendation.v1"
+      ]
+    },
+    "time": {"type": "string", "format": "date-time"},
+    "datacontenttype": {"const": "application/json"},
+    "subject": {"type": "string", "description": "Optional logical subject within source (e.g., church_id, je_id)"},
+    "dataschema": {"type": "string", "description": "URI of the payload-specific schema"},
+    "privacy_class": {"type": "string", "enum": ["P0", "P1"]},
+    "module_id": {"const": "eime"},
+    "membrane_in_flight": {"type": "string", "description": "Current membrane id this event is traversing"},
+    "consent_state_at_emit": {"type": "string", "enum": ["granted", "partial", "revoked"]},
+    "hard_block": {"type": "boolean", "description": "True for FUND_RESTRICTION_VIOLATION / PAYMENT_DEDUP_RISK — never overridable"},
+    "evidence_chain": {"type": "array", "items": {"type": "string"}, "description": "Audit chain (decision_ledger refs)"},
+    "correlation_id": {"type": "string", "description": "Propagated through UI emission bundles back to the originating decision"},
+    "data": {"type": "object", "description": "Perturbation-specific payload — see perturbations.yaml for field definitions"}
+  }
+}

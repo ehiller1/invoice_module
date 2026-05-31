@@ -1,0 +1,145 @@
+# EIME bundle — Redis Streams + Pub/Sub mesh topology
+# Module: eime (parish-tier). Wires perturbations/perturbations.yaml +
+# the embark.surface.* events to consumer groups, with retention + privacy class.
+# Consumer routing mirrors events/perturbation_bindings.yaml and
+# interactions/surface_bindings.yaml.
+
+schema_version: 1.0
+module_id: eime
+broker: redis
+namespace: ein.parish.eime
+
+# ========== STREAMS (durable, replayable) ==========
+streams:
+
+  # Inbound invoices (external ingestion)
+  ein.parish.eime.invoice_inbound:
+    description: Invoice documents ingested for extraction + mapping
+    perturbations: [eime.invoice_ingested]
+    retention: 90d
+    consumer_groups:
+      - name: eime.invoice_extractor
+      - name: eime.decision_ledger_writer
+
+  # Classification + mapping lifecycle
+  ein.parish.eime.mapping:
+    perturbations: [eime.mapping_confidence_low]
+    retention: 90d
+    consumer_groups:
+      - name: eime.hitl_gate_coordinator
+      - name: eime.decision_ledger_writer
+      - name: ui.finance_position
+      - name: ui.approvals_hitl
+
+  # Journal entry lifecycle (P0 amounts)
+  ein.parish.eime.journal_entries:
+    perturbations: [eime.journal_entry_ready]
+    retention: 365d
+    privacy_class: P0
+    consumer_groups:
+      - name: eime.journal_entry_drafter
+      - name: eime.hitl_gate_coordinator
+      - name: eime.autonomous_posting_engine
+      - name: eime.decision_ledger_writer
+      - name: ui.finance_position
+      - name: ui.treasurer_dashboard
+
+  # Hard blocks — non-overridable, retained forever
+  ein.parish.eime.hard_blocks:
+    perturbations: [eime.fund_restriction_violation, eime.payment_dedup_risk]
+    retention: forever
+    consumer_groups:
+      - name: eime.compliance_officer
+      - name: eime.reconciliation_specialist
+      - name: eime.decision_ledger_writer
+      - name: ui.treasurer_dashboard
+      - name: ui.reconciliation
+
+  # Soft flags (budget + policy)
+  ein.parish.eime.flags:
+    perturbations: [eime.budget_overage_risk, eime.policy_violation]
+    retention: 365d
+    consumer_groups:
+      - name: eime.compliance_officer
+      - name: eime.accounting_advisor
+      - name: eime.decision_ledger_writer
+      - name: ui.treasurer_dashboard
+      - name: ui.cabinet
+
+  # Reconciliation
+  ein.parish.eime.reconciliation:
+    perturbations: [eime.reconciliation_exception]
+    retention: 90d
+    consumer_groups:
+      - name: eime.hitl_gate_coordinator
+      - name: eime.reconciliation_specialist
+      - name: eime.decision_ledger_writer
+      - name: ui.reconciliation
+
+  # HITL / approval escalation (cross-membrane)
+  ein.parish.eime.hitl:
+    perturbations: [eime.hitl_escalation, eime.approval_deadline_pressure]
+    retention: 365d
+    consumer_groups:
+      - name: eime.hitl_gate_coordinator
+      - name: eime.decision_ledger_writer
+      - name: ui.approvals_hitl
+
+  # Surface-originated CloudEvents (UI interactions → mesh)
+  ein.parish.eime.surface_events:
+    description: embark.surface.* events emitted by UI interactions; consumed back by the substrate
+    perturbations:
+      - embark.surface.eime.classification_approved.v1
+      - embark.surface.eime.mapping_corrected.v1
+      - embark.surface.eime.je_posted.v1
+      - embark.surface.eime.approval_granted.v1
+      - embark.surface.eime.review_resolved.v1
+      - embark.surface.eime.exception_resolved.v1
+      - embark.surface.eime.recommendation_accepted.v1
+    retention: 365d
+    consumer_groups:
+      - name: eime.journal_entry_drafter
+      - name: eime.hitl_gate_coordinator
+      - name: eime.reconciliation_specialist
+      - name: eime.autonomous_posting_engine
+      - name: eime.decision_ledger_writer
+
+  # NBA recommendations
+  ein.parish.eime.recommendations:
+    perturbations: [embark.surface.eime.recommendation.v1]
+    retention: 90d
+    publish_through_membrane: mem.ein.parish.nba
+    consumer_groups:
+      - name: eime.outcome_listener
+      - name: eime.decision_ledger_writer
+      - name: ui.cabinet
+
+  # Conversational
+  ein.parish.eime.conversation:
+    perturbations: [intent_router.user_utterance, intent_router.dispatch_request, intent_router.dispatched_result]
+    retention: 7d
+    consumer_groups:
+      - name: eime.intent_router
+      - name: ui.finance_position
+      - name: ui.cabinet
+
+  # Decision-ledger federation export (cross-membrane, P1 floor)
+  ein.parish.eime.ledger_export:
+    description: Distilled operational patterns crossing the parish federation membrane
+    perturbations: [eime.ledger.pattern_export]
+    retention: forever
+    privacy_class: P1
+    publish_through_membrane: mem.ein.parish.ledger_export
+    consumer_groups:
+      - name: dof.parish_receptor
+
+# ========== PUB/SUB CHANNELS (ephemeral broadcasts) ==========
+pubsub:
+  ein.parish.eime.ui.refresh:
+    description: Broadcast dashboard refresh on significant posting/approval
+    publishers: [eime.autonomous_posting_engine, eime.hitl_gate_coordinator]
+    subscribers: [ui.treasurer_dashboard, ui.finance_position, ui.approvals_hitl]
+  ein.parish.eime.heartbeat:
+    description: Liveness heartbeat for every EIME agent
+    publishers: [all_eime_agents]
+    subscribers: [ops.health_monitor]

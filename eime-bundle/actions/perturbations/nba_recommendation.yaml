@@ -1,0 +1,21 @@
+# EIME NBA layer — recommendation perturbation registration
+# Republished by the Recommender. Staged in docs/registration_queue.yaml as
+# embark.surface.eime.recommendation.v1 (propose_new).
+
+schema_version: 1.0
+module_id: eime
+layer: nba
+
+perturbation:
+  id: embark.surface.eime.recommendation.v1
+  privacy_class: P1
+  crosses_membrane: false
+  origin: nba
+  publisher: recommender
+  membrane: mem.ein.parish.nba
+  schema: schemas/nba_recommendation.schema.json
+  consumed_by_surface: cabinet            # recommendations_queue (impact preview)
+  registration_state: propose_new
+  note: >-
+    Surface/NBA-originated recommendation event. Staged at Checkpoint 2 with
+    the other embark.surface.* perturbations.

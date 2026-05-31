@@ -11,10 +11,7 @@
           "component": "ApprovalCard",
           "props": {
             "title": "Possible duplicate payment",
-            "body_template": "{dedup.detail}",
-            "blocking": true,
-            "overridable": false,
-            "catalog_gap_note": "needed: non-dismissible blocking modal with explain-only action for PAYMENT_DEDUP_RISK",
+            "body_template": "This payment is blocked as a probable duplicate: {dedup.detail}. It cannot be overridden.",
             "actions": [ { "id": "explain", "label": "Why blocked?", "style": "default" } ]
           }
         },
@@ -54,5 +51,13 @@
     "membrane_id": "mem.ein.parish.intent_gate",
     "perturbation_correlation_id": "{runtime.correlation_id}"
   },
-  "rendering_hints": { "priority": "high", "dismissible": false, "persist_until": null, "theme_override": null }
+  "rendering_hints": {
+    "priority": "urgent",
+    "dismissible": false,
+    "persist_until": null,
+    "theme_override": null,
+    "catalog_gap_note": [
+      "needed: HardBlockModal — non-dismissible blocking modal with explain-only action and no override path, for PAYMENT_DEDUP_RISK during dedup review. Fallback: ApprovalCard with explain-only action (no approve/reject) + rendering_hints.dismissible=false."
+    ]
+  }
 }

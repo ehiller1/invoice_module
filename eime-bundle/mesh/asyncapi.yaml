@@ -1,0 +1,118 @@
+asyncapi: '2.6.0'
+info:
+  title: EIME Module — Parish Tier Event Mesh
+  version: 1.0.0
+  description: |
+    AsyncAPI contract for the EIME (Embark Invoice Mapping Engine) parish-tier
+    module on EmbarkNow. Wires perturbations/perturbations.yaml + the
+    embark.surface.* events to Redis Streams and Pub/Sub channels defined in
+    mesh/mesh_config.yaml.
+
+defaultContentType: application/json
+
+servers:
+  parish_redis:
+    url: redis://parish-tier-redis:6379
+    protocol: redis
+    description: Parish-tier Redis broker (per-church deployment)
+
+channels:
+
+  ein.parish.eime.invoice_inbound:
+    description: Invoice documents ingested for extraction + mapping
+    subscribe:
+      summary: EIME consumes ingested invoices
+      operationId: consumeInvoiceInbound
+      message:
+        $ref: '#/components/messages/InvoiceIngested'
+
+  ein.parish.eime.mapping:
+    description: Low-confidence mapping events routed to human review
+    publish:
+      summary: EIME emits mapping-confidence events
+      operationId: publishMapping
+      message:
+        $ref: '#/components/messages/MappingConfidenceLow'
+
+  ein.parish.eime.journal_entries:
+    description: Journal entry lifecycle (P0 amounts)
+    publish:
+      summary: EIME emits JE-ready events
+      operationId: publishJournalEntries
+      message:
+        $ref: '#/components/messages/JournalEntryReady'
+
+  ein.parish.eime.hard_blocks:
+    description: Non-overridable fund-restriction and payment-dedup blocks
+    publish:
+      summary: EIME emits hard blocks
+      operationId: publishHardBlocks
+      message:
+        oneOf:
+          - $ref: '#/components/messages/FundRestrictionViolation'
+          - $ref: '#/components/messages/PaymentDedupRisk'
+
+  ein.parish.eime.flags:
+    description: Budget overage and policy violation soft flags
+    publish:
+      summary: EIME emits soft flags
+      operationId: publishFlags
+
+  ein.parish.eime.reconciliation:
+    description: Reconciliation exceptions
+    publish:
+      summary: EIME emits reconciliation exceptions
+      operationId: publishReconciliation
+
+  ein.parish.eime.hitl:
+    description: HITL escalation + approval SLA pressure (cross-membrane)
+    publish:
+      summary: EIME emits HITL/escalation events
+      operationId: publishHitl
+
+  ein.parish.eime.surface_events:
+    description: embark.surface.* events emitted by UI interactions, consumed back by the substrate
+    publish:
+      summary: UI surfaces emit interaction CloudEvents
+      operationId: publishSurfaceEvents
+
+  ein.parish.eime.recommendations:
+    description: NBA recommendations (through mem.ein.parish.nba)
+    publish:
+      summary: NBA layer emits recommendations
+      operationId: publishRecommendations
+      message:
+        $ref: '#/components/messages/NbaRecommendation'
+
+  ein.parish.eime.conversation:
+    description: Conversational intent routing
+    publish:
+      summary: Intent router conversation events
+      operationId: publishConversation
+
+  ein.parish.eime.ledger_export:
+    description: Distilled patterns crossing the parish federation membrane (P1 floor)
+    publish:
+      summary: EIME exports ledger patterns to DOF
+      operationId: publishLedgerExport
+
+components:
+  messages:
+    InvoiceIngested:
+      name: InvoiceIngested
+      payload: { $ref: 'event_envelope.schema.json' }
+    MappingConfidenceLow:
+      name: MappingConfidenceLow
+      payload: { $ref: 'event_envelope.schema.json' }
+    JournalEntryReady:
+      name: JournalEntryReady
+      payload: { $ref: 'event_envelope.schema.json' }
+    FundRestrictionViolation:
+      name: FundRestrictionViolation
+      payload: { $ref: 'event_envelope.schema.json' }
+    PaymentDedupRisk:
+      name: PaymentDedupRisk
+      payload: { $ref: 'event_envelope.schema.json' }
+    NbaRecommendation:
+      name: NbaRecommendation
+      payload: { $ref: 'event_envelope.schema.json' }

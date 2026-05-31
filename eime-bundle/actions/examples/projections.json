@@ -1,0 +1,42 @@
+{
+  "projections": [
+    {
+      "action_type": "post_je_now",
+      "depth": 2,
+      "is_baseline": false,
+      "dimensions": {
+        "posting_accuracy_delta": { "point": 0.0, "low": -0.02, "high": 0.01, "unit": "prob" },
+        "sla_risk_delta": { "point": -0.15, "low": -0.20, "high": -0.08, "unit": "prob" },
+        "compliance_exposure": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "risk" },
+        "human_toil_delta": { "point": -6.0, "low": -8.0, "high": -3.0, "unit": "minutes" },
+        "cash_timing_impact": { "point": 0.0, "low": -1.0, "high": 0.0, "unit": "days" }
+      },
+      "delusion_flags": []
+    },
+    {
+      "action_type": "route_to_approval",
+      "depth": 2,
+      "dimensions": {
+        "posting_accuracy_delta": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "prob" },
+        "sla_risk_delta": { "point": 0.05, "low": 0.0, "high": 0.12, "unit": "prob" },
+        "compliance_exposure": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "risk" },
+        "human_toil_delta": { "point": 4.0, "low": 2.0, "high": 7.0, "unit": "minutes" },
+        "cash_timing_impact": { "point": 1.0, "low": 0.0, "high": 2.0, "unit": "days" }
+      },
+      "delusion_flags": []
+    },
+    {
+      "action_type": "do_nothing",
+      "depth": 2,
+      "is_baseline": true,
+      "dimensions": {
+        "posting_accuracy_delta": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "prob" },
+        "sla_risk_delta": { "point": 0.20, "low": 0.10, "high": 0.30, "unit": "prob" },
+        "compliance_exposure": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "risk" },
+        "human_toil_delta": { "point": 0.0, "low": 0.0, "high": 0.0, "unit": "minutes" },
+        "cash_timing_impact": { "point": 2.0, "low": 1.0, "high": 4.0, "unit": "days" }
+      },
+      "delusion_flags": []
+    }
+  ]
+}

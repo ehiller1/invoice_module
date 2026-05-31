@@ -1,0 +1,27 @@
+# EIME NBA layer — perturbation subscriptions
+# Perturbation IDs the NBA Sensor listens to. All resolve to entries in
+# perturbations/perturbations.yaml (substrate). Hard blocks are intentionally
+# excluded — they never enter NBA arbitration.
+
+schema_version: 1.0
+module_id: eime
+layer: nba
+
+sensor_subscribes_to:
+  - eime.journal_entry_ready
+  - eime.budget_overage_risk
+  - eime.reconciliation_exception
+  - eime.approval_deadline_pressure
+  - eime.mapping_confidence_low
+
+outcome_listener_subscribes_to:
+  - embark.surface.eime.je_posted.v1
+  - embark.surface.eime.approval_granted.v1
+  - embark.surface.eime.exception_resolved.v1
+  - embark.surface.eime.recommendation_accepted.v1
+
+excluded_hard_blocks:
+  - eime.fund_restriction_violation   # non-overridable; never arbitrated
+  - eime.payment_dedup_risk           # non-overridable; never arbitrated
+
+open_dependencies: []   # all subscribed perturbations exist in the substrate

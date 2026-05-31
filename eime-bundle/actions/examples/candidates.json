@@ -1,0 +1,37 @@
+{
+  "trigger_context_id": "trig-je_4821",
+  "candidates": [
+    {
+      "action_type": "post_je_now",
+      "trigger_context_id": "trig-je_4821",
+      "fields": { "je_id": "je_4821" },
+      "eligibility_passed": true,
+      "reversibility": "partially_reversible",
+      "actor_class": "agent_eligible"
+    },
+    {
+      "action_type": "route_to_approval",
+      "trigger_context_id": "trig-je_4821",
+      "fields": { "je_id": "je_4821", "target_stage": "final" },
+      "eligibility_passed": true,
+      "reversibility": "reversible",
+      "actor_class": "either"
+    },
+    {
+      "action_type": "defer_posting",
+      "trigger_context_id": "trig-je_4821",
+      "fields": { "je_id": "je_4821", "defer_reason": "await month-end batch" },
+      "eligibility_passed": true,
+      "reversibility": "reversible",
+      "actor_class": "either"
+    },
+    {
+      "action_type": "do_nothing",
+      "trigger_context_id": "trig-je_4821",
+      "fields": {},
+      "eligibility_passed": true,
+      "reversibility": "reversible",
+      "actor_class": "either"
+    }
+  ]
+}

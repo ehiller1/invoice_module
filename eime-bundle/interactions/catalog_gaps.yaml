@@ -1,32 +1,58 @@
 # EIME bundle — catalog gaps
 # Components the design wanted but the agent-output-display catalog does not
-# provide. Each falls through to a declarative composition (no new component
-# names invented). Flagged for front-end catalog evolution.
+# provide. Each is RESOLVED via a declarative composition built from real catalog
+# components (no new component names invented). The gap note now lives in the
+# emission template's rendering_hints.catalog_gap_note (where the front-end logs
+# gaps for catalog evolution), not inside component props. Per agent-output-display
+# SKILL.md, this declarative-fallback + gap-note pattern IS the documented
+# resolution for an unavailable component.
 
 schema_version: 1.0
 module_id: eime
 
 gaps:
-  - surface_id: treasurer_dashboard
+  - id: hardblockmodal-treasurer
+    surface_id: treasurer_dashboard
     needed_component: HardBlockModal
-    proposed_tier_fallback: declarative
-    fallback_used: ApprovalCard (blocking=true, overridable=false, explain-only action)
+    status: resolved
+    tier: declarative
+    fallback_used: ApprovalCard with an explain-only action (no approve/reject), making non-overridability structural; reinforced by rendering_hints.dismissible=false and priority=urgent.
+    gap_note_location: interactions/emission_templates/treasurer_dashboard.json → rendering_hints.catalog_gap_note[0]
     description: Non-dismissible blocking modal with an explain-only action and no override path, for FUND_RESTRICTION_VIOLATION and PAYMENT_DEDUP_RISK hard blocks.
 
-  - surface_id: reconciliation
+  - id: hardblockmodal-reconciliation
+    surface_id: reconciliation
     needed_component: HardBlockModal
-    proposed_tier_fallback: declarative
-    fallback_used: ApprovalCard (blocking=true, overridable=false, explain-only action)
+    status: resolved
+    tier: declarative
+    fallback_used: ApprovalCard with an explain-only action (no approve/reject); rendering_hints.dismissible=false, priority=urgent.
+    gap_note_location: interactions/emission_templates/reconciliation.json → rendering_hints.catalog_gap_note[0]
     description: Same non-overridable blocking modal, for PAYMENT_DEDUP_RISK during dedup review.
 
-  - surface_id: treasurer_dashboard
+  - id: budgetoveragebanner-treasurer
+    surface_id: treasurer_dashboard
     needed_component: BudgetOverageBanner
-    proposed_tier_fallback: declarative
-    fallback_used: EvidencePack (notice summary)
+    status: resolved
+    tier: declarative
+    fallback_used: EvidencePack notice summary ("Budget / policy notices").
+    gap_note_location: interactions/emission_templates/treasurer_dashboard.json → rendering_hints.catalog_gap_note[1]
     description: Inline non-blocking banner for BUDGET_OVERAGE_RISK with threshold gauge.
 
-  - surface_id: cabinet
+  - id: impactpreviewpanel-cabinet
+    surface_id: cabinet
     needed_component: ImpactPreviewPanel
-    proposed_tier_fallback: declarative
-    fallback_used: ActionCard (impact_preview_template in body)
+    status: resolved
+    tier: declarative
+    fallback_used: Projected impact folded into the ActionCard body_template alongside the rationale.
+    gap_note_location: interactions/emission_templates/cabinet.json → rendering_hints.catalog_gap_note[0]
     description: Scenario/impact panel showing projected before/after deltas for a next-best-action recommendation.
+
+resolution_note: |
+  All four gaps are resolved with declarative fallbacks composed exclusively from
+  catalog components documented in agent-output-display SKILL.md (Stack, ApprovalCard,
+  DecisionCard, ActionCard, EvidencePack). No unverified component props remain in the
+  emission templates: the prior `blocking`, `overridable`, `impact_preview_template`,
+  and inline `catalog_gap_note` props were removed, and each gap note relocated to
+  rendering_hints.catalog_gap_note (an array, since a surface may surface multiple gaps).
+  These remain catalog-evolution candidates: the front-end team can promote any of the
+  four to a first-class component later without changing the surface contract.

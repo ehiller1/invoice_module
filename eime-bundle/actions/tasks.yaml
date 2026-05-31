@@ -1,0 +1,42 @@
+# EIME NBA layer — six task definitions
+
+schema_version: 1.0
+module_id: eime
+layer: nba
+
+tasks:
+  - id: assess_trigger
+    agent_id: nba_sensor
+    description: Normalize the incoming perturbation into a trigger_context; suppress if within cooldown or a duplicate of a recent evaluation.
+    requires_context: [perturbation, recent_ledger_entries]
+    expected_output: nba_trigger_context (or suppressed=true)
+
+  - id: generate_candidates
+    agent_id: candidate_generator
+    description: Emit 3–7 nba_candidate_action objects from the active domain action library, filtered by eligibility predicates.
+    requires_context: [nba_trigger_context, active_nba_domain]
+    expected_output: list of nba_candidate_action (schemas/nba_candidate_action.schema.json)
+
+  - id: simulate_candidates
+    agent_id: simulator
+    description: Project impact per candidate along the domain impact dimensions, bounded to depth, including a do-nothing baseline.
+    requires_context: [candidates, nba_trigger_context]
+    expected_output: list of nba_impact_projection (schemas/nba_impact_projection.schema.json)
+
+  - id: arbitrate
+    agent_id: arbiter
+    description: Rank candidates with the four-factor model relative to each other and the baseline; record per-factor scores and a runner-up trace.
+    requires_context: [projections, scoring_weights, goal_state]
+    expected_output: ranked_candidates with chosen winner + rationale
+
+  - id: recommend_and_publish
+    agent_id: recommender
+    description: Build the goal-grounded nba_recommendation; publish to mesh for agent consumers or surface via a UCS card for human consumers; always write a ledger entry.
+    requires_context: [ranked_candidates, consumer_type, escalation_thresholds]
+    expected_output: nba_recommendation (schemas/nba_recommendation.schema.json)
+
+  - id: observe_outcome
+    agent_id: outcome_listener
+    description: On an outcome perturbation, emit nba_outcome_observed linked to the recommendation_id for online calibration.
+    requires_context: [outcome_perturbation, recommendation_id]
+    expected_output: nba_outcome_observed

@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "eime/actions/schemas/nba_impact_projection.schema.json",
+  "title": "NBA Impact Projection",
+  "type": "object",
+  "required": ["action_type", "depth", "dimensions"],
+  "properties": {
+    "action_type": { "type": "string" },
+    "depth": { "type": "integer", "minimum": 1, "maximum": 3, "default": 2 },
+    "is_baseline": { "type": "boolean", "default": false },
+    "dimensions": {
+      "type": "object",
+      "required": ["posting_accuracy_delta", "sla_risk_delta", "compliance_exposure", "human_toil_delta", "cash_timing_impact"],
+      "properties": {
+        "posting_accuracy_delta": { "$ref": "#/$defs/banded" },
+        "sla_risk_delta": { "$ref": "#/$defs/banded" },
+        "compliance_exposure": { "$ref": "#/$defs/banded" },
+        "human_toil_delta": { "$ref": "#/$defs/banded" },
+        "cash_timing_impact": { "$ref": "#/$defs/banded" }
+      }
+    },
+    "delusion_flags": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "banded": {
+      "type": "object",
+      "required": ["point", "low", "high"],
+      "properties": {
+        "point": { "type": "number" },
+        "low": { "type": "number" },
+        "high": { "type": "number" },
+        "unit": { "type": "string" }
+      }
+    }
+  }
+}

@@ -247,17 +247,6 @@
   staged_at: '2026-05-31T09:41:58.808214+00:00'
 - state: propose_new
   kind: guider_message
-  proposed_id: eime.msg.test.circular
-  fields:
-    guider: accounting-integrity
-    module_id: eime
-  text: Circular allocation detected.
-  similarity_score: 0.0
-  nearest_existing: null
-  reason: test
-  staged_at: '2026-05-31T09:43:14.638180+00:00'
-- state: propose_new
-  kind: guider_message
   proposed_id: eime.msg.accounting_integrity.invalid_gl_account_account
   fields:
     guider: accounting-integrity
@@ -465,3 +454,123 @@
   nearest_existing: null
   reason: module-specific accounting verdict text
   staged_at: '2026-05-31T09:43:56.429528+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.classification_approved.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: User approved an expense classification / GL mapping from the finance surface
+  similarity_score: 0.3067
+  nearest_existing: classification.approved
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:39:59.926114+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.mapping_corrected.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: User corrected/reclassified a GL account mapping on the finance surface
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:00.383552+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.je_posted.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: Treasurer posted a journal entry from the treasurer dashboard
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:00.859910+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.approval_granted.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: User granted a final-stage approval on a journal entry
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:01.380617+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.review_resolved.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: Human reviewer resolved a HITL review item
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:01.850411+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.exception_resolved.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: User resolved a bank reconciliation exception
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:02.302268+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.recommendation.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: System surfaced a next-best-action recommendation with impact preview
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:02.693570+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: embark.surface.eime.recommendation_accepted.v1
+  fields:
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    privacy_class: P1
+    maturity: proposed
+    origin: surface
+  text: User accepted a next-best-action recommendation in the cabinet
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: Surface-originated CloudEvent emitted by EIME UI interactions; no canonical
+    equivalent.
+  staged_at: '2026-05-31T11:40:03.061338+00:00'

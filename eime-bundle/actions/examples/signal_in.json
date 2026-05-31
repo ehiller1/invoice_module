@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "type": "eime.journal_entry_ready",
+  "source": "/eime/journal_entry_compliance",
+  "id": "pert-je-20260531-0007",
+  "subject": "je_4821",
+  "time": "2026-05-31T14:02:11Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "je_id": "je_4821",
+    "church_id": "ch_stmarys",
+    "amount": 1240.00,
+    "recurring_template_match": "tmpl_utilities_monthly",
+    "within_amount_tolerance": true,
+    "classification_confidence": 0.93,
+    "no_active_hard_block": true,
+    "approval_state": { "pending": 1, "nearing_sla_deadline": 0 },
+    "consuming_actor_role": "TREASURER_ADMIN",
+    "correlation_id": "corr-7f3a9c20"
+  }
+}

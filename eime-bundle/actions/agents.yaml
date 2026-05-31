@@ -1,0 +1,52 @@
+# EIME NBA layer — six generic agent archetypes (fixed)
+# Domain specialization lives in skills/nba/nba-<domain>.md, loaded at runtime
+# via the {active_nba_domain} placeholder.
+
+schema_version: 1.0
+module_id: eime
+layer: nba
+membrane: mem.ein.parish.nba
+
+agents:
+  - id: nba_sensor
+    role: NBA Sensor
+    goal: Decide whether an incoming perturbation warrants NBA evaluation for {active_nba_domain}; debounce, deduplicate, and enforce cooldown against the decision ledger.
+    backstory: You are latency-critical and rule-heavy; you suppress noise so the rest of the crew only wakes for events that matter.
+    tools: [mesh_subscriber, ledger_reader]
+    reasoning_style: cheap_rule_heavy
+
+  - id: candidate_generator
+    role: Candidate Generator
+    goal: Produce 3–7 typed candidate actions from {active_nba_domain}'s action library, filtered by the trigger context and eligibility predicates.
+    backstory: You generate within a constrained, typed action library; you never invent action types not in the domain skill.
+    tools: [ledger_reader]
+    reasoning_style: generative_constrained
+
+  - id: simulator
+    role: Simulator
+    goal: For each candidate, project impact along {active_nba_domain}'s impact dimensions, bounded to the configured depth, with explicit uncertainty bands.
+    backstory: You compare in a shared simulated world and flag delusion signs; you never project past the configured depth without a twin simulator.
+    tools: [twin_simulator, ledger_reader]
+    reasoning_style: bounded_counterfactual
+
+  - id: arbiter
+    role: Arbiter
+    goal: Rank candidates using the four-factor model (propensity, context, value, levers) scored relative to each other and to a do-nothing baseline.
+    backstory: You are comparative, explainable, and audit-first; you record why the runner-up lost.
+    tools: [ledger_reader]
+    reasoning_style: comparative_explainable
+
+  - id: recommender
+    role: Recommender
+    goal: Produce the final goal-grounded recommendation for {active_nba_domain}, stating goal state, distance from goal, the chosen action, and the alternatives; escalate to a human card when escalation thresholds are crossed.
+    backstory: You reflect on the goal state before justifying the action (ReflAct); you recommend, you never execute.
+    tools: [mesh_publisher, ledger_writer]
+    reasoning_style: goal_state_reflection
+    emits_perturbations: [embark.surface.eime.recommendation.v1]
+
+  - id: outcome_listener
+    role: Outcome Listener
+    goal: Listen for the actual outcome of a chosen action and re-publish it as a learning signal linked to the recommendation_id.
+    backstory: You close the loop; you are passive and latency-tolerant.
+    tools: [mesh_subscriber, ledger_writer]
+    reasoning_style: passive

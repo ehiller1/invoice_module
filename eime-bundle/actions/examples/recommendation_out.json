@@ -1,0 +1,36 @@
+{
+  "specversion": "1.0",
+  "type": "embark.surface.eime.recommendation.v1",
+  "source": "/eime/actions/nba",
+  "id": "rec-20260531-0007",
+  "subject": "je_4821",
+  "time": "2026-05-31T14:02:13Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "recommendation_id": "rec-20260531-0007",
+    "domain": "nba-eime",
+    "trigger_perturbation_id": "pert-je-20260531-0007",
+    "goal_state": "All eligible JEs posted within SLA with zero compliance exposure and minimal human toil.",
+    "distance_from_goal": "1 eligible recurring JE unposted; SLA risk rising if deferred.",
+    "chosen_action": {
+      "action_type": "post_je_now",
+      "trigger_context_id": "trig-je_4821",
+      "fields": { "je_id": "je_4821" },
+      "eligibility_passed": true,
+      "reversibility": "partially_reversible",
+      "actor_class": "agent_eligible"
+    },
+    "alternatives": [
+      { "action_type": "route_to_approval", "score": 0.61, "would_have_won_if": "classification_confidence had been below 0.85" },
+      { "action_type": "do_nothing", "score": 0.34, "would_have_won_if": "month-end batch window were imminent" }
+    ],
+    "factor_scores": { "propensity": 0.88, "context": 0.81, "value": 0.90, "levers": 0.72 },
+    "rationale": "Recurring template match within tolerance, confidence 0.93, no hard block, consuming actor is TREASURER_ADMIN. Posting now reduces SLA risk and saves ~6 minutes of human toil with zero compliance exposure; it beats the do-nothing baseline on value and SLA.",
+    "consumer": "human_card",
+    "escalate": false,
+    "surface_id": "treasurer_dashboard",
+    "ucs_mode": "Delegate",
+    "ledger_ref": "ledger-20260531-0007",
+    "correlation_id": "corr-7f3a9c20"
+  }
+}
