@@ -105,6 +105,15 @@ window.EIME_API = window.EIME_API || window.location.origin;
         Vendors
       </a>
 
+      <a data-nav="receipt-capture" href="/receipt-capture.html"
+        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Receipt Capture
+      </a>
+
       <!-- ── BANKING ──────────────────────────────────── -->
       <p class="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">Banking</p>
 
@@ -145,24 +154,6 @@ window.EIME_API = window.EIME_API || window.location.origin;
             d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
         </svg>
         13-Week Cash Forecast
-      </a>
-
-      <a data-nav="scenario-forecast" href="/scenario-forecast.html"
-        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
-        </svg>
-        What-If Planning
-      </a>
-
-      <a data-nav="forecast-merge" href="/forecast-merge.html"
-        class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-        </svg>
-        Forecast vs Actual
       </a>
 
       <!-- ── NEEDS ATTENTION ────────────────────────── -->
@@ -223,14 +214,6 @@ window.EIME_API = window.EIME_API || window.location.origin;
         </button>
 
         <div id="eime-admin-section" class="hidden flex-col gap-0.5 mt-0.5">
-          <a data-nav="treasurer" href="/treasurer-queue.html"
-            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
-            Approvals
-          </a>
           <a data-nav="jes" href="/jes.html"
             class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -279,21 +262,21 @@ window.EIME_API = window.EIME_API || window.location.origin;
             </svg>
             Tag Transactions
           </a>
-          <a data-nav="benchmark" href="/federated-benchmark.html"
+          <a data-nav="scenario-forecast" href="/scenario-forecast.html"
             class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
             </svg>
-            Peer Comparisons
+            What-If Planning
           </a>
-          <a data-nav="kb" href="/knowledge-base.html"
+          <a data-nav="forecast-merge" href="/forecast-merge.html"
             class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
             </svg>
-            Help
+            Forecast vs Actual
           </a>
           <a data-nav="settings" href="/settings.html"
             class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
@@ -303,22 +286,6 @@ window.EIME_API = window.EIME_API || window.location.origin;
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
             Settings
-          </a>
-          <a data-nav="cabinet" href="/cabinet.html"
-            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-            </svg>
-            My Profile
-          </a>
-          <a data-nav="receipt-capture" href="/receipt-capture.html"
-            class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            Receipt Capture
           </a>
           <a data-nav="policies-queue" href="/policies-queue.html"
             class="eime-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-navy-700 transition-colors">
@@ -355,17 +322,26 @@ window.EIME_API = window.EIME_API || window.location.origin;
         <div class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
         <span class="text-slate-300 text-xs truncate" id="eime-church-name-label">Loading…</span>
       </div>
-      <button id="eime-user-chip"
-        onclick="EIMEShell.promptUser()"
-        title="Switch active user"
-        class="w-full flex items-center gap-2 px-3 py-2 bg-navy-800 hover:bg-navy-700 rounded-lg text-left">
-        <div class="w-6 h-6 rounded-full bg-amber-500 text-navy-900 text-[10px] font-bold flex items-center justify-center flex-shrink-0"
-             id="eime-user-initials">G</div>
-        <div class="min-w-0 flex-1">
-          <p class="text-slate-200 text-xs font-medium truncate" id="eime-user-name">Guest</p>
-          <p class="text-slate-500 text-[10px] uppercase tracking-wide" id="eime-user-role">guest · click to switch</p>
-        </div>
-      </button>
+      <div class="flex items-center gap-1">
+        <button id="eime-user-chip"
+          onclick="EIMEShell.promptUser()"
+          title="Switch active user"
+          class="flex-1 flex items-center gap-2 px-3 py-2 bg-navy-800 hover:bg-navy-700 rounded-lg text-left">
+          <div class="w-6 h-6 rounded-full bg-amber-500 text-navy-900 text-[10px] font-bold flex items-center justify-center flex-shrink-0"
+               id="eime-user-initials">G</div>
+          <div class="min-w-0 flex-1">
+            <p class="text-slate-200 text-xs font-medium truncate" id="eime-user-name">Guest</p>
+            <p class="text-slate-500 text-[10px] uppercase tracking-wide" id="eime-user-role">guest · click to switch</p>
+          </div>
+        </button>
+        <a href="/cabinet.html" data-nav="cabinet" title="My Profile"
+          class="eime-nav-link flex items-center justify-center w-9 h-9 bg-navy-800 hover:bg-navy-700 rounded-lg flex-shrink-0 transition-colors">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+          </svg>
+        </a>
+      </div>
     </div>
   </aside>
 
