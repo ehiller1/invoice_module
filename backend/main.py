@@ -6272,6 +6272,7 @@ async def get_accrual_entries_endpoint(schedule_id: str) -> Dict[str, Any]:
 async def _build_reconciliation_status(church_id: str) -> dict:
     """Build reconciliation status, querying real pledge/GL data where available."""
     from backend.membrane.pledge.pledge_matching import list_pledges
+    from backend.db import plaid_store as _db_plaid
 
     # AR: derive from open pledges
     try:
@@ -6286,15 +6287,62 @@ async def _build_reconciliation_status(church_id: str) -> dict:
         ar_total = 0
         ar_outstanding = 0
 
+    # ── Cash: GL fund balances (book) vs Plaid bank balances (statement) ────────
+    cash_exceptions: list = []
+    try:
+        from backend.routes.financial_position import _fund_balances
+        fund_bal_map = _fund_balances(church_id)
+        gl_cash = sum(v["current"] for v in fund_bal_map.values())
+    except Exception:
+        gl_cash = 0
+
+    try:
+        plaid_accounts = _db_plaid.load_plaid_accounts(church_id)
+        bank_cash: Optional[float] = (
+            sum(float(a.current_balance) for a in plaid_accounts)
+            if plaid_accounts else None
+        )
+    except Exception:
+        bank_cash = None
+
+    if bank_cash is not None:
+        cash_expected = round(gl_cash, 2)
+        cash_actual = round(bank_cash, 2)
+        cash_diff = round(cash_actual - cash_expected, 2)
+        if cash_diff != 0:
+            cash_exceptions.append({
+                "type": "bank_gl_variance",
+                "gl_balance": cash_expected,
+                "bank_balance": cash_actual,
+                "difference": cash_diff,
+                "reason": (
+                    f"Bank statement (${cash_actual:,.2f}) does not match "
+                    f"GL fund balances (${cash_expected:,.2f})"
+                ),
+            })
+        cash_status = "reconciled" if cash_diff == 0 else f"Variance ${abs(cash_diff):,.2f}"
+    elif gl_cash > 0:
+        # No bank feed — show GL balance, flag as unverified
+        cash_expected = round(gl_cash, 2)
+        cash_actual = round(gl_cash, 2)
+        cash_diff = 0.0
+        cash_status = "no_bank_feed"
+    else:
+        cash_expected = 0
+        cash_actual = 0
+        cash_diff = 0.0
+        cash_status = "no_data"
+    # ── end cash ─────────────────────────────────────────────────────────────────
+
     return {
         "church_id": church_id,
         "as_of": datetime.now().isoformat(),
         "cash": {
-            "expected": 245000,
-            "actual": 244987,
-            "difference": -13,
-            "status": "reconciled",
-            "exceptions": [],
+            "expected": cash_expected,
+            "actual": cash_actual,
+            "difference": cash_diff,
+            "status": cash_status,
+            "exceptions": cash_exceptions,
         },
         "ar": {
             "expected": round(ar_total, 2) if ar_total else 450000,

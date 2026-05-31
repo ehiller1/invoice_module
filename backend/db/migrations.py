@@ -120,6 +120,17 @@ def init_schema(force: bool = False) -> None:
                     pass  # Type may not exist
             conn.commit()
 
+        # Check if schema already exists (types present = already initialized)
+        cursor.execute("""
+            SELECT COUNT(*) FROM pg_type
+            WHERE typname = 'je_status'
+        """)
+        (type_count,) = cursor.fetchone()
+        if type_count > 0:
+            print("[DB] Schema already exists, skipping creation")
+            cursor.close()
+            return
+
         print("[DB] Creating schema...")
         cursor.execute(sql)
         conn.commit()
