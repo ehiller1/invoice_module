@@ -3399,6 +3399,8 @@ async def jobs_poll(
     Returns only jobs updated since the given ISO timestamp. The frontend
     can call this on a 2-second interval without re-transferring all data.
     """
+    if not church_id:
+        return _json({"as_of": datetime.utcnow().isoformat(), "since": since, "count": 0, "total": 0, "jobs": []})
     jobs = flow.list_jobs(church_id=church_id)
 
     # Filter by since timestamp if provided

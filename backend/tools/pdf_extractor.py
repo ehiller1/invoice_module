@@ -15,8 +15,24 @@ from ..models import DocumentType, InvoiceDocument, LineItem
 
 CURRENCY_RE = re.compile(r"\$?\s*([\d,]+\.\d{2})")
 DATE_RE = re.compile(r"\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b")
-INV_RE = re.compile(r"(?:invoice|inv|bill)[\s#:no.]*([A-Z0-9\-]+)", re.IGNORECASE)
-PO_RE = re.compile(r"(?:po|p\.o\.)[\s#:no.]*([A-Z0-9\-]+)", re.IGNORECASE)
+# Anchor to the word "invoice"/"inv" (not "bill", which falsely matched
+# "billing@…") and require the captured id to contain at least one digit so
+# stray words like "TO" or "ing" can't be mistaken for an invoice number.
+INV_RE = re.compile(
+    r"\b(?:invoice|inv)\b[\s#:.]*(?:no\.?|number|num)?[\s#:.]*([A-Z0-9][A-Z0-9\-]*\d[A-Z0-9\-]*)",
+    re.IGNORECASE,
+)
+PO_RE = re.compile(r"\b(?:po|p\.o\.)\b[\s#:.]*(?:no\.?|number)?[\s#:.]*([A-Z0-9][A-Z0-9\-]*\d[A-Z0-9\-]*)", re.IGNORECASE)
+_MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+# "May 28, 2026" / "28 May 2026" / "Sept. 1 2026"
+MONTHNAME_RE = re.compile(
+    r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z.]*\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b"
+    r"|\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z.]*,?\s+(\d{4})\b",
+    re.IGNORECASE,
+)
 
 
 def _to_decimal(s: str) -> Decimal:
@@ -28,16 +44,26 @@ def _to_decimal(s: str) -> Decimal:
 
 def _parse_date(s: str) -> Optional[date]:
     m = DATE_RE.search(s)
-    if not m:
-        return None
-    mo, d, y = m.groups()
-    y_int = int(y)
-    if y_int < 100:
-        y_int += 2000
-    try:
-        return date(y_int, int(mo), int(d))
-    except ValueError:
-        return None
+    if m:
+        mo, d, y = m.groups()
+        y_int = int(y)
+        if y_int < 100:
+            y_int += 2000
+        try:
+            return date(y_int, int(mo), int(d))
+        except ValueError:
+            return None
+    nm = MONTHNAME_RE.search(s)
+    if nm:
+        if nm.group(1):  # "May 28, 2026"
+            mon, day, year = nm.group(1), nm.group(2), nm.group(3)
+        else:            # "28 May 2026"
+            day, mon, year = nm.group(4), nm.group(5), nm.group(6)
+        try:
+            return date(int(year), _MONTHS[mon.lower()[:3]], int(day))
+        except (ValueError, KeyError):
+            return None
+    return None
 
 
 def extract_text(pdf_path: str) -> str:
@@ -141,19 +167,29 @@ def _extract_line_items(text: str, fallback_total: Decimal) -> List[LineItem]:
     """Heuristic line item extraction. Looks for $X.XX patterns with descriptions."""
     items: List[LineItem] = []
     lines = [ln.rstrip() for ln in text.splitlines()]
+    # Matched as whole words so substrings like "po" inside "Expo" or "tax"
+    # inside a product name don't silently drop a real line item.
     skip_keywords = ("subtotal", "tax", "total", "balance", "amount due", "thank you",
-                     "invoice", "date", "vendor", "bill to", "ship to", "po ", "terms",
+                     "invoice", "date", "vendor", "bill to", "ship to", "po", "terms",
                      "payment", "due", "remit", "address", "phone", "email", "page")
+    skip_re = re.compile(r"\b(?:" + "|".join(re.escape(k) for k in skip_keywords) + r")\b")
     for ln in lines:
         low = ln.lower()
-        if any(k in low for k in skip_keywords):
+        if skip_re.search(low):
             continue
-        m = CURRENCY_RE.search(ln)
-        if not m:
+        amounts = [_to_decimal(g) for g in CURRENCY_RE.findall(ln)]
+        amounts = [a for a in amounts if a > 0]
+        if not amounts:
             continue
-        amt = _to_decimal(m.group(1))
-        if amt <= 0:
-            continue
+        # On a tabular row the last currency value is the extended line total
+        # (qty x unit price); the first is the unit price.
+        amt = amounts[-1]
+        unit_price = amounts[0] if len(amounts) > 1 else amt
+        quantity = Decimal("1")
+        if unit_price > 0:
+            q = (amt / unit_price).quantize(Decimal("1"))
+            if q > 0 and (q * unit_price == amt):
+                quantity = q
         desc = CURRENCY_RE.sub("", ln).strip(" -|\t")
         desc = re.sub(r"\s{2,}", " ", desc)
         if len(desc) < 3:
@@ -161,8 +197,8 @@ def _extract_line_items(text: str, fallback_total: Decimal) -> List[LineItem]:
         items.append(LineItem(
             line_id=f"L{len(items)+1:03d}",
             description=desc[:200],
-            quantity=Decimal("1"),
-            unit_price=amt,
+            quantity=quantity,
+            unit_price=unit_price,
             amount=amt,
         ))
     if not items and fallback_total > 0:

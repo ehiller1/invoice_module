@@ -76,6 +76,9 @@
 const API = (window.EIME_API ?? '');
 let currentJob = null;
 let lastPollTs = null;
+function jobsChurch() {
+  return (window.EIMESession && EIMESession.getChurch()) || 'holy_comforter';
+}
 
 EIMEShell.mount({
   activeNav: 'jobs',
@@ -92,7 +95,8 @@ EIMEShell.mount({
 
 async function pollJobs() {
   try {
-    const url = lastPollTs ? `${API}/api/jobs-poll?since=${encodeURIComponent(lastPollTs)}` : `${API}/api/jobs-poll`;
+    const base = `${API}/api/jobs-poll?church_id=${encodeURIComponent(jobsChurch())}`;
+    const url = lastPollTs ? `${base}&since=${encodeURIComponent(lastPollTs)}` : base;
     const res = await fetch(url);
     const data = await res.json();
     lastPollTs = data.as_of;
@@ -107,9 +111,10 @@ async function pollJobs() {
 
 async function loadJobs() {
   try {
-    const res = await fetch(`${API}/api/jobs`);
-    const jobs = await res.json();
-    
+    const res = await fetch(`${API}/api/jobs?church_id=${encodeURIComponent(jobsChurch())}`);
+    const data = await res.json();
+    const jobs = Array.isArray(data) ? data : (data.jobs || []);
+
     let pending = 0, approval = 0, ready = 0;
     jobs.forEach(j => {
       if (j.status === 'PENDING_HITL') pending++;
@@ -123,20 +128,25 @@ async function loadJobs() {
     document.getElementById('count-total').textContent = jobs.length;
     
     const list = document.getElementById('jobs-list');
-    list.innerHTML = jobs.map(j => `
+    list.innerHTML = jobs.map(j => {
+      const inv = j.invoice_document || {};
+      const vendor = j.vendor_name || inv.vendor_name || 'Unknown';
+      const total = Number(j.total_amount ?? inv.total_amount ?? 0);
+      return `
       <div class="px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors" onclick="showJob('${j.job_id}')">
         <div class="flex items-center justify-between">
           <div>
-            <p class="font-medium text-slate-900">${j.vendor_name || 'Unknown'}</p>
+            <p class="font-medium text-slate-900">${vendor}</p>
             <p class="text-sm text-slate-500">${j.job_id}</p>
           </div>
           <div class="flex items-center gap-4">
-            <span class="text-sm text-slate-600">$${(j.total_amount || 0).toFixed(2)}</span>
+            <span class="text-sm text-slate-600">$${total.toFixed(2)}</span>
             <span class="px-3 py-1 rounded-full text-xs font-medium ${statusColor(j.status)}">${statusLabel(j.status)}</span>
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (e) {
     console.error('Error loading jobs:', e);
   }
