@@ -1,0 +1,79 @@
+{
+  "bundle_version": "1.0",
+  "tier": "declarative",
+  "surface_id": "treasurer_dashboard",
+  "payload": {
+    "root": {
+      "component": "Stack",
+      "props": { "gap": "md" },
+      "children": [
+        {
+          "component": "DecisionCard",
+          "props": {
+            "title_template": "Post journal entry {je.id}",
+            "body_template": "{je.summary} — total {je.amount}",
+            "requires_tier": "TREASURER_ADMIN",
+            "actions": [
+              { "id": "post", "label": "Post", "style": "primary" },
+              { "id": "approve_final", "label": "Final approve", "style": "primary" },
+              { "id": "reject", "label": "Reject", "style": "default" }
+            ]
+          }
+        },
+        {
+          "component": "ApprovalCard",
+          "props": {
+            "title": "Hard block",
+            "body_template": "{block.reason}",
+            "blocking": true,
+            "overridable": false,
+            "catalog_gap_note": "needed: non-dismissible blocking modal with explain-only action (no override) for FUND_RESTRICTION_VIOLATION / PAYMENT_DEDUP_RISK",
+            "actions": [ { "id": "explain", "label": "Why?", "style": "default" } ]
+          }
+        },
+        {
+          "component": "EvidencePack",
+          "props": {
+            "title": "Budget / policy notices",
+            "summary_template": "{notice.kind}: {notice.detail}"
+          }
+        }
+      ]
+    }
+  },
+  "event_bindings": [
+    {
+      "binding_id": "post_je",
+      "trigger_selector": "root.children[0].actions[0]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.je_posted.v1",
+        "source": "/embark/surfaces/treasurer_dashboard",
+        "subject": "{je.id}",
+        "datacontenttype": "application/json",
+        "data_template": { "je_id": "{je.id}", "actor": "{user.id}", "authority_tier": "{user.role}" }
+      }
+    },
+    {
+      "binding_id": "approve_final",
+      "trigger_selector": "root.children[0].actions[1]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.approval_granted.v1",
+        "source": "/embark/surfaces/treasurer_dashboard",
+        "subject": "{je.id}",
+        "datacontenttype": "application/json",
+        "data_template": { "je_id": "{je.id}", "stage": "final", "actor": "{user.id}" }
+      }
+    }
+  ],
+  "provenance": {
+    "agent_id": "autonomous_posting_engine",
+    "task_id": "{runtime.task_id}",
+    "decision_ledger_ref": "{runtime.ledger_ref}",
+    "abb_ref": null,
+    "membrane_id": "mem.ein.parish.outer",
+    "perturbation_correlation_id": "{runtime.correlation_id}"
+  },
+  "rendering_hints": { "priority": "high", "dismissible": false, "persist_until": null, "theme_override": null }
+}

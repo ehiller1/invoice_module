@@ -1,0 +1,42 @@
+# EIME bundle — knowledge / RAG scaffolding
+# Activated by extraction.knowledge_needs: true.
+# Source of record: backend/tools/knowledge_base.py, COA reference loader, vendor history lookup.
+
+schema_version: 1.0
+module_id: eime
+
+collections:
+  - id: coa_reference
+    purpose: Chart-of-accounts reference + denomination expense-rule library used by the classifier and mapper.
+    source: backend/tools/knowledge_base.py, backend/db/coa_store.py
+    privacy_class: P1
+    ingestion:
+      shape: per-church COA + denomination rule docs
+      keying: church_id
+    retrieval:
+      mode: vector + keyword hybrid
+      consumers: [classify_line_items_against_coa, map_lines_to_gl_accounts, knowledge_coa_lookup]
+
+  - id: vendor_history
+    purpose: Prior vendor classifications and mapping patterns to improve confidence on repeat invoices.
+    source: backend/tools/knowledge_base.py, vendor history lookup
+    privacy_class: P1
+    ingestion:
+      shape: vendor → prior (expense_category, gl_account, confidence) records
+      keying: [church_id, vendor_name]
+    retrieval:
+      mode: vector + keyword hybrid
+      consumers: [map_lines_to_gl_accounts, knowledge_vendor_history]
+
+embedding:
+  model: sentence-transformers (lazy-initialized; see backend/tools/coa_store.py _get_embed_fn)
+  dimensions: per-model default
+  note: >-
+    Embeddings are lazy-initialized at first use to avoid import-time model load
+    (see handoff: Wave 1 coa_store lazy-init fix). EIN Memory Fabric is presumed
+    provisioned for the parish tier; no memory-stack shim is generated.
+
+retrieval_policy:
+  privacy_gate: P1 retrieval only; no P0 raw amounts cross into knowledge results.
+  k_default: 5
+  rerank: confidence-weighted by prior-classification agreement

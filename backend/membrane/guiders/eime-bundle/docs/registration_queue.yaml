@@ -1,0 +1,220 @@
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.circular_allocation_detected_in_proposed
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: Circular allocation detected in proposed journal entry.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:37.305842+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.invalid_gl_account_account
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: 'Invalid GL account: {account}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:38.134038+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.low_gl_mapping_confidence_conf_threshold
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: Low GL mapping confidence ({conf} < {threshold}).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:39.115940+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.gl_accounts_valid_mapping_confidence_acc
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: GL accounts valid; mapping confidence acceptable.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:39.684000+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.exact_duplicate_payment_detected_same_ve
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Exact duplicate payment detected (same vendor+amount+date).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:40.074811+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.perturbation_flagged_as_payment_dedup_ri
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Perturbation flagged as PAYMENT_DEDUP_RISK (hard block).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:40.467651+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.probable_duplicate_flagged_by_upstream_d
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Probable duplicate flagged by upstream detector.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:40.858145+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.no_duplicate_signals_detected
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: No duplicate signals detected.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:41.248962+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_violation_policy_id
+  fields:
+    guider: dignity
+    module_id: eime
+  text: 'Policy violation: {policy_id}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:41.658922+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_policy_id_violated_reason
+  fields:
+    guider: dignity
+    module_id: eime
+  text: 'Policy {policy_id} violated: {reason}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:42.058003+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_policy_id_violated_exception_appr
+  fields:
+    guider: dignity
+    module_id: eime
+  text: Policy {policy_id} violated; exception approved — re-confirm.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:42.455217+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_exception_previously_approved_con
+  fields:
+    guider: dignity
+    module_id: eime
+  text: Policy exception previously approved — confirm before posting.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:43.115765+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.no_active_policy_violations
+  fields:
+    guider: dignity
+    module_id: eime
+  text: No active policy violations.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:43.701093+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.polity_and_deference.no_principal_roles_supplied_cannot_autho
+  fields:
+    guider: polity-and-deference
+    module_id: eime
+  text: No principal_roles supplied; cannot authorize action.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:44.405299+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.polity_and_deference.principal_authority_cap_cap_covers_amoun
+  fields:
+    guider: polity-and-deference
+    module_id: eime
+  text: Principal authority cap ({cap}) covers amount ({amount}).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:44.975090+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.abundance_and_stewardship.perturbation_flagged_fund_restriction_vi
+  fields:
+    guider: abundance-and-stewardship
+    module_id: eime
+  text: Perturbation flagged FUND_RESTRICTION_VIOLATION (HARD BLOCK).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:45.494566+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.abundance_and_stewardship.no_fund_restriction_or_budget_threshold_
+  fields:
+    guider: abundance-and-stewardship
+    module_id: eime
+  text: No fund restriction or budget threshold breached.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:46.038064+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.no_principal_recorded_provenance_incompl
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: No principal recorded — provenance incomplete.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:46.555998+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.high_risk_risk_but_explanation_supplied_
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: High risk ({risk}) but explanation supplied — escalate for witness review.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:47.185284+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.provenance_recorded_risk_within_toleranc
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: Provenance recorded; risk within tolerance.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:42:47.829423+00:00'

@@ -1,0 +1,59 @@
+38f97f83-e110-404d-81b6-828095cd7768  guider_capability     Evaluate Priority/Boundary/Escalation/Posture-Drift/Tuning/Commitment Guiders fo
+2f3f306b-945e-424d-952f-1d9cdbaceaed  guider_capability     Evaluate Posture-Drift Guiders by diffing enacted vs committed posture.
+658a8303-553f-4360-a425-2128fd6ca699  guider_capability     Render strategic posture as audience-tier-appropriate narrative.
+5ceddc1c-9d64-442f-b31e-83b6f43beca5  guider_capability     Read external orchestrator selection, compute selectability, query L5 benchmarks
+b051ce29-6f02-494d-8c01-23a5e3b1bc30  guider_capability     Classify natural-language intents, check authority, resolve to field operation, 
+69fa6dab-c021-4f88-a419-ae2ab99cc35c  guider_capability     Rank candidates, boundary-filter, project against scenario branches, publish rec
+bca88532-f2b8-45d6-be33-9c3386abb1c9  guider_capability     Reconcile twin vs telemetry; propose Guider amendments and tuning adjustments.
+8f4e32fc-132c-4a34-90ee-de6a39912738  guider_capability     Render verdict (allow/refuse/escalate) for operations under the Context Pack.
+4c0e5cce-8548-4c5c-a693-0835b73bffc1  guider_capability     Assemble structured Context Pack across L0–L5, privacy-class gated at retrieval.
+d3868104-3f26-48d7-86ec-56cc0c6f4bf5  guider_capability     Block fundraising-class outbound actions when a pastoral suppression is active. 
+d89f059b-a03c-4e89-8e70-004fb28406fb  guider_capability     Per-donor per-channel frequency caps with segment-aware overrides. Prevents cap 
+e4651efa-821d-4c49-8170-fa25c503b195  guider_capability     Verify candidate action is appropriate for donor's current segment. Prevents gra
+7f7cba06-01e5-4b5a-ab93-eb2beadde40e  guider_capability     Align candidate action with ECS mission voice and active campaign posture. Preve
+45ace29e-17c9-4f81-9326-d0ae29ccb180  guider_capability     Block outbound actions on channels for which the donor has revoked consent or ne
+95df1462-9e26-4e5e-8818-66291371768e  guider_capability     Honor donor's opt-out preference for AI-assisted handling. Hard block; route to 
+7bf9d7ae-9c6a-4e83-bb00-ac85c6b2e0ef  guider_capability     8-guider cascade: Journey Integrity, PersonalizationProportionality, ContentInte
+980ce396-1b8a-43d4-afbc-adb42a37638b  guider_capability     Per-actor journey-position appropriateness gate. FR-EIN-MBR-05.
+72b4bc0f-cacb-4488-ae2c-e8b029235a6e  guider_capability     Probing depth + register calibration. FR-EIN-MBR-06.
+7c83525d-4e72-48fd-81ad-98fadc57da22  guider_capability     Theological / factual / denominational appropriateness. FR-EIN-MBR-07.
+d6ebb5e8-7214-4711-918c-b5186fd32e2a  guider_capability     Never positions assessment between rector/bishop, vestry/rector, or actor/canoni
+d62a4626-9915-47cd-b753-140a3e63bd6e  guider_capability     Scope-typed consent enforcement on P1/P2 emission. FR-EIN-MBR-09.
+e75fa7d3-29b9-44c2-8100-f57fe449246b  guider_capability     Mechanical Jordan independence Guard 2 — keyword + intent classifier. FR-EIN-MBR
+4930fb62-23d5-4139-b834-41db9e43f6be  guider_capability     Episcopal canonical-convention conflict block. FR-EIN-MBR-11.
+eb4d9c9f-10e6-45a5-a194-8330068548d0  guider_capability     Federation signal-strength threshold. FR-EIN-MBR-12.
+78b81546-c2a5-42e3-8d52-a73e473d4d7e  guider_capability     5-guider diocesan cascade. FR-EIN-MBR-13..17.
+77648d2d-9df9-4a93-80bb-cce5c6a12c6a  guider_capability     N≥7 + ε≤1.0 threshold check. FR-EIN-MBR-13.
+0df4e4f9-9a4b-4912-b34d-ff10bd8771de  guider_capability     Pre-screening for Jordan review queue. FR-EIN-MBR-14.
+40e57b73-5a5b-4c58-b06b-64fa0873a911  guider_capability     Episcopal canon law (Title I, Canons 6, 17) check. FR-EIN-MBR-15.
+2028b299-5db9-451b-8f4f-b722f197b7ab  guider_capability     Pattern bishop-notice flagging. FR-EIN-MBR-16.
+ae7677e3-a646-41c7-9427-3c1dc754e65e  guider_capability     Vulnerability/harm withholding without rector consent. FR-EIN-MBR-17.
+a8b2579d-f4ac-4c5c-bbd9-eed0b952ea5e  guider_capability     jordan_independence_guider — Mechanically prevents any Steward emission with att
+ff599c9e-3596-4dff-85c6-1a8ba257f7fe  guider_capability     restricted_fund_intent_guider — Annotates every outbound classification or posti
+819a8229-2b16-4e3e-be6e-f531d6089e20  guider_capability     authority_graph_guider — Enforces that every outbound emission requiring human a
+e54a6419-dcb2-4c44-91fb-9887eaeec5a9  guider_capability     consent_guider — Enforces parish federation consent state on every outbound P1+ 
+14bea09f-105b-4c2c-aa50-1d4e8ff2ca5b  guider_capability     k_anonymity_guider — Enforces k-anonymity ≥ 5 on every retrieved L5 pattern surf
+55af55f6-8b13-4a3f-8be6-cebb0a03d26e  guider_capability     id: ?
+f14b3f0f-2e6b-4b27-bead-0364b774cc6c  guider_capability     id: ?
+d31554d9-f90e-40e1-b663-908bdc56475d  guider_capability     id: ?
+d3ac6697-cda0-4e0b-a4d4-14b335ee9f6e  guider_capability     id: ?
+65666143-3a52-4b1e-beb0-37a85a7a2022  guider_capability     id: ?
+71ca6a19-2144-48fc-8cb7-da24f027e8c6  guider_capability     id: ?
+7ab21ef2-3284-4297-aded-aa2284eda5bf  guider_capability     id: ?
+2f09c147-466d-47c1-a585-783b54a5daa5  guider_capability     id: ?
+d6ba8502-143b-478b-b98a-0d22ef1564ad  guider_capability     id: ?
+c28fab90-aba0-4000-8dcb-d58559610b55  guider_capability     id: ?
+2c0f6dab-ada1-4397-ac2e-c8aeecb1580e  guider_capability     Coordinate scheduled and event-driven research sweeps across approved external d
+4e88f8eb-dbbf-4fc1-96c2-ade7cc93166e  guider_capability     Evaluate a source document against the usability threshold. Block sources below 
+d9c42656-8c50-4009-9a1b-6642dd65f616  guider_capability     Run five-stage extraction pipeline: claim identification evidence mapping condit
+7034c879-9f32-4399-8152-8f723fc34ed2  guider_capability     Synthesize extracted practices into a Best Practice Card with conditions contrai
+73083058-14db-4dfc-804d-89f38348efb0  guider_capability     Run automated evaluation correctness checks and regression tests before skill pu
+adf7e179-899d-40bb-86b4-b0d919ec31be  guider_capability     Compile approved Best Practice Card into versioned Skill Pack SKILL.md with fron
+b28e2e9c-ca01-4ce3-b3a5-a789b9d2e5bd  guider_capability     Manage skill version chain: write skill_versions delta records artifact_version_
+9e4f58b7-1cac-4dac-8caa-f1ff7b5c1be7  guider_capability     Handle best-practice retrieval queries with rank-fusion BPS re-ranking on ECS-ap
+7a26b537-5aa7-4715-acc0-58ed29404f9d  guider_capability     Enforce five BPS governance gates: evidence strength citation completeness appli
+636fa25a-25e4-4769-86c1-1a177a623a85  guider_capability     Route approved BPS artifacts to correct Memory Fabric tier L0 through L5. Block 
+e5916728-8481-453d-b9cd-ff49c23c29bf  guider_capability     Score Best Practice Card effectiveness from ECS Episode Cards. Write practice_ef
+4e6f5f0d-1dee-47cd-b315-40584a3f2edf  guider_capability     Monitor confidence decay and effectiveness score drops for stored BPCs. Propose 
+d6a53c0a-5f35-472c-a4a8-81ffb7eddab5  guider_capability     Discover local ECS outcomes conflicting with stored best practices. Propose Cont
+8c5d6664-abd4-45dc-9f08-32274982a858  guider_capability     Human-in-loop adjudication for contested drift decisions and Contraindication Ca

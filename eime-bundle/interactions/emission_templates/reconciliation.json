@@ -1,0 +1,58 @@
+{
+  "bundle_version": "1.0",
+  "tier": "declarative",
+  "surface_id": "reconciliation",
+  "payload": {
+    "root": {
+      "component": "Stack",
+      "props": { "gap": "md" },
+      "children": [
+        {
+          "component": "ApprovalCard",
+          "props": {
+            "title": "Possible duplicate payment",
+            "body_template": "{dedup.detail}",
+            "blocking": true,
+            "overridable": false,
+            "catalog_gap_note": "needed: non-dismissible blocking modal with explain-only action for PAYMENT_DEDUP_RISK",
+            "actions": [ { "id": "explain", "label": "Why blocked?", "style": "default" } ]
+          }
+        },
+        {
+          "component": "DecisionCard",
+          "props": {
+            "title_template": "Exception: {exception.id}",
+            "body_template": "{exception.summary}",
+            "actions": [
+              { "id": "match", "label": "Match", "style": "primary" },
+              { "id": "defer", "label": "Defer", "style": "default" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "event_bindings": [
+    {
+      "binding_id": "resolve_exception",
+      "trigger_selector": "root.children[1].actions[0]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.exception_resolved.v1",
+        "source": "/embark/surfaces/reconciliation",
+        "subject": "{exception.id}",
+        "datacontenttype": "application/json",
+        "data_template": { "exception_id": "{exception.id}", "matched_txn": "{selection.txn_id}", "actor": "{user.id}" }
+      }
+    }
+  ],
+  "provenance": {
+    "agent_id": "reconciliation_specialist",
+    "task_id": "{runtime.task_id}",
+    "decision_ledger_ref": "{runtime.ledger_ref}",
+    "abb_ref": null,
+    "membrane_id": "mem.ein.parish.intent_gate",
+    "perturbation_correlation_id": "{runtime.correlation_id}"
+  },
+  "rendering_hints": { "priority": "high", "dismissible": false, "persist_until": null, "theme_override": null }
+}

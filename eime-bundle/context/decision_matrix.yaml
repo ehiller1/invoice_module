@@ -1,0 +1,73 @@
+# EIME bundle — Decision Matrix
+# Authority-tier verdict rules + policy checks at dispatch.
+# Consumes the Context Pack as context_snapshot. Authority tiers map to
+# backend/auth.py ROLE_LEVELS (FINANCE_STAFF=1, BUDGET_OWNER=2, TREASURER_ADMIN=3).
+
+schema_version: 1.0
+module_id: eime
+
+authority_tiers:
+  - tier: FINANCE_STAFF
+    rank: 1
+    actions_permitted: [view_invoices, triage, view_je_amounts, review_classifications]
+  - tier: BUDGET_OWNER
+    rank: 2
+    actions_permitted: [view_invoices, view_je_amounts, correct_mapping, approve_stage_1]
+  - tier: TREASURER_ADMIN
+    rank: 3
+    actions_permitted: [view_all, post_je, approve_payment, approve_final, admin_override, release_restricted]
+
+verdict_rules:
+  rule_fund_restriction_block:
+    when: context_snapshot.constraints.blocking_rules contains restricted_fund_violation
+    verdict: deny
+    side_effect: emit FUND_RESTRICTION_VIOLATION
+    rationale: Restricted funds must never be violated — hard block, not overridable.
+
+  rule_payment_dedup_block:
+    when: candidate_payment is probable_duplicate
+    verdict: deny
+    side_effect: emit PAYMENT_DEDUP_RISK
+    rationale: Duplicate payments must be hard-blocked.
+
+  rule_amount_disclosure:
+    when: request reads je_amounts AND user.role == FINANCE_STAFF or higher
+    verdict: allow
+    else_verdict: redact_amounts
+    rationale: JE amounts (JOURNAL_ENTRY_READY, P0) are visible to FINANCE_STAFF+ only.
+
+  rule_post_je_authority:
+    when: request is post_je
+    requires_tier: TREASURER_ADMIN
+    else_verdict: escalate
+    side_effect_on_escalate: emit HITL_ESCALATION
+    rationale: Only TREASURER_ADMIN may post; lower tiers escalate.
+
+  rule_approval_stage:
+    when: request is approve
+    requires_tier_for_stage:
+      stage_1: BUDGET_OWNER
+      final: TREASURER_ADMIN
+    else_verdict: escalate
+    rationale: Multi-tier approval chain — each tier gated by role rank.
+
+  rule_budget_overage:
+    when: posting would breach budget_threshold
+    verdict: flag
+    side_effect: emit BUDGET_OVERAGE_RISK
+    rationale: Budget breaches are surfaced for review, not auto-blocked.
+
+  rule_policy_gate:
+    when: policy_gate fires against proposed_action
+    verdict: flag
+    side_effect: emit POLICY_VIOLATION
+
+escalation_chain:
+  - FINANCE_STAFF -> BUDGET_OWNER
+  - BUDGET_OWNER -> TREASURER_ADMIN
+  - TREASURER_ADMIN -> human_review   # emits HITL_ESCALATION
+
+guider_cascade_binding:
+  # The decision matrix verdict is the dispatch gate; the 6-guider cascade at
+  # mem.ein.parish.outer is the emission gate. Both must pass.
+  cascade: [accounting-integrity, payment-dedup, polity-and-deference, abundance-and-stewardship, witness-and-provenance, dignity]

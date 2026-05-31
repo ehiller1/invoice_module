@@ -1,0 +1,38 @@
+# EIME bundle — reflection hooks
+# Periodic introspection moments where agents reconsider state and prompt the
+# treasurer / dev team.
+
+schema_version: 1.0
+module_id: eime
+
+hooks:
+
+  coa_load_completeness_check:
+    when: chart of accounts loaded for a new fiscal_year
+    action: walk eime_coa + eime_funds; surface accounts/funds with missing budget or restriction metadata
+    target: budget_configured == true, all restricted funds have restriction rules
+
+  mapping_accuracy_weekly_review:
+    when: weekly
+    action: count MAPPING_CONFIDENCE_LOW emissions vs. auto-staged classifications; prompt for taxonomy tuning if low-confidence rate rising
+    target: low-confidence rate trending down week over week
+
+  approval_sla_daily_sweep:
+    when: daily
+    action: count approval_state.nearing_sla_deadline; emit APPROVAL_DEADLINE_PRESSURE for any breaching item
+    target: zero approvals past SLA
+
+  reconciliation_backlog_review:
+    when: weekly
+    action: count open RECONCILIATION_EXCEPTION items; surface unresolved recon backlog to treasurer
+    target: backlog trending down
+
+  hard_block_audit_monthly:
+    when: monthly
+    action: walk decision_ledger for FUND_RESTRICTION_VIOLATION + PAYMENT_DEDUP_RISK blocks; confirm none were overridden
+    target: zero overrides of hard blocks
+
+  autonomous_posting_drift_review:
+    when: monthly
+    action: review recurring JEs auto-posted vs. escalated; recheck amount tolerances against actuals
+    target: tolerance bands still appropriate; escalation rate stable

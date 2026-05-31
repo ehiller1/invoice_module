@@ -1,0 +1,97 @@
+# EIME bundle — guider capability + message specs
+# Guiders sit in the 6-position cascade at mem.ein.parish.outer.
+# Source of record: backend/membrane/guiders/*.py. All capabilities + messages are
+# propose_new (staged in docs/registration_queue.yaml).
+
+schema_version: 1.0
+module_id: eime
+
+guiders:
+
+  accounting-integrity:
+    capability_id: eime.guider.accounting_integrity
+    description: Validates GL mappings and account structure; blocks invalid GL accounts, circular allocations, and missing mappings.
+    classification: integrity_critical
+    competencies:
+      - Validate GL account format/existence
+      - Detect circular allocations in a proposed journal entry
+      - Enforce a minimum GL mapping confidence threshold
+    scope_of_authority: outbound_emission_filtering_only
+    source: backend/membrane/guiders/accounting_integrity.py
+    messages:
+      - { when: circular allocation in proposed JE, content: "Circular allocation detected in proposed journal entry." }
+      - { when: invalid GL account, content: "Invalid GL account: {account}." }
+      - { when: low mapping confidence, content: "Low GL mapping confidence ({conf} < {threshold})." }
+      - { when: pass, content: "GL accounts valid; mapping confidence acceptable." }
+
+  payment-dedup:
+    capability_id: eime.guider.payment_dedup
+    description: Detects duplicate payments; hard-blocks exact duplicates within a window; escalates near-duplicates.
+    classification: governance_critical
+    competencies:
+      - Hard-block exact duplicate payments (vendor+amount+date) within a window
+      - Escalate probable duplicates flagged upstream
+    scope_of_authority: outbound_emission_filtering_only
+    source: backend/membrane/guiders/payment_dedup.py
+    messages:
+      - { when: exact duplicate, content: "Exact duplicate payment detected (same vendor+amount+date)." }
+      - { when: dedup risk perturbation, content: "Perturbation flagged as PAYMENT_DEDUP_RISK (hard block)." }
+      - { when: probable duplicate, content: "Probable duplicate flagged by upstream detector." }
+      - { when: pass, content: "No duplicate signals detected." }
+
+  polity-and-deference:
+    capability_id: eime.guider.polity_and_deference
+    description: Checks whether the proposing principal has authority for an action; RBAC and approval routing.
+    classification: authority_gate
+    competencies:
+      - Verify principal_roles authorize the proposed action
+      - Apply per-principal authority caps against the action amount
+    scope_of_authority: authority_check_only
+    source: backend/membrane/guiders/polity_and_deference.py
+    messages:
+      - { when: no roles supplied, content: "No principal_roles supplied; cannot authorize action." }
+      - { when: cap covers amount, content: "Principal authority cap ({cap}) covers amount ({amount})." }
+
+  abundance-and-stewardship:
+    capability_id: eime.guider.abundance_and_stewardship
+    description: Enforces restricted-fund rules as hard blocks and budget variance limits.
+    classification: governance_critical
+    competencies:
+      - Hard-block postings that violate a restricted-fund rule
+      - Flag budget variance / threshold breaches
+    scope_of_authority: outbound_emission_filtering_only
+    source: backend/membrane/guiders/abundance_and_stewardship.py
+    messages:
+      - { when: fund restriction violated, content: "Perturbation flagged FUND_RESTRICTION_VIOLATION (HARD BLOCK)." }
+      - { when: pass, content: "No fund restriction or budget threshold breached." }
+
+  witness-and-provenance:
+    capability_id: eime.guider.witness_and_provenance
+    description: Blocks high-risk actions lacking explanation; records provenance (who/when/what); redaction.
+    classification: provenance
+    competencies:
+      - Block high-risk actions with no recorded principal/explanation
+      - Escalate high-risk-but-explained actions for witness review
+      - Record provenance on every passing action
+    scope_of_authority: outbound_emission_filtering_only
+    source: backend/membrane/guiders/witness_and_provenance.py
+    messages:
+      - { when: no principal recorded, content: "No principal recorded — provenance incomplete." }
+      - { when: high risk but explained, content: "High risk ({risk}) but explanation supplied — escalate for witness review." }
+      - { when: pass, content: "Provenance recorded; risk within tolerance." }
+
+  dignity:
+    capability_id: eime.guider.dignity
+    description: Enforces active financial policies and compliance gates (e.g. PO>10K requires 3 quotes).
+    classification: policy_gate
+    competencies:
+      - Enforce active policy set against a proposed action
+      - Re-confirm previously approved policy exceptions before posting
+    scope_of_authority: policy_enforcement_only
+    source: backend/membrane/guiders/dignity.py
+    messages:
+      - { when: policy violation, content: "Policy violation: {policy_id}." }
+      - { when: policy violated detail, content: "Policy {policy_id} violated: {reason}." }
+      - { when: violated w/ approved exception, content: "Policy {policy_id} violated; exception approved — re-confirm." }
+      - { when: prior exception, content: "Policy exception previously approved — confirm before posting." }
+      - { when: pass, content: "No active policy violations." }

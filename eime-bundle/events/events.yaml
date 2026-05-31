@@ -1,0 +1,65 @@
+# EIME bundle — event surface
+# The 10 module perturbations as the events that wake agents up. Source of record:
+# perturbations/perturbations.yaml + backend/membrane/perturbations.py.
+# Everything else in the surface layer reads this file.
+
+schema_version: 1.0
+module_id: eime
+
+events:
+  - name: INVOICE_INGESTED
+    perturbation_id: eime.invoice_ingested
+    privacy_class: P1
+    wakes: [invoice_extractor]          # starts the invoice_ingestion_mapping crew
+    decision_point: which expense taxonomy + GL account applies
+  - name: MAPPING_CONFIDENCE_LOW
+    perturbation_id: eime.mapping_confidence_low
+    privacy_class: P1
+    wakes: [hitl_gate_coordinator]
+    decision_point: human review of low-confidence GL suggestion
+  - name: BUDGET_OVERAGE_RISK
+    perturbation_id: eime.budget_overage_risk
+    privacy_class: P1
+    wakes: [compliance_officer, accounting_advisor]
+    decision_point: allow / flag posting near budget threshold
+  - name: FUND_RESTRICTION_VIOLATION
+    perturbation_id: eime.fund_restriction_violation
+    privacy_class: P1
+    hard_block: true
+    wakes: [compliance_officer]
+    decision_point: HARD BLOCK — never overridable
+  - name: JOURNAL_ENTRY_READY
+    perturbation_id: eime.journal_entry_ready
+    privacy_class: P0
+    wakes: [journal_entry_drafter, hitl_gate_coordinator, autonomous_posting_engine]
+    decision_point: route to compliance / approval / auto-post
+  - name: PAYMENT_DEDUP_RISK
+    perturbation_id: eime.payment_dedup_risk
+    privacy_class: P1
+    hard_block: true
+    wakes: [reconciliation_specialist]
+    decision_point: HARD BLOCK — possible duplicate payment
+  - name: RECONCILIATION_EXCEPTION
+    perturbation_id: eime.reconciliation_exception
+    privacy_class: P1
+    crosses_membrane: true
+    wakes: [hitl_gate_coordinator]
+    decision_point: resolve unresolved recon item
+  - name: APPROVAL_DEADLINE_PRESSURE
+    perturbation_id: eime.approval_deadline_pressure
+    privacy_class: P1
+    crosses_membrane: true
+    wakes: [hitl_gate_coordinator]
+    decision_point: escalate on SLA pressure
+  - name: HITL_ESCALATION
+    perturbation_id: eime.hitl_escalation
+    privacy_class: P1
+    crosses_membrane: true
+    wakes: [hitl_gate_coordinator]
+    decision_point: route escalated review
+  - name: POLICY_VIOLATION
+    perturbation_id: eime.policy_violation
+    privacy_class: P1
+    crosses_membrane: true
+    wakes: [compliance_officer]
+    decision_point: surface policy-gate firing

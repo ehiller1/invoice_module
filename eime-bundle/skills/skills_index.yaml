@@ -1,0 +1,97 @@
+# EIME bundle — agent-loaded skills index
+# One entry per skill/tool referenced from agents/agents.yaml.tools.
+# Source of record: backend/skills/* and backend/agents/invoice_crew.py tool functions.
+
+schema_version: 1.0
+module_id: eime
+
+skills:
+
+  # Crew 1: invoice_ingestion_mapping
+  - id: extract_invoice_pdf
+    domain: invoice_ingestion_mapping
+    purpose: Extract structured line items, vendor, totals, and warnings from an invoice PDF.
+    file: extract_invoice_pdf.SKILL.md
+  - id: load_chart_of_accounts
+    domain: invoice_ingestion_mapping
+    purpose: Load the church's COA, fund roster, budget, and capitalisation threshold by church_id.
+    file: load_chart_of_accounts.SKILL.md
+  - id: classify_line_items_against_coa
+    domain: invoice_ingestion_mapping
+    purpose: Classify each invoice line into expense_category + ministry_area against the COA, with confidence.
+    file: classify_line_items_against_coa.SKILL.md
+  - id: map_lines_to_gl_accounts
+    domain: invoice_ingestion_mapping
+    purpose: Map each classified line to a GL account with mapping confidence; flag low-confidence lines.
+    file: map_lines_to_gl_accounts.SKILL.md
+  - id: assess_risk_and_fraud
+    domain: invoice_ingestion_mapping
+    purpose: Score risk and fraud signals across the draft allocations.
+    file: assess_risk_and_fraud.SKILL.md
+  - id: compare_to_budget
+    domain: invoice_ingestion_mapping
+    purpose: Compare each proposed account posting against its budget; flag overage risk.
+    file: compare_to_budget.SKILL.md
+  - id: review_allocations_for_approval
+    domain: invoice_ingestion_mapping
+    purpose: Review mapped + risk-scored allocations for readiness to assemble a JE.
+    file: review_allocations_for_approval.SKILL.md
+  - id: build_journal_entry
+    domain: invoice_ingestion_mapping
+    purpose: Assemble a balanced journal entry from reviewed allocations.
+    file: build_journal_entry.SKILL.md
+
+  # Crew 4: bank_reconciliation
+  - id: plaid_sync
+    domain: bank_reconciliation
+    purpose: Sync bank transactions from Plaid for the configured accounts.
+    file: plaid_sync.SKILL.md
+  - id: structural_matcher
+    domain: bank_reconciliation
+    purpose: Match bank transactions to pending JEs and dedup candidate payments.
+    file: structural_matcher.SKILL.md
+
+  # Crew 5: autonomous_posting
+  - id: recurring_learning_read
+    domain: autonomous_posting
+    purpose: Read learned tolerances for a recurring JE template.
+    file: recurring_learning_read.SKILL.md
+
+  # Crew 6: advisory_nba
+  - id: decision_ledger_read
+    domain: advisory_nba
+    purpose: Read the decision ledger for audit-trail and pattern analysis.
+    file: decision_ledger_read.SKILL.md
+  - id: variance_analysis
+    domain: advisory_nba
+    purpose: Analyze budget variance and vendor patterns for advisory recommendations.
+    file: variance_analysis.SKILL.md
+
+  # Crew 7: conversational_routing
+  - id: chat_router
+    domain: conversational_routing
+    purpose: Route a user utterance to the right agent/skill or open a question card.
+    file: chat_router.SKILL.md
+  - id: intent_classifier
+    domain: conversational_routing
+    purpose: Classify an utterance against the intent registry; return top-N with confidence.
+    file: intent_classifier.SKILL.md
+
+  # Knowledge-mode skills (extraction.knowledge_needs: true)
+  - id: knowledge_coa_lookup
+    domain: knowledge
+    purpose: Look up COA accounts / denomination rules from the knowledge base.
+    file: knowledge_coa_lookup.SKILL.md
+    cross_reference: knowledge/knowledge_config.yaml
+  - id: knowledge_vendor_history
+    domain: knowledge
+    purpose: Recall a vendor's prior classifications and mapping patterns.
+    file: knowledge_vendor_history.SKILL.md
+    cross_reference: knowledge/knowledge_config.yaml
+
+  # Cross-cutting (context layer)
+  - id: memory_fabric_context_pack
+    domain: cross_cutting
+    purpose: Assemble the Context Pack from the EIN memory fabric layers.
+    file: memory_fabric_context_pack.SKILL.md
+    cross_reference: context/context_pack_schema.yaml

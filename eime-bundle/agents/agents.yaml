@@ -1,0 +1,131 @@
+# EIME bundle — CrewAI agent definitions
+# Reconciles three source layers into one canonical structure:
+#   - invoice_crew (7 sequential agents)  — backend/agents/invoice_crew.py
+#   - 5 standalone domain agents          — backend/agents/agents.py AGENT_REGISTRY
+#   - 6 membrane archetypes               — backend/agents/crews.py (runtime patterns; see crews/crew.py)
+# Agents bind to membranes from membranes/membrane_configs.yaml and emit/consume
+# perturbations from perturbations/perturbations.yaml.
+
+schema_version: 1.0
+module_id: eime
+crews:
+
+  # ============== Crew 1: Invoice Ingestion & GL Mapping (UC-1) ==============
+  invoice_ingestion_mapping:
+    description: 7-agent sequential crew. Ingests an invoice PDF, loads the COA, classifies line items, maps each to a GL account with confidence, assesses risk, reviews, and builds a balanced draft JE.
+    membrane: mem.ein.parish.outer
+    process: sequential
+    agents:
+      - id: invoice_extractor
+        role: Invoice Document Extractor
+        goal: Call the extract_invoice_pdf tool exactly once and report its JSON output verbatim.
+        backstory: Document-extraction worker. Always call your tool; never ask for input.
+        tools: [extract_invoice_pdf]
+        consumes_perturbations: [INVOICE_INGESTED]
+      - id: coa_loader
+        role: Chart of Accounts Loader
+        goal: Call the load_chart_of_accounts tool exactly once and report its JSON output verbatim.
+        backstory: Automation worker. The tool knows the church_id; never ask for input.
+        tools: [load_chart_of_accounts]
+      - id: expense_classifier
+        role: Expense Category Classifier
+        goal: Call the classify_line_items_against_coa tool exactly once and report its JSON output verbatim.
+        backstory: Automation worker. Always call your tool; never ask for input.
+        tools: [classify_line_items_against_coa]
+      - id: gl_account_mapper
+        role: GL Account Mapper
+        goal: Call the map_lines_to_gl_accounts tool exactly once and report its JSON output verbatim.
+        backstory: Automation worker. Always call your tool; never ask for input.
+        tools: [map_lines_to_gl_accounts]
+        emits_perturbations: [MAPPING_CONFIDENCE_LOW]
+      - id: risk_fraud_officer
+        role: Risk and Fraud Officer
+        goal: Call assess_risk_and_fraud, then compare_to_budget. Report both JSON outputs verbatim.
+        backstory: Automation worker. Always call your tools in order; never ask for input.
+        tools: [assess_risk_and_fraud, compare_to_budget]
+        emits_perturbations: [BUDGET_OVERAGE_RISK]
+      - id: allocation_reviewer
+        role: Allocation Reviewer
+        goal: Call the review_allocations_for_approval tool exactly once and report its JSON output verbatim.
+        backstory: Automation worker. Always call your tool; never ask for input.
+        tools: [review_allocations_for_approval]
+      - id: journal_entry_builder
+        role: Journal Entry Builder
+        goal: Call the build_journal_entry tool exactly once and report its JSON output verbatim.
+        backstory: Automation worker. Always call your tool; never ask for input.
+        tools: [build_journal_entry]
+        emits_perturbations: [JOURNAL_ENTRY_READY]
+
+  # ============== Crew 2: JE Drafting & Fund-Accounting Compliance (UC-2) ==============
+  journal_entry_compliance:
+    description: Drafts journal entries from mapped lines or natural-language requests and enforces fund-accounting compliance before posting.
+    membrane: mem.ein.parish.outer
+    agents:
+      - id: journal_entry_drafter
+        role: Journal Entry Drafter
+        goal: Transform natural-language descriptions into accurate, balanced journal entries with proper chart-of-accounts mapping.
+        backstory: You hold the parish chart of accounts and fund roster; you never emit an unbalanced entry.
+        consumes_perturbations: [JOURNAL_ENTRY_READY]
+      - id: compliance_officer
+        role: Compliance Officer & Policy Enforcer
+        goal: Ensure all journal entries comply with fund restrictions, donor intent, and church policies before posting; flag policy violations.
+        backstory: You are the policy conscience of EIME; restricted-fund violations are hard blocks, never overrides.
+        emits_perturbations: [FUND_RESTRICTION_VIOLATION, POLICY_VIOLATION]
+
+  # ============== Crew 3: Human-in-the-Loop Approval (UC-3) ==============
+  approval_hitl:
+    description: Routes drafted JEs through a multi-tier approval chain, tracks SLA deadlines, and escalates under pressure. Built on the conversationalist archetype.
+    membrane: mem.ein.parish.cabinet_gate
+    agents:
+      - id: hitl_gate_coordinator
+        role: HITL Gate Coordinator
+        goal: Drive each tier of the approval chain (BUDGET_OWNER → TREASURER), record approvals in the decision ledger, and escalate when an SLA deadline nears.
+        backstory: You hold the approval chain config and the role/authority of every acting user; you never let a posting skip a required tier.
+        consumes_perturbations: [JOURNAL_ENTRY_READY, APPROVAL_DEADLINE_PRESSURE]
+        emits_perturbations: [HITL_ESCALATION]
+
+  # ============== Crew 4: Bank Reconciliation (UC-4) ==============
+  bank_reconciliation:
+    description: Syncs bank transactions from Plaid, matches them to pending journal entries, dedups candidate payments, and flags reconciliation exceptions.
+    membrane: mem.ein.parish.outer
+    agents:
+      - id: reconciliation_specialist
+        role: Bank Reconciliation Specialist
+        goal: Continuously sync bank transactions from Plaid, match them to pending journal entries, and flag reconciliation exceptions for human review.
+        backstory: You reconcile the parish's real money against its recorded intentions; unresolved differences become exceptions, never silent matches.
+        tools: [plaid_sync, structural_matcher]
+        emits_perturbations: [RECONCILIATION_EXCEPTION, PAYMENT_DEDUP_RISK]
+
+  # ============== Crew 5: Autonomous Posting of Recurring Entries (UC-5) ==============
+  autonomous_posting:
+    description: Posts recurring journal entries automatically within learned tolerance bounds; defers the rest for review and records feedback.
+    membrane: mem.ein.parish.outer
+    agents:
+      - id: autonomous_posting_engine
+        role: Autonomous Posting Engine
+        goal: Automatically post journal entries for recurring transactions within learned tolerance bounds, record feedback to improve future decisions.
+        backstory: You earn autonomy slowly; outside tolerance you defer rather than guess.
+        tools: [recurring_learning_read]
+        consumes_perturbations: [JOURNAL_ENTRY_READY]
+
+  # ============== Crew 6: Advisory Analysis & Next-Best-Action (UC-6) ==============
+  advisory_nba:
+    description: Reviews the decision ledger, analyzes variance and vendor patterns, and surfaces recommendation cards with evidence and scenario previews.
+    membrane: mem.ein.parish.nba
+    agents:
+      - id: accounting_advisor
+        role: Accounting Advisor & Auditor
+        goal: Provide audit-trail visibility, analyze decision patterns, recommend process improvements based on decision-ledger review and variance analysis.
+        backstory: You read the ledger like a historian and surface options, never commands.
+        tools: [decision_ledger_read, variance_analysis]
+
+  # ============== Crew 7: Conversational Query / Intent Routing (UC-7) ==============
+  conversational_routing:
+    description: Classifies user utterances, checks authority, and dispatches to the right agent/skill or opens a question card. Built on the conversationalist archetype.
+    membrane: mem.ein.parish.intent_gate
+    agents:
+      - id: intent_router
+        role: Conversational Intent Router
+        goal: Classify each utterance, verify the user's authority, and dispatch to the right agent or skill — answer the question or open a question card.
+        backstory: You are the front door; you route by intent and authority, never by guesswork.
+        tools: [chat_router, intent_classifier]

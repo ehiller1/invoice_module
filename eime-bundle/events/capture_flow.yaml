@@ -1,0 +1,39 @@
+# EIME bundle — conversational intent capture protocol
+
+schema_version: 1.0
+module_id: eime
+
+flow:
+  - step: receive_utterance
+    description: User submits a free-text query through finance_position, treasurer_dashboard, approvals_hitl, reconciliation, or cabinet
+    outputs: {raw_utterance, user_id, surface, ts}
+
+  - step: load_context_pack
+    description: Memory Fabric context pack for the user (authority tier, role, church, recent perturbations, COA + fund summary, approval state)
+    invokes_skill: memory_fabric_context_pack
+    privacy_gate: privacy_class_redactor
+
+  - step: classify_intent
+    description: Run intent classifier against events/intent_registry.yaml. Returns top-3 candidate intents with confidence.
+    invokes_skill: intent_classification
+    confidence_floor: 0.70
+
+  - step: clarify_if_ambiguous
+    description: When top-1 confidence < floor or top-1 vs top-2 spread < 0.10, pause and ask a single clarifying question
+    pause_resume_protocol: conversational_gate_protocol
+
+  - step: authority_filter
+    description: Apply intent.authority_required against context_pack.facts.user.role. Refuse if below required tier.
+    on_refuse: emit polite refusal + log to decision_ledger
+
+  - step: decision_matrix_verdict
+    description: Run context/decision_matrix.yaml rules via tools/decision_matrix_tools.verdict(). Result is one of {allow, deny, escalate, flag, redact_amounts}
+    invokes_skill: decision_matrix_evaluator
+
+  - step: dispatch
+    description: Route to target.id from intent registry; for kind=open_dependency, return Evidence-only response with explanation
+    emits_perturbation: intent_router.dispatch_request
+
+  - step: narrate
+    description: Render result in user-facing voice with optional evidence chain on demand
+    invokes_agent: conversationalist

@@ -1,0 +1,50 @@
+vm-second-frame  guider_message        Annotation second_frame_required must be present before publish on cross-membran
+92f1fe75-e644-479c-aacc-73240c238cb1  guider_message        msg.refusal.insufficient_authority
+7a99e4c1-6b53-4eea-b613-d7f19c81b44b  guider_message        msg.escalation_packet.pricing_competitive_response
+c75c7106-2b0b-48c5-974a-4b02b3a1bfc9  guider_message        msg.escalation_packet.capability_change
+8fc34836-b73f-4a99-a166-7f6f06a34309  guider_message        msg.escalation_packet.strategic_pivot
+5d4d5ca9-a6d6-4c0b-856f-d5177f3cabe7  guider_message        msg.escalation_packet.intelligence_layer_posture
+6ba94f37-66eb-4834-85c0-25f77ae6b789  guider_message        msg.escalation_packet.guider_amendment
+b6e169dc-e5ff-4921-960e-6f2a74687794  guider_message        msg.escalation_packet.reconciliation_gap
+de07e2e4-e9b6-4939-96ea-50d3b1642d4d  guider_message        msg.narration.board_summary
+273ce50e-d448-43cd-a825-119ec5a077a3  guider_message        msg.narration.executive_briefing
+9e754a92-7cd8-45fb-9d98-f3f6e983f10e  guider_message        msg.narration.internal_instrumented
+c560a13d-e011-4ef2-9282-307e558ff26c  guider_message        msg.classification.clarification_question
+851ae058-196e-4bf8-b7e4-b593ff83c66a  guider_message        msg.reconciliation.summary
+0d578b42-8554-4874-9283-1f185077b0c3  guider_message        Pastoral suppression active for this donor. Fundraising-class outreach BLOCKED. 
+25a0658d-be4b-468d-9d0d-d01496db61ed  guider_message        Frequency cap reached for this donor on this channel for the current window. Act
+de5d30ee-64dc-4d8d-9ff5-5d5f86966592  guider_message        Donor has opted out of AI-assisted handling for this action class. Action BLOCKE
+feac5d47-7a19-4ace-adc8-a1028951567a  guider_message        Donor consent revoked for this channel. Choose a consented channel within the do
+110345f3-2915-4994-84bb-12d8928c826f  guider_message        EIN guider message ein.journey_integrity.outbound.role_mismatch_block
+07cff54c-1e3f-40f2-ac46-e168eedd4ba0  guider_message        EIN guider message ein.consent.outbound.scope_mismatch_block
+f1500ced-4481-42fd-8b5b-4cc635aaffa4  guider_message        EIN guider message ein.jordan_independence.outbound.attest_pattern_block
+1a8cbc37-b486-4f30-8323-14789ae9a378  guider_message        EIN guider message ein.content_integrity.outbound.tone_modify
+43fc3d86-5ae9-4e9a-aa0d-ca6cea10b47d  guider_message        EIN guider message ein.minimal_contribution.outbound.signal_weak_drop
+1f4b3c6b-96c8-4628-95fd-0216efef1282  guider_message        EIN guider message ein.pattern_quality.outbound.below_n7_block
+2dc6dbb5-2c88-46e0-9f5a-42e21c675449  guider_message        EIN guider message ein.bishop_authority.outbound.notice_required_flag
+a225b6c0-e825-4f7d-83e4-13b860fce130  guider_message        EIN guider message ein.harm_avoidance.outbound.vulnerability_withhold
+21603c76-0e97-48c1-897b-95351836f6c4  guider_message        EIN guider message ein.canonical_alignment.outbound.canon_conflict_block
+fce157d1-b416-43f0-a65f-9624958bc748  guider_message        EIN guider message ein.connection_fidelity.outbound.verdict_block
+09021a82-e4c6-48c6-8fca-e6fde29d65ad  guider_message        EIN guider message ein.personalization_proportionality.outbound.intrusive_probe_
+669c5ef8-db1f-4034-946b-f738371f079e  guider_message        EIN guider message ein.denominational_polity.outbound.polity_conflict_block
+3e13c825-d4ff-433e-b957-9337c42cacac  guider_message        EIN guider message ein.jordan_review.outbound.pre_screen_defer
+3902ab02-ef23-48a3-9fc1-d82f89877cba  guider_message        msg_attest_redirect_outbound under jordan_independence_guider: {Steward} cannot 
+6926de08-80f4-41c9-a8d7-4f1b91859cc6  guider_message        msg_advisory_safety_check under jordan_independence_guider: Recommendation withh
+57df157f-e839-4282-86c7-0614d94ae334  guider_message        msg_intent_annotation under restricted_fund_intent_guider: {Fund Name} — donor i
+b5f5515d-372e-432e-922b-3b14678468bb  guider_message        msg_intent_violation_block under restricted_fund_intent_guider: Potential restri
+ea0caee9-0eef-4889-bce4-ddc7c88e36f4  guider_message        msg_documentation_remediation_due under restricted_fund_intent_guider: {Fund Nam
+11312701-f0b6-4363-843d-871054be69ee  guider_message        msg_bypass_refused under authority_graph_guider: I can't post that without going
+06ead5ad-d430-44e9-a76d-c8050febd07c  guider_message        msg_threshold_routing under authority_graph_guider: This action requires {next_t
+1564d58b-4fcd-4794-91fe-b6ad8f4c1fd8  guider_message        msg_emission_cancelled_consent under consent_guider: Emission cancelled — parish
+2c7952cd-41d3-45f0-89fa-1fe5596603b6  guider_message        msg_pattern_unavailable_k under k_anonymity_guider: A relevant pattern exists bu
+00043317-0c65-40e0-9342-3bf74bb89db9  guider_message        id: ?
+1747d879-d48a-4a1c-9d6c-dd4bbae25dc5  guider_message        id: ?
+88217b10-dd2d-48d1-96b1-b8c30cc7b617  guider_message        id: ?
+9ae9161b-3f55-4157-9489-bc4af953127f  guider_message        id: ?
+8e3f40f1-80e7-46fa-a552-541e657c1207  guider_message        id: ?
+986bbe4b-c0de-451f-9d1c-b968cdacc5d9  guider_message        id: ?
+9b2a0bb6-68d4-4206-99a3-22917757dfdf  guider_message        id: ?
+2cc95d49-d0f3-4712-957e-bdacc86424f9  guider_message        id: ?
+1d3fc02e-8bc3-4bf5-8648-a4375e7c212d  guider_message        id: ?
+29d3b49d-7422-41d1-9c42-1697a9b779ba  guider_message        id: ?
+5819c6a2-2578-444e-926c-772f911dff54  guider_message        id: ?

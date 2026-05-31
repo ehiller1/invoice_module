@@ -1,0 +1,27 @@
+# EIME bundle — UI ↔ conversation handoff rules
+
+schema_version: 1.0
+module_id: eime
+
+handoffs:
+  - from: finance_position.classification_review_grid (DecisionCard)
+    to: conversationalist.evidence_on_demand
+    trigger: user_clicks_why
+  - from: finance_position.je_draft_panel (DecisionCard)
+    to: conversationalist.amount_redaction_notice
+    trigger: sub_finance_staff_requests_amounts
+  - from: treasurer_dashboard.fund_restriction_block_modal
+    to: conversationalist.hard_block_explanation
+    trigger: user_clicks_override
+  - from: reconciliation.dedup_review
+    to: conversationalist.hard_block_explanation
+    trigger: user_clicks_override
+  - from: treasurer_dashboard.posting_queue
+    to: conversationalist.posting_authority_redirect
+    trigger: sub_treasurer_admin_clicks_post
+  - from: cabinet.recommendations_queue (ActionCard)
+    to: conversationalist.recommendation_impact_framing
+    trigger: user_clicks_more_context
+  - from: any_je_amount_query_below_finance_staff
+    to: conversationalist.amount_redaction_notice
+    trigger: classification_match

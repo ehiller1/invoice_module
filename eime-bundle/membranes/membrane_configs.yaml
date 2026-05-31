@@ -1,0 +1,58 @@
+# EIME bundle — membrane configurations
+# All membrane ids validated against canonical membranes.yaml (see docs/membrane_validation.md).
+# No proposed-new membranes for this bundle (5/5 resolved at parish tier).
+
+schema_version: 1.0
+module_id: eime
+parish_tier_membranes:
+
+  outer:
+    id: mem.ein.parish.outer
+    role: >-
+      EIME's outermost membrane at the parish tier. All EIME-emitted perturbations
+      cross this membrane before reaching other parish-tier agents or the ledger export.
+    distiller:
+      strips: [P0_raw_amounts_unless_finance_staff, parish_specific_identifiers_unless_explicit]
+      preserves: [P1_distilled_findings, P0_aggregate_position]
+    redactor:
+      gate_on: parish.consent.status
+      privacy_class_rules:
+        P0: emit_to_finance_staff_plus_only   # JOURNAL_ENTRY_READY amounts
+        P1: emit_distilled
+    guider_cascade:
+      # 6-position cascade — backend/membrane/guiders/cascade.py CASCADE_ORDER
+      - accounting-integrity
+      - payment-dedup
+      - polity-and-deference
+      - abundance-and-stewardship
+      - witness-and-provenance
+      - dignity
+    publisher:
+      target: mem.ein.parish.ledger_export
+      cadence: continuous
+    crossing_perturbations:
+      - RECONCILIATION_EXCEPTION
+      - APPROVAL_DEADLINE_PRESSURE
+      - HITL_ESCALATION
+      - POLICY_VIOLATION
+
+  intent_gate:
+    id: mem.ein.parish.intent_gate
+    role: Intent routing gate — classifies conversational utterances and dispatches to agent/skill.
+    source: backend/tools/chat_router.py, backend/skills/router.py
+    handles_perturbations: []   # routing layer, not an emission boundary
+
+  nba:
+    id: mem.ein.parish.nba
+    role: Next-best-action membrane — emits recommendation cards with evidence + scenario preview.
+    source: backend/membrane/nba/{crew,recommendation_card}.py, backend/membrane/scenario/simulator.py
+
+  cabinet_gate:
+    id: mem.ein.parish.cabinet_gate
+    role: Cabinet / management gate — per-principal cabinet items and financial-position views.
+    source: backend/routes/cabinets.py, backend/routes/financial_position.py
+
+  ledger_export:
+    id: mem.ein.parish.ledger_export
+    role: Decision-ledger export (federation) — every dispatch and outbound emission recorded.
+    source: backend/decision_ledger.py

@@ -1,0 +1,95 @@
+# EIME bundle — decision policy
+# When does an agent act autonomously vs. escalate? Authority-tier-aware.
+# Consumes events/events.yaml + context/decision_matrix.yaml. Authority tiers
+# map to backend/auth.py ROLE_LEVELS (FINANCE_STAFF=1, BUDGET_OWNER=2,
+# TREASURER_ADMIN=3).
+
+schema_version: 1.0
+module_id: eime
+
+policies:
+
+  # --- Invoice ingestion + classification (Band 1 transactional) ---
+  invoice_ingestion:
+    autonomous: true
+    rationale: Ingest + OCR/extract is read-and-stage only; nothing posts to the books.
+
+  expense_classification:
+    autonomous_above_confidence: 0.85
+    surface_ranked_candidates_below: 0.85
+    side_effect_below: emit MAPPING_CONFIDENCE_LOW
+    explainability_required: true
+    rationale: GL/taxonomy suggestions above the confidence floor auto-stage; below, route to human review.
+
+  gl_account_mapping:
+    autonomous_above_confidence: 0.85
+    surface_below: 0.85
+    side_effect_below: emit MAPPING_CONFIDENCE_LOW
+    explainability_required: true
+
+  # --- Hard blocks — never autonomous, never overridable ---
+  restricted_fund_violation:
+    autonomous: false
+    blocking_authority: true
+    rationale: Restricted-fund donor intent must never be violated. Always block, always route to compliance_officer. Never override on instruction.
+    side_effect: emit FUND_RESTRICTION_VIOLATION
+
+  payment_dedup:
+    autonomous: false
+    blocking_authority: true
+    rationale: Probable duplicate payments are hard-blocked and routed to reconciliation_specialist. Never auto-post.
+    side_effect: emit PAYMENT_DEDUP_RISK
+
+  # --- Journal entry posting (authority-gated) ---
+  journal_entry_drafting:
+    autonomous: true
+    rationale: Drafting a JE is advisory; the draft does not post until it clears the approval chain.
+
+  journal_entry_posting:
+    autonomous: false
+    requires_tier: TREASURER_ADMIN
+    else_verdict: escalate
+    side_effect_on_escalate: emit HITL_ESCALATION
+    rationale: Only TREASURER_ADMIN may post a JE; lower tiers escalate through the approval chain.
+
+  autonomous_posting:
+    autonomous_for_recurring_within_tolerance: true
+    requires: [recurring_template_match, within_amount_tolerance, no_active_hard_block]
+    else_verdict: escalate
+    rationale: Recurring JEs matching an institutional template within tolerance auto-post; anything outside tolerance escalates.
+
+  # --- Approval staging (multi-tier chain) ---
+  approval_stage_1:
+    autonomous: false
+    requires_tier: BUDGET_OWNER
+    else_verdict: escalate
+
+  approval_final:
+    autonomous: false
+    requires_tier: TREASURER_ADMIN
+    else_verdict: escalate
+
+  # --- Soft flags (surface for review, not blocked) ---
+  budget_overage:
+    autonomous_emission: true
+    verdict: flag
+    side_effect: emit BUDGET_OVERAGE_RISK
+    rationale: Budget threshold breaches are surfaced for review, not auto-blocked.
+
+  policy_gate:
+    autonomous_emission: true
+    verdict: flag
+    side_effect: emit POLICY_VIOLATION
+
+  # --- Amount disclosure (privacy class P0) ---
+  je_amount_disclosure:
+    autonomous: false
+    requires_tier: FINANCE_STAFF
+    else_verdict: redact_amounts
+    rationale: JOURNAL_ENTRY_READY amounts are P0 — visible to FINANCE_STAFF+ only.
+
+  # --- Reconciliation ---
+  reconciliation_match:
+    autonomous_above_match_confidence: 0.95
+    surface_below: 0.95
+    side_effect_below: emit RECONCILIATION_EXCEPTION

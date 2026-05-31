@@ -1,0 +1,62 @@
+# EIME bundle — escalation rules
+# Triggered when timeouts, threshold breaches, hard blocks, or refusals occur.
+# Escalation chain: FINANCE_STAFF -> BUDGET_OWNER -> TREASURER_ADMIN -> human_review.
+
+schema_version: 1.0
+module_id: eime
+
+rules:
+
+  restricted_fund_violation_proposed:
+    trigger: any posting/classification that would violate restricted-fund donor intent or balance
+    action: block + emit FUND_RESTRICTION_VIOLATION + route to compliance_officer
+    log_to: decision_ledger
+    overridable: false
+
+  duplicate_payment_detected:
+    trigger: candidate payment matches an existing payment within dedup window
+    action: block + emit PAYMENT_DEDUP_RISK + route to reconciliation_specialist
+    log_to: decision_ledger
+    overridable: false
+
+  post_je_below_authority:
+    trigger: post_je requested by role below TREASURER_ADMIN
+    action: escalate + emit HITL_ESCALATION + route to hitl_gate_coordinator
+    fallback: escalation_chain[TREASURER_ADMIN]
+    log_to: decision_ledger
+
+  approval_sla_pressure:
+    trigger: pending approval nearing SLA deadline (approval_state.nearing_sla_deadline > 0)
+    action: emit APPROVAL_DEADLINE_PRESSURE + route to hitl_gate_coordinator
+    fallback: escalation_chain[next_tier]
+    log_to: decision_ledger
+
+  mapping_confidence_low:
+    trigger: classification/mapping confidence < 0.85
+    action: emit MAPPING_CONFIDENCE_LOW + route to hitl_gate_coordinator for human review
+    log_to: decision_ledger
+
+  reconciliation_unresolved:
+    trigger: reconciliation item unmatched below 0.95 confidence
+    action: emit RECONCILIATION_EXCEPTION + route to hitl_gate_coordinator
+    log_to: decision_ledger
+
+  budget_threshold_crossed:
+    trigger: proposed posting would breach configured budget_threshold
+    action: emit BUDGET_OVERAGE_RISK; surface to compliance_officer + accounting_advisor; do not auto-block
+    log_to: decision_ledger
+
+  policy_gate_fired:
+    trigger: policy gate fires against a proposed action
+    action: emit POLICY_VIOLATION + route to compliance_officer
+    log_to: decision_ledger
+
+  bypass_instruction_received:
+    trigger: any user instruction interpretable as 'override a hard block' (fund restriction or payment dedup)
+    action: refuse + log; hard blocks are never overridable
+    log_to: [decision_ledger]
+
+  consent_revoked_during_pending_emission:
+    trigger: church consent revoked while an outbound P1 emission is queued
+    action: cancel emission; do not re-attempt
+    log_to: decision_ledger

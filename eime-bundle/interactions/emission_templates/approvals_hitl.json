@@ -1,0 +1,69 @@
+{
+  "bundle_version": "1.0",
+  "tier": "declarative",
+  "surface_id": "approvals_hitl",
+  "payload": {
+    "root": {
+      "component": "Stack",
+      "props": { "gap": "md" },
+      "children": [
+        {
+          "component": "TaskCard",
+          "props": {
+            "title_template": "Review: {item.kind}",
+            "body_template": "{item.summary}",
+            "sla_template": "{item.sla_deadline}",
+            "priority_template": "{item.priority}"
+          }
+        },
+        {
+          "component": "DecisionCard",
+          "props": {
+            "title_template": "{item.id}",
+            "body_template": "{item.detail}",
+            "actions": [
+              { "id": "approve", "label": "Approve", "style": "primary" },
+              { "id": "correct", "label": "Correct", "style": "default" },
+              { "id": "escalate", "label": "Escalate", "style": "default" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "event_bindings": [
+    {
+      "binding_id": "resolve_approve",
+      "trigger_selector": "root.children[1].actions[0]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.review_resolved.v1",
+        "source": "/embark/surfaces/approvals_hitl",
+        "subject": "{item.id}",
+        "datacontenttype": "application/json",
+        "data_template": { "item_id": "{item.id}", "resolution": "approved", "actor": "{user.id}" }
+      }
+    },
+    {
+      "binding_id": "resolve_escalate",
+      "trigger_selector": "root.children[1].actions[2]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "eime.hitl_escalation",
+        "source": "/embark/surfaces/approvals_hitl",
+        "subject": "{item.id}",
+        "datacontenttype": "application/json",
+        "data_template": { "item_id": "{item.id}", "actor": "{user.id}", "reason": "{escalate.reason}" }
+      }
+    }
+  ],
+  "provenance": {
+    "agent_id": "hitl_gate_coordinator",
+    "task_id": "{runtime.task_id}",
+    "decision_ledger_ref": "{runtime.ledger_ref}",
+    "abb_ref": null,
+    "membrane_id": "mem.ein.parish.intent_gate",
+    "perturbation_correlation_id": "{runtime.correlation_id}"
+  },
+  "rendering_hints": { "priority": "high", "dismissible": false, "persist_until": null, "theme_override": null }
+}

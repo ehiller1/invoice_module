@@ -1,0 +1,45 @@
+# EIME bundle — Context Pack schema
+# Returned by the memory_fabric_context_pack skill to any reasoning invocation.
+
+schema_version: 1.0
+module_id: eime
+
+context_pack:
+  facts:
+    user:
+      id: string
+      role: enum [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]   # backend/auth.py ROLE_LEVELS
+      authority_tier: derived_from role_level
+      surface: enum [treasurer_dashboard, finance_position, cabinet, web, api]
+    church:
+      id: string                      # eime_churches.church_id
+      fiscal_year: int
+      coa_loaded: bool
+      consent_state: enum [granted, partial, revoked]
+    recent_perturbations:
+      window_minutes: 60
+      list: [{name, ts, privacy_class}]
+    coa_summary:
+      account_count: int
+      fund_count: int
+      budget_configured: bool
+      capitalisation_threshold_usd: number
+    fund_summary:
+      restricted_funds: count
+      restriction_violations_open: count
+    approval_state:
+      pending_approvals: count
+      nearing_sla_deadline: count       # drives APPROVAL_DEADLINE_PRESSURE
+    decision_ledger_recent:
+      window_days: 7
+      blocks_count: int                 # FUND_RESTRICTION_VIOLATION + PAYMENT_DEDUP_RISK
+      escalation_count: int             # HITL_ESCALATION
+
+  constraints:
+    privacy_class_max_emission: enum [P0, P1]
+    role_thresholds: from backend/auth.py ROLE_LEVELS
+    blocking_rules:
+      - restricted_fund_violation_blocks_posting   # FUND_RESTRICTION_VIOLATION hard block
+      - duplicate_payment_blocks_posting            # PAYMENT_DEDUP_RISK hard block
+    disclosure_rules:
+      - je_amounts_visible_to_finance_staff_plus_only   # JOURNAL_ENTRY_READY P0

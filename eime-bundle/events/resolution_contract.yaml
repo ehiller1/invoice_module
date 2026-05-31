@@ -1,0 +1,48 @@
+# EIME bundle — intent → target invocation contract
+# Also wires the three context integration points: fabric call (context_pack),
+# authority filter (decision_matrix authority_tiers), verdict gate
+# (decision_matrix verdict_rules).
+
+schema_version: 1.0
+module_id: eime
+
+contracts:
+
+  agent_invocation:
+    pre_conditions:
+      - context_pack loaded (memory_fabric_context_pack)            # integration point 1: fabric call
+      - authority filter passed (intent.authority_required)         # integration point 2: authority filter
+      - decision matrix verdict in {allow, escalate, flag}          # integration point 3: verdict gate
+    invocation_protocol:
+      input_schema: {intent_id, raw_utterance, context_pack_ref, authority_tier, params: {...}}
+      output_schema: {target_id, result_payload, evidence_chain, perturbations_emitted[]}
+    context_bindings:
+      fabric: context/fabric_bindings.yaml
+      decision_matrix: context/decision_matrix.yaml
+    expected_perturbations_by_intent:
+      explain_classification: [eime.invoice_ingested.evidence_response]
+      correct_mapping: [eime.mapping_confidence_low.resolved]
+      review_low_confidence_queue: [eime.mapping_confidence_low.query]
+      approve_classifications: [eime.journal_entry_ready]
+      view_je_draft: [eime.journal_entry_ready.evidence_response]
+      post_journal_entry: [eime.journal_entry_ready.posted]
+      check_budget_position: [eime.budget_overage_risk.query]
+      check_fund_restrictions: [eime.fund_restriction_violation.check]
+      run_reconciliation: [eime.reconciliation_exception]
+      resolve_reconciliation_exception: [eime.reconciliation_exception.resolved]
+      review_escalations: [eime.hitl_escalation.query]
+      next_best_action: [evidence_only_response]   # open_dependency until NBA layer wired
+
+  verdict_side_effects:
+    deny: { fund_restriction: emit eime.fund_restriction_violation, dedup: emit eime.payment_dedup_risk }
+    escalate: emit eime.hitl_escalation
+    flag: { budget: emit eime.budget_overage_risk, policy: emit eime.policy_violation }
+    redact_amounts: strip JE amount fields from result_payload (P0 below FINANCE_STAFF)
+
+  evidence_only_fallback:
+    when: intent.target.kind == open_dependency
+    response_shape: {evidence_chain, related_state_snapshot, recommendation_text, no_commit_flag: true}
+    notes: Used for next_best_action until the NBA layer (actions/) is wired.
+
+open_dependencies:
+  - nba_recommender   # resolved by nba-crew-architect (actions/) in this same surface layer

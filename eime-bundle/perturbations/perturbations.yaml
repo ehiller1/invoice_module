@@ -1,0 +1,118 @@
+# EIME bundle — perturbation registry
+# All 10 entries are propose_new (staged in docs/registration_queue.yaml).
+# Source of record: backend/membrane/perturbations.py (_REGISTRY_SPEC, local ids 59-68).
+# Local integer ids are NOT canonical; canonical ids are eime.<snake_name> (see queue).
+
+schema_version: 1.0
+module_id: eime
+domain: ein.parish.financial_intelligence
+
+perturbations:
+
+  - name: INVOICE_INGESTED
+    proposed_id: eime.invoice_ingested
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: false
+    retention_days: 30
+    hard_block: false
+    trigger: New invoice document enters the GL-mapping pipeline.
+    nearest_existing: invoice.received
+    similarity_score: 0.31
+    reason: Distinct — ingestion into the GL-mapping pipeline, not donor invoice receipt.
+
+  - name: MAPPING_CONFIDENCE_LOW
+    proposed_id: eime.mapping_confidence_low
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: false
+    retention_days: 30
+    hard_block: false
+    trigger: GL-account mapper produced a low-confidence suggestion needing review.
+    reason: No analogue — GL-mapper confidence signal is module-specific.
+
+  - name: BUDGET_OVERAGE_RISK
+    proposed_id: eime.budget_overage_risk
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: false
+    retention_days: 90
+    hard_block: false
+    trigger: Proposed posting would breach a budget threshold.
+    reason: No analogue — budget-threshold breach risk on a proposed posting.
+
+  - name: FUND_RESTRICTION_VIOLATION
+    proposed_id: eime.fund_restriction_violation
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: false
+    retention_days: 365
+    hard_block: true
+    trigger: HARD BLOCK — posting violates a restricted-fund rule.
+    nearest_existing: restricted_fund.violation.proposed
+    similarity_score: 0.371
+    reason: Near but distinct — hard-block on restricted-fund posting at mapping stage.
+
+  - name: JOURNAL_ENTRY_READY
+    proposed_id: eime.journal_entry_ready
+    state: propose_new
+    privacy_class: P0
+    crosses_membrane: false
+    retention_days: 365
+    hard_block: false
+    trigger: Balanced JE assembled; amounts visible to FINANCE_STAFF+ only.
+    reason: No analogue — balanced-JE-ready P0 signal with role-gated amounts.
+
+  - name: PAYMENT_DEDUP_RISK
+    proposed_id: eime.payment_dedup_risk
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: false
+    retention_days: 180
+    hard_block: true
+    trigger: HARD BLOCK — candidate payment is a possible duplicate.
+    reason: No analogue — duplicate-payment hard block.
+
+  - name: RECONCILIATION_EXCEPTION
+    proposed_id: eime.reconciliation_exception
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: true
+    retention_days: 180
+    hard_block: false
+    trigger: Reconciliation produced an unresolved exception.
+    nearest_existing: reconciliation.drafted
+    similarity_score: 0.309
+    reason: Distinct — unresolved recon exception vs a drafted reconciliation.
+
+  - name: APPROVAL_DEADLINE_PRESSURE
+    proposed_id: eime.approval_deadline_pressure
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: true
+    retention_days: 30
+    hard_block: false
+    trigger: Pending approval nearing its SLA deadline.
+    reason: No analogue — SLA-deadline pressure on a pending approval.
+
+  - name: HITL_ESCALATION
+    proposed_id: eime.hitl_escalation
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: true
+    retention_days: 180
+    hard_block: false
+    trigger: Human-in-the-loop review requested or escalated.
+    reason: No analogue — generic HITL escalation request.
+
+  - name: POLICY_VIOLATION
+    proposed_id: eime.policy_violation
+    state: propose_new
+    privacy_class: P1
+    crosses_membrane: true
+    retention_days: 365
+    hard_block: false
+    trigger: Policy gate fired against a proposed action.
+    nearest_existing: restricted_fund.violation.proposed
+    similarity_score: 0.187
+    reason: Distinct — general policy-gate firing vs fund-specific violation.

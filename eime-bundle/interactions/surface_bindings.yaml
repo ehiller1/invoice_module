@@ -1,0 +1,60 @@
+# EIME bundle — surface ↔ perturbation bindings
+# Surfaces align to context_pack facts.user.surface enum + the live frontend
+# pages/routes. Each surface consumes perturbations (events/events.yaml) and
+# emits user-initiated perturbations.
+
+schema_version: 1.0
+module_id: eime
+
+bindings:
+
+  finance_position:
+    audience: [FINANCE_STAFF, BUDGET_OWNER]
+    routes: [financial_position, questions]
+    consumes:
+      - eime.invoice_ingested (render in invoice_intake_queue)
+      - eime.mapping_confidence_low (render in classification_review_grid, ranked candidates)
+      - eime.journal_entry_ready (render je_draft_panel; amounts redacted below FINANCE_STAFF)
+    emits:
+      - eime.invoice_ingested (on manual invoice upload)
+      - intent_router.user_utterance (when user types in the questions pane)
+
+  treasurer_dashboard:
+    audience: [TREASURER_ADMIN]
+    routes: [approvals, policies, financial_position]
+    consumes:
+      - eime.journal_entry_ready (render in posting_queue with post action)
+      - eime.budget_overage_risk (render as budget_overage_banner)
+      - eime.fund_restriction_violation (render as blocking modal — not overridable)
+      - eime.payment_dedup_risk (render as blocking modal — not overridable)
+      - eime.policy_violation (render in policy_violation_feed)
+    emits:
+      - eime.journal_entry_ready (on post_je / approve_final)
+
+  approvals_hitl:
+    audience: [BUDGET_OWNER, TREASURER_ADMIN]
+    routes: [hitl, approvals]
+    consumes:
+      - eime.mapping_confidence_low (render in hitl_review_inbox)
+      - eime.hitl_escalation (render in escalation_inbox)
+      - eime.approval_deadline_pressure (render as sla_pressure_banner)
+    emits:
+      - intent_router.dispatched_result (on approve / correct / escalate)
+
+  reconciliation:
+    audience: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    routes: [reconciliation, exceptions]
+    consumes:
+      - eime.payment_dedup_risk (render as blocking modal in dedup_review)
+      - eime.reconciliation_exception (render in reconciliation_exception_queue)
+    emits:
+      - intent_router.dispatched_result (on resolve exception)
+
+  cabinet:
+    audience: [BUDGET_OWNER, TREASURER_ADMIN]
+    routes: [cabinets, recommendations]
+    consumes:
+      - eime.budget_overage_risk (render in advisory_feed)
+      - embark.surface.eime.recommendation.v1 (render in recommendations_queue with impact preview)
+    emits:
+      - intent_router.user_utterance (when user types in the cabinet conversational pane)

@@ -1,0 +1,59 @@
+# EIME bundle — Memory Fabric bindings
+# Six-layer endpoints + decision ledger + privacy class gates.
+# EIN Memory Fabric is presumed provisioned for the parish tier (sibling to steward).
+
+schema_version: 1.0
+module_id: eime
+deployment_assumption: fabric_provisioned  # memory-stack-access shim NOT included
+
+layers:
+
+  L0_working:
+    purpose: In-flight reasoning state for the current agent turn.
+    storage: in_process_memory
+    eviction: per_turn
+    read_by: [all_agents]
+    write_by: [all_agents]
+
+  L1_session:
+    purpose: User session state — recent utterances, open clarifications, in-flight approvals.
+    storage: redis_session_store
+    eviction: ttl_24h_idle
+    read_by: [intent_router, hitl_gate_coordinator]
+    write_by: [intent_router]
+
+  L2_episodic:
+    purpose: Recent operational events — last 30–90 days of perturbations, mappings, approvals, exceptions.
+    storage: postgres_episodic
+    eviction: rolling_90_day
+    read_by: [accounting_advisor, autonomous_posting_engine, reconciliation_specialist]
+    write_by: [decision_ledger, autonomous_posting_engine]
+
+  L3_domain_operational:
+    purpose: Current operational state — open invoices, draft JEs, pending approvals, in-progress reconciliations.
+    storage: postgres_operational   # eime_* prefixed tables (Phase 2 DBP)
+    read_by: [invoice_extractor, gl_account_mapper, journal_entry_drafter, reconciliation_specialist, hitl_gate_coordinator]
+    write_by: [journal_entry_builder, journal_entry_drafter, reconciliation_specialist]
+
+  L4_institutional:
+    purpose: Chart of accounts, fund roster, budget, policy set, approval-chain config, recurring-JE templates/tolerances.
+    storage: postgres_institutional   # eime_coa, eime_funds, eime_policies, eime_recurring_* tables
+    read_by: [coa_loader, expense_classifier, gl_account_mapper, compliance_officer, autonomous_posting_engine]
+
+  L5_federation:
+    purpose: Cross-parish patterns exported via the decision-ledger federation membrane.
+    storage: dof_federation_store
+    publisher: mem.ein.parish.ledger_export
+    privacy_class_floor: P1
+
+decision_ledger:
+  source: backend/decision_ledger.py
+  records: every dispatch and outbound emission
+  binding: mem.ein.parish.ledger_export
+  note: >-
+    Hash-chain tamper evidence (prev_hash/entry_hash) is an open_item (Wave 3.14)
+    — see manifest open_items.
+
+privacy_class_gates:
+  P0: finance_staff_plus_only   # JOURNAL_ENTRY_READY amounts
+  P1: distilled_operational

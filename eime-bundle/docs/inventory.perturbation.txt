@@ -1,0 +1,175 @@
+DEMAND_SOFTENING  perturbation          Donor giving capacity is softening across the major-gift cohort over the last 90
+3238adec-045f-4036-b1b0-7c5b7d2fed85  perturbation          Distinct: customer-side vs broad external.
+d0b25216-1b96-4235-bb0d-8f4c4d572b08  perturbation          Internal capacity-to-act vs supply-side resource constraint.
+fecc84c0-7680-4897-946f-f8148677d4d3  perturbation          No analogue in current map.
+90453752-8c04-4d40-bf17-155efc2a38c1  perturbation          scenario_invalidation
+e617a901-8881-4b3f-9464-30e36ddb72c2  perturbation          assumption_violation
+6a043c29-1e25-41a2-b47d-cb06e6c438c9  perturbation          posture_drift
+15053ba0-0f39-4d5b-a28e-e3491ef37c87  perturbation          intelligence_layer_shift
+eb4b76fd-381d-4dd9-bbd1-222d74aa1f9c  perturbation          commitment_matured
+bcca6bef-ecd2-4154-b838-84bcf7c34cf2  perturbation          concern_attenuation
+ef15fc6c-7177-4c34-9527-8515bfa290ca  perturbation          reconciliation_gap
+1e35b935-83e0-4a33-b514-2a5b031429f8  perturbation          Donor makes a gift. Payload includes amount, designation, channel, timestamp, re
+9ea95df0-dfe7-4b0c-9302-ed39f78662c7  perturbation          Pledge or recurring gift fails. Triggers payment-method recovery flow without fu
+269200cc-f182-4bf4-85a5-0b4515a10b01  perturbation          Saved payment method nearing expiry; triggers a gentle update touch.
+40fa3fe4-6553-45d5-ae13-f1099c21f846  perturbation          Expected gift cadence missed beyond threshold. Vision §3.1 — "silence may be a s
+c0cc0b6b-d196-40bb-8445-c29cb5160ff4  perturbation          Detected obituary, marriage, birth, retirement, job change for a donor. Reshapes
+8c23d50e-96d5-4c67-ac2f-bc9af94dc256  perturbation          Death of donor or close family member. Privacy class P3. Pastorally led, fundrai
+f6fa00ac-97d3-4be4-81ec-6fa4fa2225ee  perturbation          Address, phone, or email change detected from Salesforce or external source. Upd
+98647188-fb9a-4040-956d-b94b7fce64c3  perturbation          Donor opens email, clicks link, views page, attends event. Low-salience touches 
+a9a68e8b-841a-4ead-bcfe-5a131a313582  perturbation          Donor logs volunteer service. Credits relational capital independent of financia
+96455f53-97be-43f0-ac48-28164fff4b9c  perturbation          Donor mentioned in public news or org context. Routes through Pastoral Intellige
+30fadd88-fefe-4aa4-86ae-a63f9ee77cf7  perturbation          Capital campaign launch, leadership change, crisis. Reframes portfolio positioni
+69aab53b-e71b-4afa-8cc0-8308f720cff7  perturbation          Pastoral flag indicating fundraising suppression for a donor. Privacy class P3. 
+601f578c-bab5-4cf6-970d-3bf4958e8293  perturbation          Donor refers a friend or joins a committee. Elevates relationship priority and e
+4e1f19e2-3a92-4213-a2a9-d5daaa28c765  perturbation          Matt or operations logs a donor interaction. Closes the act → verify → document 
+27513bd2-a6a0-4765-9129-a123db7e4246  perturbation          Donor explicitly opts out of AI-assisted handling. Closes FRD Open Item O-09. Gu
+d67431ec-4afa-4bc2-9f75-58ec8e0d8a67  perturbation          Donor engagement score crosses a threshold. Emitted by Engagement Health Analyti
+cc29774b-9650-4bce-b184-c4d2b8faa8e4  perturbation          Donor moves between approved segments. Ledger-tracked transition with rationale_
+00d52341-3b3b-4090-ac7f-1c2ffc27783c  perturbation          Donor flagged at risk of lapse or disengagement. Carries risk_drivers and recomm
+07e6fbc8-62f4-4139-95d8-77323a0e7eb6  perturbation          Life event acknowledged and routed. Class-only when pastorally adjacent.
+bfa94617-0d95-4086-af2c-ce48983af4a7  perturbation          DRM imposes outreach suppression on a donor. Reason_class = "sensitive" never th
+d2e92446-6bf4-4284-afde-6ce4ca228d08  perturbation          Periodic aggregate portfolio health summary. Segment_breakdown, risk_count, oppo
+631dc9b5-7355-4069-90a0-80b25e5da3ab  perturbation          AI-drafted outreach awaiting approval. Carries draft_id, template_id, template_v
+eabc3f54-2ea3-482e-80b1-6d77d2d2364f  perturbation          Next Best Action proposal with impact preview. Ranked, with rationale, evidence_
+9b78d7ac-3e48-41ea-978f-0f41f038cf89  perturbation          EIN parish-tier session lifecycle perturbation. No analogue in store.
+5a44a066-479c-477f-8122-ee5deb0897c9  perturbation          Conv. surface loads prior state.
+f8f56da6-0ad4-4ff7-a017-5e3c2f35e498  perturbation          Conversationalist begins; visible in Observatory feed.
+3625e15b-4362-49d5-b4c8-9b583b60671b  perturbation          Completion percentage / current domain delta.
+2be5496d-b598-4302-92de-63f80d9aa63d  perturbation          Parish-internal; never crosses membrane.
+f90c6c18-dcdc-4cb9-b4fb-0b5dbf54d70f  perturbation          EIN perturbation assessment.session.paused
+cddaa52e-4cc4-4555-a59a-3d2c2d6df63b  perturbation          EIN perturbation assessment.session.resumed
+89428f0a-8cdc-4155-96a3-d7e7dc4e9ef4  perturbation          EIN perturbation assessment.actor.invited_added
+6e457aaa-6916-44f3-b8ec-10f3fce714f7  perturbation          Domain assessor raises a scorable finding.
+3c620201-3342-40c9-9a4e-8ab3e7a7c86e  perturbation          Post-Redactor anonymized contribution to pattern computation.
+56c4cbcb-7d05-472b-860d-2b4e9b4fd8b0  perturbation          0–4 rubric level assigned within domain area.
+3ffe40d2-3286-4dd5-a751-8de804145365  perturbation          EIN perturbation assessment.probe.needed
+daa0a47f-41b2-4494-945e-07834f7d2b36  perturbation          EIN perturbation assessment.domain.confidence_threshold_reached
+2908f0b9-bcdc-411d-b189-61ad218127b5  perturbation          Cross-domain pattern agent emission.
+159f7aad-8d70-409d-a522-eaa5a464eb5f  perturbation          EIN perturbation assessment.ambition_reality.divergence
+425d792b-e0e1-4649-a5ee-376f73d676a9  perturbation          EIN perturbation assessment.capacity.strain_detected
+ebbec08f-367c-434f-8384-fef59a95f383  perturbation          EIN perturbation assessment.stewardship_attendance.coupling
+bb63dc48-58a6-4fa7-a578-43cc153a18a4  perturbation          EIN perturbation assessment.pastoral.load_signal
+fc9d6751-2249-4bfc-8a25-222722d6c26f  perturbation          EIN perturbation assessment.defensive_response.detected
+fe614ee1-0cb3-41c4-af9d-94ffc014ad45  perturbation          EIN perturbation assessment.consistency.discrepancy
+b1e8b6ca-6b71-4912-915f-0616ef697599  perturbation          Triggers Steward + Companion Introducer.
+d07e7134-41d1-4f34-b1e8-20def71c9267  perturbation          EIN perturbation assessment.configuration.blueprint_ready
+1098f23a-d8e6-4d18-8ac4-ac322999b76e  perturbation          Filtered through Jordan routing classifier (Guard 1).
+1c3308f4-1c2a-4bd4-b632-43948a92f185  perturbation          EIN perturbation assessment.recommendation.nba_candidate
+daa1d1b1-1b6b-433e-b164-a51ad4097980  perturbation          EIN perturbation assessment.roadmap.generated
+07fff961-9fd4-4f4a-8111-a3b7da5a770f  perturbation          EIN perturbation assessment.digital_twin.updated
+3baa3e5b-6478-42a9-84c8-86d85fcacf0e  perturbation          EIN perturbation companion.introduction.queued
+4c3a2b5f-2954-4083-89dc-f477f543bfc2  perturbation          EIN perturbation companion.activation.recorded
+8c5eb81f-3577-4b38-8431-4cbe825c4f36  perturbation          EIN perturbation companion.outcome.observed
+91e5c46a-4d9c-4fb7-ac91-b8e60ab9fd2d  perturbation          Triggers federated-pattern scrub (Tier 1–4) per FR-EIN-GOV-10..12.
+11d2be9d-432f-4d30-8cb9-e3910d9da7ed  perturbation          EIN perturbation steward.shadow_run.completed
+79992a50-6222-464d-b958-3376d04a4c7a  perturbation          EIN perturbation steward.go_live.requested
+1deb31b0-1137-4968-90c7-c1f2bc962040  perturbation          Pattern reached threshold (N≥7, ε≤1.0); enters Jordan review queue.
+104327cf-ff30-4645-bb2b-d32f4fe31b46  perturbation          EIN perturbation pattern.published
+2acd959b-bac9-4170-aadb-e8da8fb33eef  perturbation          EIN perturbation pattern.revoked
+909f2e67-7782-4b4d-9c47-428a7d1375d8  perturbation          Jordan rejects candidate; archived with rationale.
+0fff96b0-87cd-447f-9da9-ac9b1fef69a1  perturbation          t+30 adoption monitoring per FR-EIN-TPL-03.
+9ab541b2-e948-445c-89db-d32a41700c0a  perturbation          Pattern Prevalence Analyst batch output.
+49e97722-0884-425d-9c59-a6f8bf9e603d  perturbation          Diocesan Health Composer real-time output.
+54dfde5c-86a4-43a6-8e89-5530502c1903  perturbation          DUAL-CLASS: Canon (P1) + Bishop aggregate (P3). Redactor enforces split.
+007b173e-55ce-457b-b1fd-685c7aee801e  perturbation          EIN perturbation cohort.progress.updated
+96b8d57c-6956-40cc-92e7-0aedea8ec9be  perturbation          EIN perturbation companion.adoption.delta
+6cfa7e3e-d667-4ddb-b4f5-f3a3ef51333b  perturbation          EIN perturbation federation.contribution.acknowledged
+fce87826-c532-4c01-ac01-a5b21ed47e5c  perturbation          EIN perturbation assessment.federated.pattern_contribution
+035ab8e2-107e-47f6-a21c-19931bab62e7  perturbation          EIN perturbation assessment.deliverable.published
+c3539dbb-cb8e-47a7-a90a-c7c1ec729085  perturbation          EIN perturbation steward.blueprint.ready
+130321ae-c872-4239-b344-9df0baa9697b  perturbation          200/500 parish thresholds per FR-EIN-GOV-05..06.
+52ec3cdd-83dc-468b-8cb9-5bcf6f24a11a  perturbation          invoice.received — Any new invoice arrives at the parish.. Privacy P0. Source: a
+5e6e5d00-0cbd-4263-8295-cb1584c59856  perturbation          pledge.received — Any pledge or designated gift payment hits any inbound channel
+be5692f9-100d-4356-bb09-6d78388c61aa  perturbation          bank.feed.transactions — Periodic sync window closes; new transactions delivered
+0062e97b-6e2d-4c49-8006-367a37c4a4e8  perturbation          classification.proposed — Steward classifies a transaction; awaits treasurer rev
+19fc5c10-e64f-4fea-9b32-a96f67dd96d0  perturbation          classification.approved — Treasurer approves a proposed classification (or auton
+97173933-25f7-4fbe-a412-cd0ce793e068  perturbation          pledge.attributed — Donor identity resolved with confidence ≥ 0.85 and treasurer
+f612ccfb-2531-4b6c-8eb3-080c156855f8  perturbation          reconciliation.drafted — Bank-feed close detected; reconciliation drafted within
+ade5358e-f39e-4f7b-80c8-94aee25c7843  perturbation          reserve.threshold.crossed — Daily reserve compute crosses PCB Risk Posture thres
+d875ec43-bb84-4742-8c5b-782dacc461c0  perturbation          restricted_fund.violation.proposed — A proposed transaction would violate restri
+537e0d8d-50ca-484f-90c5-3699caf5e7d9  perturbation          audit_readiness.score.computed — Composite score recomputed (continuous).. Priva
+1ddb175e-92c5-4506-9d62-a77a6d3326c6  perturbation          companion.introduction.queued — A Steward financial signal maps to a non-financi
+00cacca1-8b9d-4815-9c98-69e2c0cc4d9a  perturbation          assessor.finding.contributed — An anonymized finding is contributed to L5; runs 
+2151493b-9998-469e-9eb8-30a5ca271469  perturbation          canonical.obligation.advance_notice — Lead-time before a canonical obligation pe
+443247ce-35c5-4fba-935c-a8811e41aa38  perturbation          parish.consent.status — Parish consent state changes (revoke / grant / scope cha
+154c57f6-63a4-46f3-8f28-76b45c08c552  perturbation          discrepancy_report.proposed — End of shadow run (Day 30).. Privacy P0. Source: .
+1d150afa-0864-48a5-9348-59fbb44adbe2  perturbation          threshold_authorization.signed — Treasurer + Rector counter-sign a Threshold Aut
+b026434d-bf23-4c6a-be21-6a4b84927671  perturbation          variance.commentary.composed — Budget line off by > threshold (default 10% YTD).
+3de28357-e8ec-4139-bc99-721c64a70acf  perturbation          cashflow.forecast.refreshed — Forecast recomputed (continuous; minimum daily; on
+44f6d155-2dfb-48dd-93c7-82a12d5a0469  perturbation          vestry_packet.assembled — One business day before scheduled vestry meeting; FR-S
+25e22666-f75d-49fe-9c94-ec155ffc2002  perturbation          attest_query.redirected — Attest-shape user query detected (FR-STW-GOV-04).. Pri
+28e25220-8703-4ab3-840f-7e1ed1cb3186  perturbation          bypass_attempt.logged — A user instructs Steward to bypass an Authority Graph th
+514df910-baac-4945-bf41-8731ff78a084  perturbation          integration_health.event — Connection state change, sync failure, or recovery.. 
+82908b4b-1f33-42ab-9229-42e4814e3f8c  perturbation          pcb_documentation.remediation_due — Monthly cycle for each UNCERTAIN/MISSING-sta
+330db39e-aae0-4106-9b80-007efb180b80  perturbation          pcb_validation.gate_failed — PCB section perturbation fails its validation gate 
+0825dd2d-86ab-4bc3-888a-f72df2a543ef  perturbation          id: ?
+ac46b801-9675-4bfc-9a19-07cba6f96095  perturbation          id: ?
+cc59fe84-fc57-4fff-881a-d185b6aa83f4  perturbation          id: ?
+ec07b8f7-47f5-460d-8f79-a34d15a04b99  perturbation          id: ?
+c5642448-ae1f-494e-b46f-2ba73025510b  perturbation          id: ?
+18bcea5f-1816-4938-a065-754db541843e  perturbation          id: ?
+7bc1e27d-b488-4641-8549-9a12d5adc55a  perturbation          id: ?
+7959a121-9ff5-47be-907a-0d17eca5706b  perturbation          id: ?
+87acb983-afcc-45d5-9fee-7d8890f9f846  perturbation          id: ?
+7f46ed35-c0e0-4ef8-89d1-012830b81a7c  perturbation          id: ?
+14403eb2-eef7-469e-a165-798f80ad2288  perturbation          id: ?
+3c5b425a-381c-473a-b292-35bbbf0c7d9f  perturbation          id: ?
+bf2f0c23-3d84-4212-8f0f-d86b8676558a  perturbation          id: ?
+dc025d4d-4d48-4b21-8e7d-a25c25a761b7  perturbation          id: ?
+b2672872-0782-4511-baf2-fcef2114c7c3  perturbation          id: ?
+9f39819a-4f5a-4f7c-adcf-5ea82141d7c5  perturbation          id: ?
+1e64f7d5-5c9b-4715-a655-a3ce13d543af  perturbation          id: ?
+6186a4f9-8d50-45e4-9d7a-3a0c2874d6d5  perturbation          id: ?
+e17cffca-a015-4929-bc82-15afe1bc39e2  perturbation          id: ?
+16b598c3-e529-487a-ae38-ffc9e7615515  perturbation          id: ?
+b5cb77f5-e59f-46f6-9525-dd99ed0e511e  perturbation          id: ?
+48a876cd-c0a9-4d79-9e2a-9a4a4acc9be0  perturbation          id: ?
+176acf64-3d35-4458-b157-3b20bc17d088  perturbation          id: ?
+53aeb206-bb26-497d-8e7c-2e0db8ad7609  perturbation          id: ?
+62badede-7b6a-4f09-92f4-b779c8028f5b  perturbation          id: ?
+deeaa369-fe72-498a-8295-1779dcbb52e6  perturbation          id: ?
+ad9f2c91-73ec-4658-961a-2befb9ca8faf  perturbation          id: ?
+174468f9-09cb-453c-a8e9-e16b178764d1  perturbation          id: ?
+f8632a38-7eb8-4884-a064-38893261db6f  perturbation          id: ?
+439c4da7-8dd6-4a76-86cb-6140ee1515c0  perturbation          id: ?
+3b6e5f76-abd3-4c09-b4ce-50e579c08d97  perturbation          id: ?
+9b59be16-27fc-4d5e-b29d-c1ba46d296a6  perturbation          id: ?
+eddd395f-288d-4af9-b941-8f4da069e0e5  perturbation          id: ?
+9551afda-a43b-470f-bc50-b67941e807d7  perturbation          id: ?
+dc56ec19-66d7-462d-890c-aecdbab14f5e  perturbation          id: ?
+bdcacf10-807e-4dfd-ad3c-7f82557ab0e1  perturbation          id: ?
+02e07acd-8241-445f-a677-f5d3e2772523  perturbation          id: ?
+887cf0c8-b6fe-4c89-89c6-2851629da623  perturbation          id: ?
+df600cc0-bbd8-4ecf-bdee-ab4ca8b291de  perturbation          id: ?
+5049f880-9dc8-4cce-b272-2ca682e09ab8  perturbation          id: ?
+f10c90d2-15cc-4c91-bd77-87497c85df11  perturbation          id: ?
+359e29a6-03ac-4bfd-81a1-d324b1ceda0c  perturbation          id: ?
+dac2916b-077f-48d2-a31f-8b92bc78fb20  perturbation          id: ?
+11d3393f-82be-4631-9615-1908161e9abb  perturbation          id: ?
+8b0bf4ec-0fd9-4a3f-8aad-dfd0796784a2  perturbation          id: ?
+9c214113-d654-4ec2-bcb8-96d7329985bd  perturbation          id: ?
+b94d30c3-fbb5-4e24-a604-09602c96241a  perturbation          id: ?
+8accce51-8ae6-45ec-a34e-abdc82487962  perturbation          id: ?
+58c19a5b-473f-4ff8-bedb-4f10e2170a8b  perturbation          id: ?
+a2c38bf2-105d-4219-91b4-a147449b49f5  perturbation          id: ?
+8443397a-38c8-4770-becc-1b5acbe97057  perturbation          id: ?
+a9589071-0662-473c-8d48-25a2b870285e  perturbation          id: ?
+1e331fb7-8dfb-44db-92bf-0b327e57b0b1  perturbation          id: ?
+a3533ea2-36b7-4b8a-8df9-4be15781a9c7  perturbation          id: ?
+1176070e-7ec1-4ef0-b36f-31b5ee65db8d  perturbation          id: ?
+899dbdb7-fe8d-4754-becc-828574f58762  perturbation          id: ?
+c3f60dfc-1895-455c-87a0-f11271bf9145  perturbation          id: ?
+2c8a4fd5-1025-4d82-80bb-2c26ce8d9bf5  perturbation          id: ?
+16c557f5-e9c5-44b9-96a5-2fad691a5b06  perturbation          id: ?
+9d5103f8-7786-4e41-b900-a8f4fe4788a0  perturbation          id: ?
+a3818d32-3e05-4212-95f4-db584bbd7bed  perturbation          Scheduled or manual trigger for a full best-practices research sweep across appr
+2f9127f3-74d6-422c-bb51-133e73e64a24  perturbation          Ad hoc event-driven research sweep targeted at a specific fundraising topic. Emi
+99ad78b5-e966-45c9-b17c-c7cbdcecf9c7  perturbation          A best-practice artifact transitioned between lifecycle states: candidate extrac
+7a8e97ab-0c72-4c72-b374-7ade240a9406  perturbation          A new version of a Skill Pack was published. Skill Delta record emitted. Prior v
+636a3a56-6091-4868-89ae-9c9ad962599c  perturbation          An agent or staff member issued a best-practices retrieval query. ContextFragmen
+9685df3d-9930-4b40-9ea4-b2ae43df5d29  perturbation          A new ECS Episode Card was written to Memory Fabric. Triggers in-store effective
+223d6e39-aa4a-4749-9487-a511af7f5b65  perturbation          Drift score crossed threshold for a stored Best Practice Card. Proposed keep rev
+9a700069-f0b6-4580-bd58-ee39a294d91a  perturbation          Local ECS outcome conflicts with a stored best practice. Contraindication Card c
+f3759712-c26f-45fd-8d7f-8bda245c5e8d  perturbation          All five BPS governance gates passed: evidence strength, citation completeness, 
+00f5f0ed-8dac-4db4-9223-59cc0c1b4022  perturbation          One or more BPS governance gates failed. Artifact blocked. Rejection record writ

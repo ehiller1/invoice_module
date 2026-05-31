@@ -1,0 +1,48 @@
+# EIME bundle — perturbation→agent bindings (consumer routing)
+# Source of record for `wakes` is events/events.yaml. `primary` is the agent
+# that owns the decision; `fan_out` agents observe/record in parallel.
+
+schema_version: 1.0
+module_id: eime
+
+bindings:
+
+  eime.invoice_ingested:
+    primary: invoice_extractor
+    fan_out: [decision_ledger_writer]
+
+  eime.mapping_confidence_low:
+    primary: hitl_gate_coordinator
+    fan_out: [decision_ledger_writer]
+
+  eime.budget_overage_risk:
+    primary: compliance_officer
+    fan_out: [accounting_advisor, decision_ledger_writer]
+
+  eime.fund_restriction_violation:
+    primary: compliance_officer
+    fan_out: [decision_ledger_writer]
+
+  eime.journal_entry_ready:
+    primary: journal_entry_drafter
+    fan_out: [hitl_gate_coordinator, autonomous_posting_engine, decision_ledger_writer]
+
+  eime.payment_dedup_risk:
+    primary: reconciliation_specialist
+    fan_out: [decision_ledger_writer]
+
+  eime.reconciliation_exception:
+    primary: hitl_gate_coordinator
+    fan_out: [reconciliation_specialist, decision_ledger_writer]
+
+  eime.approval_deadline_pressure:
+    primary: hitl_gate_coordinator
+    fan_out: [decision_ledger_writer]
+
+  eime.hitl_escalation:
+    primary: hitl_gate_coordinator
+    fan_out: [decision_ledger_writer]
+
+  eime.policy_violation:
+    primary: compliance_officer
+    fan_out: [decision_ledger_writer]

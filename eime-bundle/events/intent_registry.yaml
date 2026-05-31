@@ -1,0 +1,156 @@
+# EIME bundle — intent registry
+# Conversational intent surface for finance staff, budget owners, treasurers.
+# Consumed by router.py at startup; runtime CRUD via interactions/management_surface.yaml.
+# authority_required values map to backend/auth.py ROLE_LEVELS.
+
+schema_version: 1.0
+module_id: eime
+authoritative_source: events/intent_registry.yaml
+
+intents:
+
+  - id: explain_classification
+    name: Explain a GL classification
+    description: Show the reasoning chain for a specific invoice's expense taxonomy / GL account mapping
+    example_utterances:
+      - "Why was this invoice mapped to the utilities account?"
+      - "Explain this classification."
+    target:
+      kind: agent
+      id: expense_classifier
+    authority_required: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: correct_mapping
+    name: Correct a GL mapping
+    description: Override the suggested GL account / expense taxonomy on an invoice
+    example_utterances:
+      - "Reclassify this to the building maintenance account."
+      - "That GL account is wrong, change it."
+    target:
+      kind: agent
+      id: gl_account_mapper
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: review_low_confidence_queue
+    name: Review low-confidence classifications
+    description: List invoices whose mapping confidence fell below the auto-stage floor
+    example_utterances:
+      - "Show me the low-confidence classifications."
+      - "What needs my review?"
+    target:
+      kind: agent
+      id: hitl_gate_coordinator
+    authority_required: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: approve_classifications
+    name: Approve classifications
+    description: Approve one or many staged classifications
+    example_utterances:
+      - "Approve the high-confidence classifications."
+      - "Bulk-approve the easy ones."
+    target:
+      kind: agent
+      id: hitl_gate_coordinator
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: view_je_draft
+    name: View a journal entry draft
+    description: Show a drafted journal entry with lines and amounts
+    example_utterances:
+      - "Show me the draft journal entry for this invoice."
+      - "What does the JE look like?"
+    target:
+      kind: agent
+      id: journal_entry_drafter
+    authority_required: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P0
+    disclosure_check: je_amounts_finance_staff_plus_only
+
+  - id: post_journal_entry
+    name: Post a journal entry
+    description: Post an approved journal entry to the books
+    example_utterances:
+      - "Post this journal entry."
+      - "Book this JE."
+    target:
+      kind: agent
+      id: autonomous_posting_engine
+    authority_required: [TREASURER_ADMIN]
+    privacy_class: P0
+
+  - id: check_budget_position
+    name: Check budget position
+    description: Where a fund/department stands against its budget threshold
+    example_utterances:
+      - "Are we over budget on facilities?"
+      - "What's our budget position this month?"
+    target:
+      kind: agent
+      id: accounting_advisor
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: check_fund_restrictions
+    name: Check fund restrictions
+    description: Whether a proposed posting respects restricted-fund donor intent
+    example_utterances:
+      - "Can we pay this from the memorial fund?"
+      - "Is this allowed against restricted funds?"
+    target:
+      kind: agent
+      id: compliance_officer
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: run_reconciliation
+    name: Run a bank reconciliation
+    description: Draft a reconciliation for the named account and surface exceptions
+    example_utterances:
+      - "Reconcile the operating account."
+      - "Run the bank reconciliation."
+    target:
+      kind: agent
+      id: reconciliation_specialist
+    authority_required: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: resolve_reconciliation_exception
+    name: Resolve a reconciliation exception
+    description: Work an unmatched / exception recon item to resolution
+    example_utterances:
+      - "Help me clear this reconciliation exception."
+      - "Match this transaction."
+    target:
+      kind: agent
+      id: reconciliation_specialist
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: review_escalations
+    name: Review escalations
+    description: List items escalated for human review and their SLA pressure
+    example_utterances:
+      - "What's escalated to me?"
+      - "Show the HITL queue."
+    target:
+      kind: agent
+      id: hitl_gate_coordinator
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1
+
+  - id: next_best_action
+    name: Next best action
+    description: Recommend the highest-value next action with a projected impact preview
+    example_utterances:
+      - "What should we do next?"
+      - "Show me what happens if we post all approved JEs now."
+    target:
+      kind: open_dependency
+      id: nba_recommender
+    notes: Resolved by the NBA layer (actions/). Until wired, returns Evidence-only recommendation without committing.
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    privacy_class: P1

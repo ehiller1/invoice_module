@@ -1,0 +1,27 @@
+# EIME bundle — per-module pack_registration.yaml
+# Owning sub-skill: membrane-agent-designer (per design-bundle-orchestrator Phase 5b protocol).
+# This file is the canonical source for the bundle's pack.yaml entry.
+# The keywords list is mirrored verbatim into crew.py's header (crew layer).
+
+schema_version: 1.0
+module_id: eime
+domain: ein.parish.financial_intelligence
+category: parish_tier_agent
+
+keywords:
+  - parish financial intelligence
+  - invoice gl mapping
+  - fund accounting compliance
+  - journal entry approval
+  - bank reconciliation matching
+  - autonomous recurring posting
+
+notes: |
+  EIME (Embark Invoice Mapping Engine) is the parish-tier invoice-to-GL agent of EmbarkNow,
+  sibling to Steward in the ein.parish.financial_intelligence domain. It ingests invoices,
+  maps line items to GL accounts with confidence scoring, drafts balanced journal entries
+  under fund-accounting compliance, routes multi-tier HITL approvals, reconciles bank feeds,
+  auto-posts recurring entries, and surfaces next-best-action advisory. A 6-position guider
+  cascade (accounting-integrity, payment-dedup, polity-and-deference, abundance-and-stewardship,
+  witness-and-provenance, dignity) governs every outbound emission at mem.ein.parish.outer.
+  Restricted-fund violations and duplicate payments are mechanical hard blocks.

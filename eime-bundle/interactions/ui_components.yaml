@@ -1,0 +1,83 @@
+# EIME bundle — UI component inventory
+# Maps EIME surfaces to the shared Embark Card catalog. Component names are
+# drawn from the agent-output-display catalog; gaps recorded in catalog_gaps.yaml.
+
+schema_version: 1.0
+module_id: eime
+
+cards_used:
+  IntentCard:
+    surfaces: [finance_position, cabinet]
+    description: User queries; intents from events/intent_registry.yaml
+  EvidenceCard:
+    surfaces: [all]
+    description: Reasoning chain for every classification, GL mapping, JE draft, recommendation
+  DecisionCard:
+    surfaces: [finance_position, treasurer_dashboard, approvals_hitl, reconciliation]
+    description: Every classification approval/correction, JE post/approval, exception resolution, and the non-overridable hard blocks
+  ActionCard:
+    surfaces: [cabinet, treasurer_dashboard]
+    description: Next-best-action recommendations; remediation tasks; escalations
+  TaskCard:
+    surfaces: [approvals_hitl, reconciliation]
+    description: HITL review tasks, recon exception tasks, SLA-pressured approvals
+  ScheduleCard:
+    surfaces: [treasurer_dashboard]
+    description: Approval deadlines, recurring-JE posting schedule
+  ConsentCard:
+    surfaces: [treasurer_dashboard]
+    read_only: true
+    description: Church federation consent state display
+
+components:
+  invoice_intake_queue:
+    surface: finance_position
+    cards: [EvidenceCard]
+  classification_review_grid:
+    surface: finance_position
+    cards: [DecisionCard, EvidenceCard]
+    bulk_approve_high_confidence: true
+    ranked_candidates_for_low_confidence: true
+  je_draft_panel:
+    surface: finance_position
+    cards: [DecisionCard, EvidenceCard]
+    redact_amounts_below_tier: FINANCE_STAFF
+  posting_queue:
+    surface: treasurer_dashboard
+    cards: [DecisionCard, ScheduleCard]
+    post_action_requires_tier: TREASURER_ADMIN
+  budget_overage_banner:
+    surface: treasurer_dashboard
+    cards: [EvidenceCard]
+  fund_restriction_block_modal:
+    surface: treasurer_dashboard
+    cards: [DecisionCard, EvidenceCard]
+    blocking: true
+    overridable: false
+  policy_violation_feed:
+    surface: treasurer_dashboard
+    cards: [EvidenceCard, ActionCard]
+  hitl_review_inbox:
+    surface: approvals_hitl
+    cards: [TaskCard, DecisionCard, EvidenceCard]
+  escalation_inbox:
+    surface: approvals_hitl
+    cards: [TaskCard, ActionCard]
+  sla_pressure_banner:
+    surface: approvals_hitl
+    cards: [TaskCard]
+  dedup_review:
+    surface: reconciliation
+    cards: [DecisionCard, EvidenceCard]
+    blocking: true
+    overridable: false
+  reconciliation_exception_queue:
+    surface: reconciliation
+    cards: [TaskCard, DecisionCard]
+  advisory_feed:
+    surface: cabinet
+    cards: [EvidenceCard, ActionCard]
+  recommendations_queue:
+    surface: cabinet
+    cards: [ActionCard, EvidenceCard]
+    impact_preview: true

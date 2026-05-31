@@ -1,0 +1,35 @@
+# EIME bundle — intent management surface
+# Runtime CRUD on the intent registry via the treasurer dashboard.
+
+schema_version: 1.0
+module_id: eime
+
+operations:
+  list_intents:
+    authority_required: [FINANCE_STAFF, BUDGET_OWNER, TREASURER_ADMIN]
+    returns: events/intent_registry.yaml.intents (paginated)
+
+  add_intent:
+    authority_required: [TREASURER_ADMIN]
+    payload: {id, name, description, example_utterances[], target, authority_required[], privacy_class}
+    validation: must reference an existing target.id OR declare target.kind=open_dependency with notes
+    side_effect: append to events/intent_registry.yaml + reindex classifier
+
+  edit_intent:
+    authority_required: [TREASURER_ADMIN]
+    immutable_fields: [id]
+
+  retire_intent:
+    authority_required: [TREASURER_ADMIN]
+    side_effect: archive (never delete); appears in decision_ledger
+    rationale: intent removals can break upstream integrations; require admin authority
+
+  test_intent_dispatch:
+    authority_required: [BUDGET_OWNER, TREASURER_ADMIN]
+    payload: {utterance, intent_id?}
+    returns: {classifier_top_3, authority_filter_result, decision_matrix_verdict, dispatched_target}
+    side_effect: none
+
+audit_trail:
+  every_mutation_logs_to: decision_ledger
+  schema: {actor, op, intent_id, before_state_hash, after_state_hash, ts}

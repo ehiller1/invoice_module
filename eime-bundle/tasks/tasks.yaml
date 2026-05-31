@@ -1,0 +1,76 @@
+# EIME bundle — CrewAI task definitions
+# One task per agent in agents/agents.yaml. Sequential within a crew where process: sequential.
+
+schema_version: 1.0
+module_id: eime
+tasks:
+
+  # ---- Crew 1: invoice_ingestion_mapping (sequential) ----
+  - id: extract_invoice
+    agent_id: invoice_extractor
+    description: Read the ingested invoice PDF and emit structured line items, vendor, totals, and any extraction warnings.
+    expected_output: A JSON invoice document with line_items[], vendor_name, total_amount, and warnings[].
+  - id: load_coa
+    agent_id: coa_loader
+    description: Load the church's chart of accounts, fund roster, budget, and capitalisation threshold for the job's church_id.
+    expected_output: A JSON COA context with account_count, fund_count, budget_configured, capitalisation_threshold_usd.
+  - id: classify_lines
+    agent_id: expense_classifier
+    description: Classify each invoice line into an expense_category and ministry_area against the loaded COA, with a confidence per line.
+    expected_output: A per-line classification array with expense_category, ministry_area, confidence, flags[].
+  - id: map_to_gl
+    agent_id: gl_account_mapper
+    description: Map each classified line to a GL account with a mapping confidence; emit MAPPING_CONFIDENCE_LOW for any low-confidence line.
+    expected_output: A per-line GL mapping with account_number, fund_id, confidence, and rationale.
+  - id: assess_risk_budget
+    agent_id: risk_fraud_officer
+    description: Score risk and fraud signals for the draft allocations, then compare each account against budget; emit BUDGET_OVERAGE_RISK on breach.
+    expected_output: A risk summary (risk_level, risk_score, flags) and a budget comparison per account.
+  - id: review_allocations
+    agent_id: allocation_reviewer
+    description: Review the mapped+risk-scored allocations and decide whether they are ready for journal-entry assembly.
+    expected_output: A review verdict per allocation with any blocking flags.
+  - id: build_je
+    agent_id: journal_entry_builder
+    description: Assemble a balanced journal entry from the reviewed allocations; emit JOURNAL_ENTRY_READY when balanced.
+    expected_output: A balanced JE with document_total_debits == document_total_credits and per-line postings.
+
+  # ---- Crew 2: journal_entry_compliance ----
+  - id: draft_je
+    agent_id: journal_entry_drafter
+    description: Draft a balanced JE from mapped lines or a natural-language request, mapping to the correct chart-of-accounts entries.
+    expected_output: A balanced draft journal entry ready for compliance review.
+  - id: enforce_compliance
+    agent_id: compliance_officer
+    description: Check the draft JE against fund restrictions, donor intent, budget thresholds, and the policy set; hard-block restricted-fund violations and surface policy violations.
+    expected_output: A compliance verdict — allow, hard-block (FUND_RESTRICTION_VIOLATION), or flag (POLICY_VIOLATION).
+
+  # ---- Crew 3: approval_hitl ----
+  - id: drive_approval_chain
+    agent_id: hitl_gate_coordinator
+    description: Walk the JE through each approval tier, record decisions in the decision ledger, and escalate (HITL_ESCALATION) when an SLA deadline nears (APPROVAL_DEADLINE_PRESSURE).
+    expected_output: A recorded multi-tier approval outcome with escalations where triggered.
+
+  # ---- Crew 4: bank_reconciliation ----
+  - id: reconcile_bank_feed
+    agent_id: reconciliation_specialist
+    description: Sync Plaid transactions, match them to pending JEs, dedup candidate payments (PAYMENT_DEDUP_RISK), and raise unresolved items as RECONCILIATION_EXCEPTION.
+    expected_output: A reconciliation result — matched set, dedup hard-blocks, and exception list.
+
+  # ---- Crew 5: autonomous_posting ----
+  - id: auto_post_recurring
+    agent_id: autonomous_posting_engine
+    description: For each recurring JE due, post automatically when within learned tolerance, else defer for review; record feedback to update tolerances.
+    expected_output: A posting decision per recurring entry (posted | deferred) with learning update.
+
+  # ---- Crew 6: advisory_nba ----
+  - id: surface_recommendation
+    agent_id: accounting_advisor
+    description: Analyze decision patterns, variance, and vendor history; surface a recommendation card with evidence and a scenario preview.
+    expected_output: A recommendation card with evidence and an optional scenario simulation.
+
+  # ---- Crew 7: conversational_routing ----
+  - id: route_intent
+    agent_id: intent_router
+    description: Classify the user's utterance, verify authority, and dispatch to the right agent/skill, answering or opening a question card.
+    expected_output: A routed dispatch decision with an answer or an opened question card.

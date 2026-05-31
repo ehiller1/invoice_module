@@ -1,0 +1,63 @@
+mem.strategic_planning.outer: {}
+mem.strategic_planning.field: {}
+mem.strategic_planning.ledger_export: {}
+mem.strategic_planning.federation: {}
+mem.strategic_planning.intent_gate: {}
+mem.strategic_planning.nba: {}
+mem.drm.outer: {}
+mem.drm.blackboard: {}
+mem.drm.intent_gate: {}
+mem.drm.nba: {}
+mem.drm.cabinet_gate: {}
+mem.ein.parish.outer:
+  id: mem.ein.parish.outer
+  tier: parish
+  pattern_match: mem.<domain>.outer
+mem.ein.diocese.outer:
+  id: mem.ein.diocese.outer
+  tier: diocese
+  pattern_match: mem.<domain>.outer
+mem.ein.federation.outer:
+  id: mem.ein.federation.outer
+  tier: federation
+  pattern_match: mem.<domain>.federation
+mem.ein.parish.intent_gate:
+  id: mem.ein.parish.intent_gate
+  tier: parish
+  pattern_match: mem.<domain>.intent_gate
+mem.ein.diocese.intent_gate:
+  id: mem.ein.diocese.intent_gate
+  tier: diocese
+  pattern_match: mem.<domain>.intent_gate
+mem.ein.parish.cabinet_gate:
+  id: mem.ein.parish.cabinet_gate
+  tier: parish
+  pattern_match: mem.<domain>.cabinet_gate
+mem.ein.diocese.cabinet_gate:
+  id: mem.ein.diocese.cabinet_gate
+  tier: diocese
+  pattern_match: mem.<domain>.cabinet_gate
+mem.ein.federation.cabinet_gate:
+  id: mem.ein.federation.cabinet_gate
+  tier: federation
+  pattern_match: mem.<domain>.cabinet_gate
+mem.ein.parish.nba:
+  id: mem.ein.parish.nba
+  tier: parish
+  pattern_match: mem.<domain>.nba
+mem.ein.diocese.nba:
+  id: mem.ein.diocese.nba
+  tier: diocese
+  pattern_match: mem.<domain>.nba
+mem.ein.parish.ledger_export:
+  id: mem.ein.parish.ledger_export
+  tier: parish
+  pattern_match: mem.<domain>.ledger_export
+mem.ein.diocese.ledger_export:
+  id: mem.ein.diocese.ledger_export
+  tier: diocese
+  pattern_match: mem.<domain>.ledger_export
+'?': {}
+mem.bps.research: {}
+mem.bps.governance: {}
+mem.bps.analytics: {}

@@ -1,0 +1,82 @@
+{
+  "bundle_version": "1.0",
+  "tier": "declarative",
+  "surface_id": "finance_position",
+  "payload": {
+    "root": {
+      "component": "Stack",
+      "props": { "gap": "md" },
+      "children": [
+        {
+          "component": "EvidencePack",
+          "props": {
+            "title": "Classification reasoning",
+            "summary_template": "{classification.taxonomy} → {classification.gl_account} (confidence {classification.confidence})",
+            "detail_ref_template": "{provenance.decision_ledger_ref}"
+          }
+        },
+        {
+          "component": "DecisionCard",
+          "props": {
+            "title_template": "Invoice {invoice.id}: {classification.gl_account}",
+            "body_template": "Suggested mapping for {invoice.vendor}. Ranked alternatives shown when confidence < 0.85.",
+            "ranked_candidates_template": "{classification.candidates}",
+            "amount_field_template": "{je.amount}",
+            "redact_amount_below_tier": "FINANCE_STAFF",
+            "actions": [
+              { "id": "approve", "label": "Approve", "style": "primary" },
+              { "id": "correct", "label": "Reclassify", "style": "default" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "event_bindings": [
+    {
+      "binding_id": "approve_classification",
+      "trigger_selector": "root.children[1].actions[0]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.classification_approved.v1",
+        "source": "/embark/surfaces/finance_position",
+        "subject": "{provenance.task_id}",
+        "datacontenttype": "application/json",
+        "data_template": { "invoice_id": "{invoice.id}", "gl_account": "{classification.gl_account}", "actor": "{user.id}" }
+      }
+    },
+    {
+      "binding_id": "correct_mapping",
+      "trigger_selector": "root.children[1].actions[1]",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "embark.surface.eime.mapping_corrected.v1",
+        "source": "/embark/surfaces/finance_position",
+        "subject": "{provenance.task_id}",
+        "datacontenttype": "application/json",
+        "data_template": { "invoice_id": "{invoice.id}", "new_gl_account": "{selection.gl_account}", "actor": "{user.id}" }
+      }
+    },
+    {
+      "binding_id": "upload_invoice",
+      "trigger_selector": "surface.upload",
+      "cloudevent": {
+        "specversion": "1.0",
+        "type": "eime.invoice_ingested",
+        "source": "/embark/surfaces/finance_position",
+        "subject": "{upload.file_id}",
+        "datacontenttype": "application/json",
+        "data_template": { "file_id": "{upload.file_id}", "church_id": "{church.id}", "actor": "{user.id}" }
+      }
+    }
+  ],
+  "provenance": {
+    "agent_id": "expense_classifier",
+    "task_id": "{runtime.task_id}",
+    "decision_ledger_ref": "{runtime.ledger_ref}",
+    "abb_ref": null,
+    "membrane_id": "mem.ein.parish.intent_gate",
+    "perturbation_correlation_id": "{runtime.correlation_id}"
+  },
+  "rendering_hints": { "priority": "normal", "dismissible": true, "persist_until": null, "theme_override": null }
+}

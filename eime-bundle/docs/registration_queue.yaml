@@ -1,0 +1,467 @@
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.invoice_ingested
+  fields:
+    name: INVOICE_INGESTED
+    privacy_class: P1
+    crosses_membrane: 'no'
+    retention_days: '30'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'distinct: ingestion into GL-mapping pipeline, not donor invoice receipt'
+  similarity_score: 0.31
+  nearest_existing: invoice.received
+  reason: 'distinct: ingestion into GL-mapping pipeline, not donor invoice receipt'
+  staged_at: '2026-05-31T09:41:15.602284+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.mapping_confidence_low
+  fields:
+    name: MAPPING_CONFIDENCE_LOW
+    privacy_class: P1
+    crosses_membrane: 'no'
+    retention_days: '30'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: GL-mapper confidence signal is module-specific'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: GL-mapper confidence signal is module-specific'
+  staged_at: '2026-05-31T09:41:15.914348+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.budget_overage_risk
+  fields:
+    name: BUDGET_OVERAGE_RISK
+    privacy_class: P1
+    crosses_membrane: 'no'
+    retention_days: '90'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: budget-threshold breach risk on a proposed posting'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: budget-threshold breach risk on a proposed posting'
+  staged_at: '2026-05-31T09:41:16.157777+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.fund_restriction_violation
+  fields:
+    name: FUND_RESTRICTION_VIOLATION
+    privacy_class: P1
+    crosses_membrane: 'no'
+    retention_days: '365'
+    hard_block: 'true'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'near but distinct: hard-block on restricted-fund posting at mapping stage'
+  similarity_score: 0.371
+  nearest_existing: restricted_fund.violation.proposed
+  reason: 'near but distinct: hard-block on restricted-fund posting at mapping stage'
+  staged_at: '2026-05-31T09:41:16.476504+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.journal_entry_ready
+  fields:
+    name: JOURNAL_ENTRY_READY
+    privacy_class: P0
+    crosses_membrane: 'no'
+    retention_days: '365'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: balanced-JE-ready P0 signal with role-gated amounts'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: balanced-JE-ready P0 signal with role-gated amounts'
+  staged_at: '2026-05-31T09:41:16.738222+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.payment_dedup_risk
+  fields:
+    name: PAYMENT_DEDUP_RISK
+    privacy_class: P1
+    crosses_membrane: 'no'
+    retention_days: '180'
+    hard_block: 'true'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: duplicate-payment hard block'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: duplicate-payment hard block'
+  staged_at: '2026-05-31T09:41:16.961772+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.reconciliation_exception
+  fields:
+    name: RECONCILIATION_EXCEPTION
+    privacy_class: P1
+    crosses_membrane: 'yes'
+    retention_days: '180'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'distinct: unresolved recon exception vs a drafted reconciliation'
+  similarity_score: 0.309
+  nearest_existing: reconciliation.drafted
+  reason: 'distinct: unresolved recon exception vs a drafted reconciliation'
+  staged_at: '2026-05-31T09:41:17.172649+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.approval_deadline_pressure
+  fields:
+    name: APPROVAL_DEADLINE_PRESSURE
+    privacy_class: P1
+    crosses_membrane: 'yes'
+    retention_days: '30'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: SLA-deadline pressure on a pending approval'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: SLA-deadline pressure on a pending approval'
+  staged_at: '2026-05-31T09:41:17.408664+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.hitl_escalation
+  fields:
+    name: HITL_ESCALATION
+    privacy_class: P1
+    crosses_membrane: 'yes'
+    retention_days: '180'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'no analogue: generic HITL escalation request'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'no analogue: generic HITL escalation request'
+  staged_at: '2026-05-31T09:41:17.684831+00:00'
+- state: propose_new
+  kind: perturbation
+  proposed_id: eime.policy_violation
+  fields:
+    name: POLICY_VIOLATION
+    privacy_class: P1
+    crosses_membrane: 'yes'
+    retention_days: '365'
+    hard_block: 'false'
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+    maturity: proposed
+  text: 'distinct: general policy-gate firing vs fund-specific violation'
+  similarity_score: 0.187
+  nearest_existing: restricted_fund.violation.proposed
+  reason: 'distinct: general policy-gate firing vs fund-specific violation'
+  staged_at: '2026-05-31T09:41:17.920756+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.accounting_integrity
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Validate GL mappings and account structure; block invalid GL accounts, circular
+    allocations, missing mappings.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: GL-integrity capability is accounting-specific'
+  staged_at: '2026-05-31T09:41:57.081164+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.dignity
+  fields:
+    guider: dignity
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Enforce active financial policies and compliance gates (e.g. PO>10K requires
+    3 quotes).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: policy-gate capability is module-specific'
+  staged_at: '2026-05-31T09:41:57.377413+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.polity_and_deference
+  fields:
+    guider: polity-and-deference
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Check whether the proposing principal has authority for an action; RBAC and
+    approval routing.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: authority/RBAC gate is accounting-specific'
+  staged_at: '2026-05-31T09:41:57.747370+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.abundance_and_stewardship
+  fields:
+    guider: abundance-and-stewardship
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Enforce restricted-fund rules as hard blocks and budget variance limits.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: fund-restriction hard-block capability is new'
+  staged_at: '2026-05-31T09:41:58.254696+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.witness_and_provenance
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Block high-risk actions lacking explanation; record provenance (who/when/what);
+    redaction.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: provenance/redaction capability is module-specific'
+  staged_at: '2026-05-31T09:41:58.550471+00:00'
+- state: propose_new
+  kind: guider_capability
+  proposed_id: eime.guider.payment_dedup
+  fields:
+    guider: payment-dedup
+    module_id: eime
+    domain: ein.parish.financial_intelligence
+  text: Detect duplicate payments; hard-block exact duplicates within a window; escalate
+    near-duplicates.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: 'none in store: payment-dedup capability is new'
+  staged_at: '2026-05-31T09:41:58.808214+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.test.circular
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: Circular allocation detected.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: test
+  staged_at: '2026-05-31T09:43:14.638180+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.invalid_gl_account_account
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: 'Invalid GL account: {account}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:51.993094+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.low_gl_mapping_confidence_conf_threshold
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: Low GL mapping confidence ({conf} < {threshold}).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:52.216168+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.accounting_integrity.gl_accounts_valid_mapping_confidence_acc
+  fields:
+    guider: accounting-integrity
+    module_id: eime
+  text: GL accounts valid; mapping confidence acceptable.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:52.459707+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.exact_duplicate_payment_detected_same_ve
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Exact duplicate payment detected (same vendor+amount+date).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:52.687692+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.perturbation_flagged_as_payment_dedup_ri
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Perturbation flagged as PAYMENT_DEDUP_RISK (hard block).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:52.912930+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.probable_duplicate_flagged_by_upstream_d
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: Probable duplicate flagged by upstream detector.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:53.138605+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.payment_dedup.no_duplicate_signals_detected
+  fields:
+    guider: payment-dedup
+    module_id: eime
+  text: No duplicate signals detected.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:53.365898+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_violation_policy_id
+  fields:
+    guider: dignity
+    module_id: eime
+  text: 'Policy violation: {policy_id}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:53.595438+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_policy_id_violated_reason
+  fields:
+    guider: dignity
+    module_id: eime
+  text: 'Policy {policy_id} violated: {reason}.'
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:53.864210+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_policy_id_violated_exception_appr
+  fields:
+    guider: dignity
+    module_id: eime
+  text: Policy {policy_id} violated; exception approved — re-confirm.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:54.155706+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.policy_exception_previously_approved_con
+  fields:
+    guider: dignity
+    module_id: eime
+  text: Policy exception previously approved — confirm before posting.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:54.412108+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.dignity.no_active_policy_violations
+  fields:
+    guider: dignity
+    module_id: eime
+  text: No active policy violations.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:54.651109+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.polity_and_deference.no_principal_roles_supplied_cannot_autho
+  fields:
+    guider: polity-and-deference
+    module_id: eime
+  text: No principal_roles supplied; cannot authorize action.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:54.924368+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.polity_and_deference.principal_authority_cap_cap_covers_amoun
+  fields:
+    guider: polity-and-deference
+    module_id: eime
+  text: Principal authority cap ({cap}) covers amount ({amount}).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:55.188800+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.abundance_and_stewardship.perturbation_flagged_fund_restriction_vi
+  fields:
+    guider: abundance-and-stewardship
+    module_id: eime
+  text: Perturbation flagged FUND_RESTRICTION_VIOLATION (HARD BLOCK).
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:55.457615+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.abundance_and_stewardship.no_fund_restriction_or_budget_threshold_
+  fields:
+    guider: abundance-and-stewardship
+    module_id: eime
+  text: No fund restriction or budget threshold breached.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:55.699904+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.no_principal_recorded_provenance_incompl
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: No principal recorded — provenance incomplete.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:55.941514+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.high_risk_risk_but_explanation_supplied_
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: High risk ({risk}) but explanation supplied — escalate for witness review.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:56.182230+00:00'
+- state: propose_new
+  kind: guider_message
+  proposed_id: eime.msg.witness_and_provenance.provenance_recorded_risk_within_toleranc
+  fields:
+    guider: witness-and-provenance
+    module_id: eime
+  text: Provenance recorded; risk within tolerance.
+  similarity_score: 0.0
+  nearest_existing: null
+  reason: module-specific accounting verdict text
+  staged_at: '2026-05-31T09:43:56.429528+00:00'

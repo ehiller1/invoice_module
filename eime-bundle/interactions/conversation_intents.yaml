@@ -1,0 +1,39 @@
+# EIME bundle — conversational intent surface
+# Mirrors events/intent_registry.yaml but adds conversational UX hints.
+
+schema_version: 1.0
+module_id: eime
+
+conversational_modes:
+  clarification:
+    when: intent_classifier.top1_confidence < 0.70 OR top1_vs_top2_spread < 0.10
+    prompt_style: single_question
+    examples:
+      - "Are you asking about this invoice's GL account, or its expense taxonomy?"
+      - "Do you mean the draft journal entry or one already posted?"
+
+  evidence_on_demand:
+    when: user asks "why" or "show your work"
+    response: surface evidence_chain from the most recent DecisionCard / EvidenceCard
+
+  hard_block_explanation:
+    when: user asks to override a FUND_RESTRICTION_VIOLATION or PAYMENT_DEDUP_RISK block
+    response: |
+      I can't override that — it's a hard block. {block_reason} Restricted-fund violations and probable duplicate payments are never overridable. I can route it to {compliance_or_recon} for review of the underlying facts; want me to do that?
+    emits: null
+
+  posting_authority_redirect:
+    when: a sub-TREASURER_ADMIN user asks to post a journal entry
+    response: |
+      Posting a journal entry requires TREASURER_ADMIN authority. I can stage it and escalate it through the approval chain for you — want me to start that?
+    emits: eime.hitl_escalation
+
+  amount_redaction_notice:
+    when: a sub-FINANCE_STAFF user requests journal entry amounts
+    response: |
+      Journal entry amounts are visible to finance staff and above. I can show you the classification and status without the amounts.
+
+  recommendation_impact_framing:
+    when: surfacing a next-best-action recommendation
+    response: |
+      Here's what I'd suggest: {recommended_action}. If you take it, the projected effect is {impact_preview}. Want me to draft it?
