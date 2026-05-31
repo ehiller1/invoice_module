@@ -1,0 +1,40 @@
+# EIME bundle — component catalog subset
+# The agent-output-display catalog components actually referenced by EIME
+# emission templates. The full catalog is owned by the agent-output-display
+# skill; this is the shipped subset the front-end team must support for EIME.
+
+schema_version: 1.0
+module_id: eime
+
+components_used:
+  Stack:
+    tier: declarative
+    role: layout primitive (vertical composition, gap prop)
+    surfaces: [finance_position, treasurer_dashboard, approvals_hitl, reconciliation, cabinet]
+  DecisionCard:
+    tier: declarative
+    role: approval/decision surface with action buttons; supports amount redaction by tier
+    surfaces: [finance_position, treasurer_dashboard, approvals_hitl, reconciliation]
+  ApprovalCard:
+    tier: declarative
+    role: approval/sign-off surface; used here (with catalog gap) for non-overridable hard-block modals
+    surfaces: [treasurer_dashboard, reconciliation]
+  EvidencePack:
+    tier: declarative
+    role: reasoning chain / evidence summary with drill-down ref
+    surfaces: [finance_position, treasurer_dashboard, cabinet]
+  TaskCard:
+    tier: declarative
+    role: actionable task with SLA + priority
+    surfaces: [approvals_hitl]
+  ActionCard:
+    tier: declarative
+    role: next-best-action recommendation; used (with catalog gap) for impact preview
+    surfaces: [cabinet]
+
+tier_per_surface:
+  finance_position: declarative
+  treasurer_dashboard: declarative
+  approvals_hitl: declarative
+  reconciliation: declarative
+  cabinet: declarative

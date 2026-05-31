@@ -1,0 +1,32 @@
+# EIME bundle — catalog gaps
+# Components the design wanted but the agent-output-display catalog does not
+# provide. Each falls through to a declarative composition (no new component
+# names invented). Flagged for front-end catalog evolution.
+
+schema_version: 1.0
+module_id: eime
+
+gaps:
+  - surface_id: treasurer_dashboard
+    needed_component: HardBlockModal
+    proposed_tier_fallback: declarative
+    fallback_used: ApprovalCard (blocking=true, overridable=false, explain-only action)
+    description: Non-dismissible blocking modal with an explain-only action and no override path, for FUND_RESTRICTION_VIOLATION and PAYMENT_DEDUP_RISK hard blocks.
+
+  - surface_id: reconciliation
+    needed_component: HardBlockModal
+    proposed_tier_fallback: declarative
+    fallback_used: ApprovalCard (blocking=true, overridable=false, explain-only action)
+    description: Same non-overridable blocking modal, for PAYMENT_DEDUP_RISK during dedup review.
+
+  - surface_id: treasurer_dashboard
+    needed_component: BudgetOverageBanner
+    proposed_tier_fallback: declarative
+    fallback_used: EvidencePack (notice summary)
+    description: Inline non-blocking banner for BUDGET_OVERAGE_RISK with threshold gauge.
+
+  - surface_id: cabinet
+    needed_component: ImpactPreviewPanel
+    proposed_tier_fallback: declarative
+    fallback_used: ActionCard (impact_preview_template in body)
+    description: Scenario/impact panel showing projected before/after deltas for a next-best-action recommendation.
